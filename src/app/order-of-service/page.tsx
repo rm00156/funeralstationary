@@ -7,7 +7,16 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import HowItWorks from "@/components/HowItWorks";
 import OrderOfServiceConfigurator from "@/components/OrderOfServiceConfigurator";
-import { formatPrice, getQuote } from "@/lib/orderOfServicePricing";
+import {
+  defaultSelection,
+  formatPence,
+  getQuote,
+} from "@/lib/orderOfServicePricing";
+import { getPricingData } from "@/lib/pricing.server";
+
+// Pricing lives in MySQL and is editable from /admin, so this page must
+// render per-request rather than being frozen at build time.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Order of Service Booklets | The Funeral Stationery",
@@ -58,16 +67,14 @@ const SPECS = [
   ["Minimum order", "15 copies"],
 ];
 
-const STARTING_QUOTE = getQuote({
-  quantity: "15",
-  size: "a5",
-  colour: "mono",
-  pages: "4",
-  paper: "silk",
-  delivery: "standard",
-});
+export default async function OrderOfServicePage() {
+  const pricing = await getPricingData("order-of-service");
+  // The cheapest configuration: first option on every axis, mono colour.
+  const startingQuote = getQuote(pricing, {
+    ...defaultSelection(pricing),
+    colour: "mono",
+  });
 
-export default function OrderOfServicePage() {
   return (
     <>
       <Header />
@@ -91,7 +98,7 @@ export default function OrderOfServicePage() {
             <p className="font-body text-lg text-on-surface-variant mb-6">
               From{" "}
               <span className="font-semibold text-secondary">
-                {formatPrice(STARTING_QUOTE.total)}
+                {formatPence(startingQuote.totalPence)}
               </span>{" "}
               for 15 copies
             </p>
@@ -126,7 +133,7 @@ export default function OrderOfServicePage() {
               </div>
 
               <div className="order-1 lg:order-2 lg:-mt-[69px]">
-                <OrderOfServiceConfigurator />
+                <OrderOfServiceConfigurator pricing={pricing} />
               </div>
             </div>
           </div>

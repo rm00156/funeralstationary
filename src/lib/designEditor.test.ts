@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  instantiateLayout,
   makeBlankPage,
   makeStarterDoc,
   templateAccent,
@@ -20,6 +21,12 @@ function makeTemplate(categories: string[]): Template {
 describe("templateAccent", () => {
   it("returns the accent for the template's first matching category", () => {
     expect(templateAccent(makeTemplate(["floral"]))).toBe("#6b2d6a");
+  });
+
+  it("prefers the DB-loaded accent over the static category map", () => {
+    expect(templateAccent({ ...makeTemplate(["floral"]), accent: "#123456" })).toBe(
+      "#123456",
+    );
   });
 
   it("falls back to the default ink colour for an unknown category", () => {
@@ -43,6 +50,33 @@ describe("makeStarterDoc", () => {
   it("fills any pages between the cover and back page as blank", () => {
     const doc = makeStarterDoc(makeTemplate(["classic"]), 4);
     expect(doc.pages[2].elements).toHaveLength(0);
+  });
+});
+
+describe("instantiateLayout", () => {
+  const layout = makeStarterDoc(makeTemplate(["classic"]), 3).pages;
+
+  it("deep-clones the layout with fresh page and element ids", () => {
+    const doc = instantiateLayout("my-template", layout, 3);
+    expect(doc.templateId).toBe("my-template");
+    expect(doc.pages).toHaveLength(3);
+    for (const [index, page] of doc.pages.entries()) {
+      expect(page.id).not.toBe(layout[index].id);
+      expect(page.elements).toHaveLength(layout[index].elements.length);
+      for (const [elementIndex, element] of page.elements.entries()) {
+        expect(element.id).not.toBe(layout[index].elements[elementIndex].id);
+      }
+    }
+    // Mutating the instance must never write through to the source layout.
+    doc.pages[0].elements.pop();
+    expect(layout[0].elements.length).toBeGreaterThan(doc.pages[0].elements.length);
+  });
+
+  it("reconciles to the requested page count", () => {
+    expect(instantiateLayout("t", layout, 2).pages).toHaveLength(2);
+    const grown = instantiateLayout("t", layout, 5);
+    expect(grown.pages).toHaveLength(5);
+    expect(grown.pages[4].elements).toHaveLength(0);
   });
 });
 

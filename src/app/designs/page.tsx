@@ -7,7 +7,6 @@ import Footer from "@/components/Footer";
 import SavedDesignList from "@/components/SavedDesignList";
 import { listDesigns } from "@/lib/designs.server";
 import { readOwner } from "@/lib/session";
-import { PRODUCTS, TEMPLATES } from "@/lib/templates";
 
 export const metadata: Metadata = {
   title: "My Designs | The Funeral Stationery",
@@ -24,12 +23,8 @@ export default async function DesignsPage() {
     name: design.name,
     pageCount: design.pageCount,
     updatedAt: design.updatedAt.toISOString(),
-    templateName:
-      TEMPLATES.find((template) => template.id === design.templateId)?.name ??
-      design.templateId,
-    productLabel:
-      PRODUCTS.find((product) => product.id === design.productId)?.label ??
-      design.productId,
+    templateName: design.templateName,
+    productLabel: design.productLabel,
   }));
 
   return (

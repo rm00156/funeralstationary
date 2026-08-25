@@ -6,6 +6,11 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import HowItWorks from "@/components/HowItWorks";
 import TemplateBrowser from "@/components/TemplateBrowser";
+import { getCategories, getProducts, getTemplates } from "@/lib/catalogue.server";
+
+// The catalogue lives in MySQL and is editable from /admin, so this page
+// must render per-request rather than being frozen at build time.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Funeral Stationery Templates | The Funeral Stationery",
@@ -13,7 +18,13 @@ export const metadata: Metadata = {
     "Browse our funeral order of service templates and personalise the wording, photographs, colours and pages. Design it yourself, or send us your content and we will put every page together for you.",
 };
 
-export default function TemplatesPage() {
+export default async function TemplatesPage() {
+  const [products, categories, templates] = await Promise.all([
+    getProducts(),
+    getCategories(),
+    getTemplates(),
+  ]);
+
   return (
     <>
       <Header />
@@ -64,7 +75,11 @@ export default function TemplatesPage() {
             </div>
 
             <div className="mt-12 md:mt-16">
-              <TemplateBrowser />
+              <TemplateBrowser
+                products={products}
+                categories={categories}
+                templates={templates}
+              />
             </div>
           </div>
         </section>

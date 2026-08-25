@@ -14,7 +14,6 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { designs, pageCountOptions, paperOptions, products, templates } from "@/db/schema";
 import type { DesignDoc } from "@/lib/designEditor";
-import { PAGE_OPTIONS, PAPER_OPTIONS } from "@/lib/orderOfServicePricing";
 import type { Owner } from "@/lib/session";
 
 /** Max pages a doc may carry — mirrors the proof route's MAX_PAGES. */
@@ -29,7 +28,9 @@ export interface SavedDesign {
   id: string;
   name: string;
   templateId: string;
+  templateName: string;
   productId: string;
+  productLabel: string;
   doc: DesignDoc;
   pagesOptionId: string;
   paperId: string;
@@ -53,12 +54,14 @@ function isLiveDesign() {
  *
  * The page-count invariant matters: setPageCount() in the editor calls
  * withPageCount(), so doc.pages.length must always equal the chosen page
- * option's `pages`. MySQL CHECK constraints can't reach another table, so
- * this is the enforcement point.
+ * option's `pages` (the caller resolves the option row via
+ * getPageCountOption and passes its pageCount). MySQL CHECK constraints
+ * can't reach another table, so this is the enforcement point. Option
+ * existence itself is enforced by the DB resolvers in this module.
  */
 export function validateDesignPayload(
   doc: unknown,
-  spec: DesignSpec,
+  expectedPages: number,
 ): { ok: true; doc: DesignDoc } | { ok: false; error: string } {
   if (!doc || typeof doc !== "object") return { ok: false, error: "doc is required" };
   const candidate = doc as DesignDoc;
@@ -77,16 +80,11 @@ export function validateDesignPayload(
     }
   }
 
-  const pageOption = PAGE_OPTIONS.find((option) => option.id === spec.pagesOptionId);
-  if (!pageOption) return { ok: false, error: "Unknown page count option" };
-  if (pageOption.pages !== candidate.pages.length) {
+  if (candidate.pages.length !== expectedPages) {
     return {
       ok: false,
-      error: `doc.pages has ${candidate.pages.length} pages but the "${pageOption.label}" option expects ${pageOption.pages}`,
+      error: `doc.pages has ${candidate.pages.length} pages but the chosen page option expects ${expectedPages}`,
     };
-  }
-  if (!PAPER_OPTIONS.some((option) => option.id === spec.paperId)) {
-    return { ok: false, error: "Unknown paper option" };
   }
 
   return { ok: true, doc: candidate };
@@ -101,7 +99,9 @@ function savedDesignSelection() {
     pageCount: designs.pageCount,
     updatedAt: designs.updatedAt,
     templateSlug: templates.slug,
+    templateName: templates.name,
     productSlug: products.slug,
+    productLabel: products.label,
     pageCountSlug: pageCountOptions.slug,
     paperSlug: paperOptions.slug,
   };
@@ -114,7 +114,9 @@ type SelectedRow = {
   pageCount: number;
   updatedAt: Date;
   templateSlug: string;
+  templateName: string;
   productSlug: string;
+  productLabel: string;
   pageCountSlug: string;
   paperSlug: string;
 };
@@ -124,7 +126,9 @@ function toSavedDesign(row: SelectedRow): SavedDesign {
     id: row.id,
     name: row.name,
     templateId: row.templateSlug,
+    templateName: row.templateName,
     productId: row.productSlug,
+    productLabel: row.productLabel,
     doc: row.doc,
     pagesOptionId: row.pageCountSlug,
     paperId: row.paperSlug,

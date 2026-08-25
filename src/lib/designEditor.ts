@@ -143,6 +143,9 @@ export const CATEGORY_ACCENTS: Record<string, string> = {
 };
 
 export function templateAccent(template: Template): string {
+  // DB-loaded templates carry their first category's accent_hex directly;
+  // the static map remains as the fallback for fixtures and seed data.
+  if (template.accent) return template.accent;
   for (const category of template.categories) {
     const accent = CATEGORY_ACCENTS[category];
     if (accent) return accent;
@@ -335,6 +338,26 @@ export function makeStarterDoc(template: Template, pageCount: number): DesignDoc
     }
   }
   return { templateId: template.id, pages };
+}
+
+/**
+ * Turn an admin-authored template layout (templates.layout) into a fresh
+ * document. Every page and element gets a new id — two designs instantiated
+ * from the same template must never share ids — and the page count is
+ * reconciled to the requested length.
+ */
+export function instantiateLayout(
+  templateId: string,
+  layout: DesignPage[],
+  pageCount: number,
+): DesignDoc {
+  const pages: DesignPage[] = layout.map((page) => ({
+    id: uid("page"),
+    elements: page.elements.map(
+      (element) => ({ ...structuredClone(element), id: uid(element.type) }) as CanvasElement,
+    ),
+  }));
+  return withPageCount({ templateId, pages }, pageCount);
 }
 
 /** Grow or shrink a document to the requested page count. */

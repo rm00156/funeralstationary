@@ -6,20 +6,28 @@ import { useMemo, useState } from "react";
 import { ChevronDown, Heart } from "lucide-react";
 
 import {
-  CATEGORIES,
-  DEFAULT_PRODUCT,
-  PRODUCTS,
   filterTemplates,
+  type Product,
+  type Template,
+  type TemplateCategory,
 } from "@/lib/templates";
 
-export default function TemplateBrowser() {
-  const [productId, setProductId] = useState(DEFAULT_PRODUCT);
+export default function TemplateBrowser({
+  products,
+  categories,
+  templates: allTemplates,
+}: {
+  products: Product[];
+  categories: TemplateCategory[];
+  templates: Template[];
+}) {
+  const [productId, setProductId] = useState(products[0]?.id ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [favourites, setFavourites] = useState<string[]>([]);
 
   const templates = useMemo(
-    () => filterTemplates(productId, categoryId),
-    [productId, categoryId],
+    () => filterTemplates(allTemplates, productId, categoryId),
+    [allTemplates, productId, categoryId],
   );
 
   const toggleFavourite = (id: string) =>
@@ -45,7 +53,7 @@ export default function TemplateBrowser() {
             onChange={(event) => setProductId(event.target.value)}
             className="w-full appearance-none rounded-lg bg-surface-container-low px-4 py-3 pr-10 font-body text-sm font-medium text-primary border border-outline-variant transition-colors duration-300 hover:bg-surface-container focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15"
           >
-            {PRODUCTS.map((product) => (
+            {products.map((product) => (
               <option key={product.id} value={product.id}>
                 {product.label}
               </option>
@@ -67,7 +75,7 @@ export default function TemplateBrowser() {
             selected={categoryId === null}
             onClick={() => setCategoryId(null)}
           />
-          {CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <CategoryLink
               key={category.id}
               label={category.label}
