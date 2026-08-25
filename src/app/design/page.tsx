@@ -22,16 +22,19 @@ export default async function DesignPage({
     design: designParam,
   } = await searchParams;
 
-  // Reopening a saved design: its own template/product win over the query
-  // string, so a shared link always renders what was actually saved.
+  // ?design=<id> is the canonical address for an existing design and is
+  // authoritative on its own: the row owns its template and product, and both
+  // can change from inside the editor. ?template=/?product= only seed a *new*
+  // design (the link /templates builds); the editor strips them from the URL
+  // as soon as a design id exists.
   const owner = designParam ? await readOwner() : null;
   const saved = owner && designParam ? await getDesign(owner, designParam) : null;
 
   const template =
-    TEMPLATES.find((item) => item.id === (saved?.templateId ?? templateParam)) ??
+    TEMPLATES.find((item) => item.id === (saved ? saved.templateId : templateParam)) ??
     TEMPLATES[0];
   const product =
-    PRODUCTS.find((item) => item.id === (saved?.productId ?? productParam)) ??
+    PRODUCTS.find((item) => item.id === (saved ? saved.productId : productParam)) ??
     PRODUCTS.find((item) => item.id === DEFAULT_PRODUCT)!;
 
   return (

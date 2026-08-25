@@ -33,10 +33,10 @@ export const designs = mysqlTable(
     userId: char("user_id", { length: 36 }).references(() => users.id, { onDelete: "cascade" }),
     /** Set while a design has no owner yet; claimed (cleared) on registration. */
     guestToken: char("guest_token", { length: 36 }),
-    templateId: varchar("template_id", { length: 64 })
+    templateId: int("template_id")
       .notNull()
       .references(() => templates.id, { onDelete: "restrict" }),
-    productId: varchar("product_id", { length: 64 })
+    productId: int("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "restrict" }),
     name: varchar("name", { length: 200 }).notNull().default("Untitled design"),
@@ -52,12 +52,18 @@ export const designs = mysqlTable(
     pageCount: smallint("page_count")
       .notNull()
       .generatedAlwaysAs(sql`json_length(\`doc\`, '$.pages')`, { mode: "stored" }),
-    quantityOptionId: varchar("quantity_option_id", { length: 64 }),
-    sizeOptionId: varchar("size_option_id", { length: 64 }),
-    colourOptionId: varchar("colour_option_id", { length: 64 }),
-    pageCountOptionId: varchar("page_count_option_id", { length: 64 }).notNull().default("4"),
-    paperOptionId: varchar("paper_option_id", { length: 64 }).notNull().default("silk"),
-    deliveryOptionId: varchar("delivery_option_id", { length: 64 }),
+    quantityOptionId: int("quantity_option_id"),
+    sizeOptionId: int("size_option_id"),
+    colourOptionId: int("colour_option_id"),
+    /**
+     * Required, but with no DB-level default: a literal default can't safely
+     * hardcode a surrogate id (it depends on seed insertion order), so
+     * createDesign() in designs.server.ts resolves the "4 page"/"silk" slugs
+     * to this product's option ids and supplies them explicitly on insert.
+     */
+    pageCountOptionId: int("page_count_option_id").notNull(),
+    paperOptionId: int("paper_option_id").notNull(),
+    deliveryOptionId: int("delivery_option_id"),
     thumbnailUrl: varchar("thumbnail_url", { length: 1024 }),
     lastOpenedAt: timestamp("last_opened_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

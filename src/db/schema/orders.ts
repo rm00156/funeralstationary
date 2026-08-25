@@ -23,6 +23,12 @@ import { users } from "./users";
  * columns below deliberately carry no FK into the catalogue, so a later
  * change to a rate or the removal of a paper stock can never rewrite
  * history. (Contrast with designs.*, which FKs live into the catalogue.)
+ *
+ * They stay `varchar` slugs, not the catalogue's surrogate int ids, on
+ * purpose: a surrogate id is meaningless once its row is gone, whereas
+ * "silk"/"order-of-service" stays a readable historical record even then.
+ * Don't "fix" these to int to match catalogue.ts/pricing.ts — that would
+ * defeat the point of a snapshot.
  */
 
 export const orderStatusValues = [

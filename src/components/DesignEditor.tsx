@@ -211,8 +211,16 @@ export default function DesignEditor({
   const [paperId, setPaperId] = useState(savedDesign?.paperId ?? "silk");
   const [uploads, setUploads] = useState<string[]>([]);
   const [designId, setDesignId] = useState<string | null>(savedDesign?.id ?? null);
+  /**
+   * The template currently applied to the cover. Seeded from the `template`
+   * prop (which the server already resolves from a saved design's own
+   * templateId), then kept in sync by applyTemplate — the prop itself never
+   * changes, so anything that read it directly would go stale the moment a
+   * different template was picked.
+   */
+  const [activeTemplate, setActiveTemplate] = useState<Template>(template);
   // Renaming happens on /designs; a new design just takes the template's name.
-  const designName = savedDesign?.name ?? template.name;
+  const [designName, setDesignName] = useState(savedDesign?.name ?? template.name);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [toast, setToast] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
@@ -247,7 +255,13 @@ export default function DesignEditor({
     async (options: { silent?: boolean } = {}) => {
       setSaveState("saving");
       try {
-        const payload = { doc, pagesOptionId, paperId, name: designName };
+        const payload = {
+          doc,
+          pagesOptionId,
+          paperId,
+          name: designName,
+          templateId: activeTemplate.id,
+        };
         const response = designId
           ? await fetch(`/api/designs/${designId}`, {
               method: "PATCH",
@@ -257,22 +271,13 @@ export default function DesignEditor({
           : await fetch("/api/designs", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ...payload,
-                templateId: template.id,
-                productId,
-              }),
+              body: JSON.stringify({ ...payload, productId }),
             });
 
         if (!response.ok) throw new Error(await response.text());
         const saved = (await response.json()) as { id: string };
 
-        if (!designId) {
-          setDesignId(saved.id);
-          const url = new URL(window.location.href);
-          url.searchParams.set("design", saved.id);
-          window.history.replaceState(null, "", url);
-        }
+        if (!designId) setDesignId(saved.id);
         setSaveState("saved");
         if (!options.silent) flash("Design saved to your account");
       } catch {
@@ -280,12 +285,32 @@ export default function DesignEditor({
         if (!options.silent) flash("Could not save — please try again");
       }
     },
-    [doc, pagesOptionId, paperId, designName, designId, template.id, productId, flash],
+    [doc, pagesOptionId, paperId, designName, designId, activeTemplate.id, productId, flash],
   );
 
   const saveDesign = () => {
     void persist();
   };
+
+  /**
+   * Once a design exists, its id is the whole address — the row owns its own
+   * template and product, and both can change from inside the editor. A
+   * lingering ?template=/?product= would start lying the moment a different
+   * template was applied, so they're dropped here (they only ever seed a new
+   * design, from /templates).
+   */
+  useEffect(() => {
+    if (!designId) return;
+    const url = new URL(window.location.href);
+    const alreadyClean =
+      url.searchParams.get("design") === designId &&
+      !url.searchParams.has("template") &&
+      !url.searchParams.has("product");
+    if (alreadyClean) return;
+    url.search = "";
+    url.searchParams.set("design", designId);
+    window.history.replaceState(null, "", url);
+  }, [designId]);
 
   /** Debounced autosave — the "saves automatically as you go" promise. */
   const firstRender = useRef(true);
@@ -593,7 +618,17 @@ export default function DesignEditor({
 
   const applyTemplate = (next: Template) => {
     const starter = makeStarterDoc(next, doc.pages.length);
-    commit(withElements(doc, 0, starter.pages[0].elements));
+    // templateId has to move with the cover: it's what gets persisted to
+    // designs.template_id, so leaving it behind would save the design under
+    // whichever template happened to be open first.
+    commit({
+      ...withElements(doc, 0, starter.pages[0].elements),
+      templateId: next.id,
+    });
+    setActiveTemplate(next);
+    // Follow the template name only while it's still the auto-derived one —
+    // a name the user set themselves on /designs is left alone.
+    setDesignName((current) => (current === activeTemplate.name ? next.name : current));
     setPageIndex(0);
     setSelectedId(null);
     flash(`Applied “${next.name}” to your cover`);
@@ -644,7 +679,7 @@ export default function DesignEditor({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${template.id}-proof.pdf`;
+      link.download = `${activeTemplate.id}-proof.pdf`;
       link.click();
       URL.revokeObjectURL(url);
       setProofState("idle");
@@ -1044,8 +1079,9 @@ export default function DesignEditor({
                     key={item.id}
                     type="button"
                     onClick={() => applyTemplate(item)}
+                    aria-current={item.id === activeTemplate.id}
                     className={`overflow-hidden rounded-lg border text-left transition-colors ${
-                      item.id === template.id
+                      item.id === activeTemplate.id
                         ? "border-secondary"
                         : "border-outline-variant/40 hover:border-primary-container"
                     }`}
@@ -1120,7 +1156,7 @@ export default function DesignEditor({
                         id: uid("clipart"),
                         type: "clipart",
                         icon: id,
-                        color: templateAccent(template),
+                        color: templateAccent(activeTemplate),
                         x: 42,
                         y: 42,
                         w: 16,

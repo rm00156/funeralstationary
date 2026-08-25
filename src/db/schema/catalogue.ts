@@ -1,6 +1,6 @@
 import {
   boolean,
-  char,
+  int,
   json,
   mysqlEnum,
   mysqlTable,
@@ -8,26 +8,31 @@ import {
   smallint,
   timestamp,
   varchar,
+  char,
 } from "drizzle-orm/mysql-core";
 import type { DesignPage } from "@/lib/designEditor";
 
 /**
- * Catalogue tables are keyed by the same human-readable slugs already used
- * throughout the app (`order-of-service`, `floral`, `gentle-farewell`, ...) —
- * see src/lib/templates.ts. URLs and `DesignDoc.templateId` already carry
- * these slugs, so seeding is a direct transcription with no id-translation
- * layer required.
+ * Catalogue tables use surrogate int PKs (small, fast to join, and these
+ * rows are only ever created by our own seed script — never by an untrusted
+ * client, unlike users/designs/orders where a UUID makes sense). Each table
+ * also carries a `slug` — the same human-readable id already used throughout
+ * the app (`order-of-service`, `floral`, `gentle-farewell`, in URLs and
+ * src/lib/templates.ts) — as a unique column, not the PK, so business
+ * identifiers stay stable and readable without doubling as the join key.
  */
 
 export const products = mysqlTable("products", {
-  id: varchar("id", { length: 64 }).primaryKey(),
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 64 }).notNull().unique(),
   label: varchar("label", { length: 200 }).notNull(),
   sortOrder: smallint("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
 });
 
 export const templateCategories = mysqlTable("template_categories", {
-  id: varchar("id", { length: 64 }).primaryKey(),
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 64 }).notNull().unique(),
   label: varchar("label", { length: 200 }).notNull(),
   /** Accent colour a template's starter layout uses when this is its first category. */
   accentHex: char("accent_hex", { length: 7 }).notNull(),
@@ -38,8 +43,17 @@ export const templateCategories = mysqlTable("template_categories", {
 export const templateStatusValues = ["draft", "published", "archived"] as const;
 
 export const templates = mysqlTable("templates", {
-  id: varchar("id", { length: 64 }).primaryKey(),
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 64 }).notNull().unique(),
   name: varchar("name", { length: 200 }).notNull(),
+  /**
+   * A template's starter content (cover / running order / back page, via
+   * makeStarterDoc) is specific to one product's format, so this is a plain
+   * FK — a template belongs to exactly one product, not many.
+   */
+  productId: int("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "restrict" }),
   previewImageUrl: varchar("preview_image_url", { length: 1024 }).notNull(),
   /**
    * Real per-template starter content. Null means "no layout authored yet" —
@@ -56,10 +70,10 @@ export const templates = mysqlTable("templates", {
 export const templateCategoryLinks = mysqlTable(
   "template_category_links",
   {
-    templateId: varchar("template_id", { length: 64 })
+    templateId: int("template_id")
       .notNull()
       .references(() => templates.id, { onDelete: "cascade" }),
-    categoryId: varchar("category_id", { length: 64 })
+    categoryId: int("category_id")
       .notNull()
       .references(() => templateCategories.id, { onDelete: "restrict" }),
     /**
@@ -70,17 +84,4 @@ export const templateCategoryLinks = mysqlTable(
     position: smallint("position").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.templateId, t.categoryId] })],
-);
-
-export const templateProductLinks = mysqlTable(
-  "template_product_links",
-  {
-    templateId: varchar("template_id", { length: 64 })
-      .notNull()
-      .references(() => templates.id, { onDelete: "cascade" }),
-    productId: varchar("product_id", { length: 64 })
-      .notNull()
-      .references(() => products.id, { onDelete: "restrict" }),
-  },
-  (t) => [primaryKey({ columns: [t.templateId, t.productId] })],
 );

@@ -3,10 +3,16 @@
  *
  * Every query is scoped by owner — a design is only ever reachable by the
  * visitor who owns it. Soft-deleted rows (deleted_at) are excluded everywhere.
+ *
+ * The catalogue (templates/products/pricing options) uses surrogate int PKs,
+ * but the rest of the app is entirely slug-based — URLs, src/lib/templates.ts,
+ * the Selection type in orderOfServicePricing.ts. This module is the seam:
+ * every write resolves an incoming slug to its surrogate id, and every read
+ * joins back out to slugs, so nothing outside src/db ever sees a surrogate id.
  */
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { designs } from "@/db/schema";
+import { designs, pageCountOptions, paperOptions, products, templates } from "@/db/schema";
 import type { DesignDoc } from "@/lib/designEditor";
 import { PAGE_OPTIONS, PAPER_OPTIONS } from "@/lib/orderOfServicePricing";
 import type { Owner } from "@/lib/session";
@@ -86,22 +92,108 @@ export function validateDesignPayload(
   return { ok: true, doc: candidate };
 }
 
+/** The joined shape every read maps into a slug-based SavedDesign. */
+function savedDesignSelection() {
+  return {
+    id: designs.id,
+    name: designs.name,
+    doc: designs.doc,
+    pageCount: designs.pageCount,
+    updatedAt: designs.updatedAt,
+    templateSlug: templates.slug,
+    productSlug: products.slug,
+    pageCountSlug: pageCountOptions.slug,
+    paperSlug: paperOptions.slug,
+  };
+}
+
+type SelectedRow = {
+  id: string;
+  name: string;
+  doc: DesignDoc;
+  pageCount: number;
+  updatedAt: Date;
+  templateSlug: string;
+  productSlug: string;
+  pageCountSlug: string;
+  paperSlug: string;
+};
+
+function toSavedDesign(row: SelectedRow): SavedDesign {
+  return {
+    id: row.id,
+    name: row.name,
+    templateId: row.templateSlug,
+    productId: row.productSlug,
+    doc: row.doc,
+    pagesOptionId: row.pageCountSlug,
+    paperId: row.paperSlug,
+    pageCount: row.pageCount,
+    updatedAt: row.updatedAt,
+  };
+}
+
 export async function listDesigns(owner: Owner): Promise<SavedDesign[]> {
   const rows = await db
-    .select()
+    .select(savedDesignSelection())
     .from(designs)
+    .innerJoin(templates, eq(designs.templateId, templates.id))
+    .innerJoin(products, eq(designs.productId, products.id))
+    .innerJoin(pageCountOptions, eq(designs.pageCountOptionId, pageCountOptions.id))
+    .innerJoin(paperOptions, eq(designs.paperOptionId, paperOptions.id))
     .where(and(ownedBy(owner), isLiveDesign()))
     .orderBy(desc(designs.updatedAt));
   return rows.map(toSavedDesign);
 }
 
 export async function getDesign(owner: Owner, id: string): Promise<SavedDesign | null> {
+  const rows = await db
+    .select(savedDesignSelection())
+    .from(designs)
+    .innerJoin(templates, eq(designs.templateId, templates.id))
+    .innerJoin(products, eq(designs.productId, products.id))
+    .innerJoin(pageCountOptions, eq(designs.pageCountOptionId, pageCountOptions.id))
+    .innerJoin(paperOptions, eq(designs.paperOptionId, paperOptions.id))
+    .where(and(eq(designs.id, id), ownedBy(owner), isLiveDesign()))
+    .limit(1);
+  return rows[0] ? toSavedDesign(rows[0]) : null;
+}
+
+async function resolveProductId(slug: string): Promise<number | null> {
+  const [row] = await db.select({ id: products.id }).from(products).where(eq(products.slug, slug)).limit(1);
+  return row?.id ?? null;
+}
+
+async function resolveTemplateId(slug: string): Promise<number | null> {
+  const [row] = await db.select({ id: templates.id }).from(templates).where(eq(templates.slug, slug)).limit(1);
+  return row?.id ?? null;
+}
+
+async function resolvePageCountOptionId(productId: number, slug: string): Promise<number | null> {
   const [row] = await db
-    .select()
+    .select({ id: pageCountOptions.id })
+    .from(pageCountOptions)
+    .where(and(eq(pageCountOptions.productId, productId), eq(pageCountOptions.slug, slug)))
+    .limit(1);
+  return row?.id ?? null;
+}
+
+async function resolvePaperOptionId(productId: number, slug: string): Promise<number | null> {
+  const [row] = await db
+    .select({ id: paperOptions.id })
+    .from(paperOptions)
+    .where(and(eq(paperOptions.productId, productId), eq(paperOptions.slug, slug)))
+    .limit(1);
+  return row?.id ?? null;
+}
+
+async function getOwnedDesignProductId(owner: Owner, id: string): Promise<number | null> {
+  const [row] = await db
+    .select({ productId: designs.productId })
     .from(designs)
     .where(and(eq(designs.id, id), ownedBy(owner), isLiveDesign()))
     .limit(1);
-  return row ? toSavedDesign(row) : null;
+  return row?.productId ?? null;
 }
 
 export async function createDesign(
@@ -114,17 +206,31 @@ export async function createDesign(
     spec: DesignSpec;
   },
 ): Promise<SavedDesign> {
+  const productId = await resolveProductId(input.productId);
+  const templateId = await resolveTemplateId(input.templateId);
+  if (!productId) throw new Error(`Unknown product "${input.productId}"`);
+  if (!templateId) throw new Error(`Unknown template "${input.templateId}"`);
+
+  const pageCountOptionId = await resolvePageCountOptionId(productId, input.spec.pagesOptionId);
+  const paperOptionId = await resolvePaperOptionId(productId, input.spec.paperId);
+  if (!pageCountOptionId) {
+    throw new Error(`Unknown page count option "${input.spec.pagesOptionId}" for "${input.productId}"`);
+  }
+  if (!paperOptionId) {
+    throw new Error(`Unknown paper option "${input.spec.paperId}" for "${input.productId}"`);
+  }
+
   const id = crypto.randomUUID();
   await db.insert(designs).values({
     id,
     userId: owner.userId,
     guestToken: owner.userId ? null : owner.guestToken,
-    templateId: input.templateId,
-    productId: input.productId,
+    templateId,
+    productId,
     name: input.name,
     doc: input.doc,
-    pageCountOptionId: input.spec.pagesOptionId,
-    paperOptionId: input.spec.paperId,
+    pageCountOptionId,
+    paperOptionId,
   });
   const created = await getDesign(owner, id);
   if (!created) throw new Error("Design vanished immediately after insert");
@@ -138,22 +244,38 @@ export async function updateDesign(
     doc?: DesignDoc;
     spec?: DesignSpec;
     name?: string;
+    /** Slug — set when the editor applies a different template to the cover. */
+    templateId?: string;
   },
 ): Promise<SavedDesign | null> {
-  const existing = await getDesign(owner, id);
-  if (!existing) return null;
+  const productId = await getOwnedDesignProductId(owner, id);
+  if (!productId) return null;
+
+  let pageCountOptionId: number | undefined;
+  let paperOptionId: number | undefined;
+  if (patch.spec) {
+    const resolvedPageCount = await resolvePageCountOptionId(productId, patch.spec.pagesOptionId);
+    const resolvedPaper = await resolvePaperOptionId(productId, patch.spec.paperId);
+    if (!resolvedPageCount) throw new Error(`Unknown page count option "${patch.spec.pagesOptionId}"`);
+    if (!resolvedPaper) throw new Error(`Unknown paper option "${patch.spec.paperId}"`);
+    pageCountOptionId = resolvedPageCount;
+    paperOptionId = resolvedPaper;
+  }
+
+  let templateId: number | undefined;
+  if (patch.templateId !== undefined) {
+    const resolved = await resolveTemplateId(patch.templateId);
+    if (!resolved) throw new Error(`Unknown template "${patch.templateId}"`);
+    templateId = resolved;
+  }
 
   await db
     .update(designs)
     .set({
       ...(patch.doc ? { doc: patch.doc } : {}),
-      ...(patch.spec
-        ? {
-            pageCountOptionId: patch.spec.pagesOptionId,
-            paperOptionId: patch.spec.paperId,
-          }
-        : {}),
+      ...(patch.spec ? { pageCountOptionId, paperOptionId } : {}),
       ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(templateId !== undefined ? { templateId } : {}),
     })
     .where(and(eq(designs.id, id), ownedBy(owner), isLiveDesign()));
 
@@ -169,20 +291,4 @@ export async function deleteDesign(owner: Owner, id: string): Promise<boolean> {
     .set({ deletedAt: new Date() })
     .where(and(eq(designs.id, id), ownedBy(owner), isLiveDesign()));
   return true;
-}
-
-type DesignRow = typeof designs.$inferSelect;
-
-function toSavedDesign(row: DesignRow): SavedDesign {
-  return {
-    id: row.id,
-    name: row.name,
-    templateId: row.templateId,
-    productId: row.productId,
-    doc: row.doc,
-    pagesOptionId: row.pageCountOptionId,
-    paperId: row.paperOptionId,
-    pageCount: row.pageCount,
-    updatedAt: row.updatedAt,
-  };
 }

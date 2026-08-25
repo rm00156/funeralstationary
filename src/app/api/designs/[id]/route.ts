@@ -6,6 +6,7 @@ import {
   validateDesignPayload,
 } from "@/lib/designs.server";
 import { getOrCreateOwner } from "@/lib/session";
+import { TEMPLATES } from "@/lib/templates";
 
 export const runtime = "nodejs";
 
@@ -38,11 +39,18 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/design
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { doc, pagesOptionId, paperId, name } = (body ?? {}) as Record<string, unknown>;
+  const { doc, pagesOptionId, paperId, name, templateId } = (body ?? {}) as Record<string, unknown>;
 
   const owner = await getOrCreateOwner();
   const existing = await getDesign(owner, id);
   if (!existing) return Response.json({ error: "Design not found" }, { status: 404 });
+
+  // The editor's template picker rewrites the cover, so the design's template
+  // can change after creation — otherwise the row would keep pointing at
+  // whichever template the editor happened to open with.
+  if (templateId !== undefined && !TEMPLATES.some((template) => template.id === templateId)) {
+    return Response.json({ error: "Unknown templateId" }, { status: 400 });
+  }
 
   const spec = {
     pagesOptionId: String(pagesOptionId ?? existing.pagesOptionId),
@@ -62,6 +70,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/design
     doc: nextDoc,
     spec,
     name: typeof name === "string" ? name.trim().slice(0, 200) || "Untitled design" : undefined,
+    templateId: typeof templateId === "string" ? templateId : undefined,
   });
   if (!updated) return Response.json({ error: "Design not found" }, { status: 404 });
 

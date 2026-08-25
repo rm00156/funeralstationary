@@ -10,113 +10,132 @@ CREATE TABLE `users` (
 );
 --> statement-breakpoint
 CREATE TABLE `products` (
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`label` varchar(200) NOT NULL,
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`is_active` boolean NOT NULL DEFAULT true,
-	CONSTRAINT `products_id` PRIMARY KEY(`id`)
+	CONSTRAINT `products_id` PRIMARY KEY(`id`),
+	CONSTRAINT `products_slug_unique` UNIQUE(`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `template_categories` (
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`label` varchar(200) NOT NULL,
 	`accent_hex` char(7) NOT NULL,
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`is_active` boolean NOT NULL DEFAULT true,
-	CONSTRAINT `template_categories_id` PRIMARY KEY(`id`)
+	CONSTRAINT `template_categories_id` PRIMARY KEY(`id`),
+	CONSTRAINT `template_categories_slug_unique` UNIQUE(`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `template_category_links` (
-	`template_id` varchar(64) NOT NULL,
-	`category_id` varchar(64) NOT NULL,
+	`template_id` int NOT NULL,
+	`category_id` int NOT NULL,
 	`position` smallint NOT NULL DEFAULT 0,
 	CONSTRAINT `template_category_links_template_id_category_id_pk` PRIMARY KEY(`template_id`,`category_id`)
 );
 --> statement-breakpoint
-CREATE TABLE `template_product_links` (
-	`template_id` varchar(64) NOT NULL,
-	`product_id` varchar(64) NOT NULL,
-	CONSTRAINT `template_product_links_template_id_product_id_pk` PRIMARY KEY(`template_id`,`product_id`)
-);
---> statement-breakpoint
 CREATE TABLE `templates` (
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`name` varchar(200) NOT NULL,
+	`product_id` int NOT NULL,
 	`preview_image_url` varchar(1024) NOT NULL,
 	`layout` json,
 	`status` enum('draft','published','archived') NOT NULL DEFAULT 'published',
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
 	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `templates_id` PRIMARY KEY(`id`)
+	CONSTRAINT `templates_id` PRIMARY KEY(`id`),
+	CONSTRAINT `templates_slug_unique` UNIQUE(`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `colour_options` (
-	`product_id` varchar(64) NOT NULL,
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`product_id` int NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`label` varchar(200) NOT NULL,
 	`multiplier` decimal(6,4) NOT NULL,
 	`note` varchar(500),
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`is_active` boolean NOT NULL DEFAULT true,
-	CONSTRAINT `colour_options_product_id_id_pk` PRIMARY KEY(`product_id`,`id`)
+	CONSTRAINT `colour_options_id` PRIMARY KEY(`id`),
+	CONSTRAINT `colour_options_product_id_uq` UNIQUE(`product_id`,`id`),
+	CONSTRAINT `colour_options_product_slug_uq` UNIQUE(`product_id`,`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `delivery_options` (
-	`product_id` varchar(64) NOT NULL,
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`product_id` int NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`label` varchar(200) NOT NULL,
 	`price_pence` int NOT NULL,
 	`note` varchar(500) NOT NULL,
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`is_active` boolean NOT NULL DEFAULT true,
-	CONSTRAINT `delivery_options_product_id_id_pk` PRIMARY KEY(`product_id`,`id`)
+	CONSTRAINT `delivery_options_id` PRIMARY KEY(`id`),
+	CONSTRAINT `delivery_options_product_id_uq` UNIQUE(`product_id`,`id`),
+	CONSTRAINT `delivery_options_product_slug_uq` UNIQUE(`product_id`,`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `page_count_options` (
-	`product_id` varchar(64) NOT NULL,
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`product_id` int NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`label` varchar(200) NOT NULL,
 	`page_count` int NOT NULL,
 	`base_rate_pence` int NOT NULL,
 	`note` varchar(500),
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`is_active` boolean NOT NULL DEFAULT true,
-	CONSTRAINT `page_count_options_product_id_id_pk` PRIMARY KEY(`product_id`,`id`)
+	CONSTRAINT `page_count_options_id` PRIMARY KEY(`id`),
+	CONSTRAINT `page_count_options_product_id_uq` UNIQUE(`product_id`,`id`),
+	CONSTRAINT `page_count_options_product_slug_uq` UNIQUE(`product_id`,`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `paper_options` (
-	`product_id` varchar(64) NOT NULL,
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`product_id` int NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`label` varchar(200) NOT NULL,
 	`multiplier` decimal(6,4) NOT NULL,
 	`note` varchar(500),
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`is_active` boolean NOT NULL DEFAULT true,
-	CONSTRAINT `paper_options_product_id_id_pk` PRIMARY KEY(`product_id`,`id`)
+	CONSTRAINT `paper_options_id` PRIMARY KEY(`id`),
+	CONSTRAINT `paper_options_product_id_uq` UNIQUE(`product_id`,`id`),
+	CONSTRAINT `paper_options_product_slug_uq` UNIQUE(`product_id`,`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `quantity_options` (
-	`product_id` varchar(64) NOT NULL,
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`product_id` int NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`label` varchar(200) NOT NULL,
 	`multiplier` decimal(6,4) NOT NULL,
 	`note` varchar(500),
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`is_active` boolean NOT NULL DEFAULT true,
 	`copies` int NOT NULL,
-	CONSTRAINT `quantity_options_product_id_id_pk` PRIMARY KEY(`product_id`,`id`)
+	CONSTRAINT `quantity_options_id` PRIMARY KEY(`id`),
+	CONSTRAINT `quantity_options_product_id_uq` UNIQUE(`product_id`,`id`),
+	CONSTRAINT `quantity_options_product_slug_uq` UNIQUE(`product_id`,`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `size_options` (
-	`product_id` varchar(64) NOT NULL,
-	`id` varchar(64) NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
+	`product_id` int NOT NULL,
+	`slug` varchar(64) NOT NULL,
 	`label` varchar(200) NOT NULL,
 	`multiplier` decimal(6,4) NOT NULL,
 	`note` varchar(500),
 	`sort_order` smallint NOT NULL DEFAULT 0,
 	`is_active` boolean NOT NULL DEFAULT true,
-	CONSTRAINT `size_options_product_id_id_pk` PRIMARY KEY(`product_id`,`id`)
+	CONSTRAINT `size_options_id` PRIMARY KEY(`id`),
+	CONSTRAINT `size_options_product_id_uq` UNIQUE(`product_id`,`id`),
+	CONSTRAINT `size_options_product_slug_uq` UNIQUE(`product_id`,`slug`)
 );
 --> statement-breakpoint
 CREATE TABLE `design_assets` (
@@ -149,18 +168,18 @@ CREATE TABLE `designs` (
 	`id` char(36) NOT NULL,
 	`user_id` char(36),
 	`guest_token` char(36),
-	`template_id` varchar(64) NOT NULL,
-	`product_id` varchar(64) NOT NULL,
+	`template_id` int NOT NULL,
+	`product_id` int NOT NULL,
 	`name` varchar(200) NOT NULL DEFAULT 'Untitled design',
 	`status` enum('draft','ready','ordered','archived') NOT NULL DEFAULT 'draft',
 	`doc` json NOT NULL,
 	`page_count` smallint GENERATED ALWAYS AS (json_length(`doc`, '$.pages')) STORED NOT NULL,
-	`quantity_option_id` varchar(64),
-	`size_option_id` varchar(64),
-	`colour_option_id` varchar(64),
-	`page_count_option_id` varchar(64) NOT NULL DEFAULT '4',
-	`paper_option_id` varchar(64) NOT NULL DEFAULT 'silk',
-	`delivery_option_id` varchar(64),
+	`quantity_option_id` int,
+	`size_option_id` int,
+	`colour_option_id` int,
+	`page_count_option_id` int NOT NULL,
+	`paper_option_id` int NOT NULL,
+	`delivery_option_id` int,
 	`thumbnail_url` varchar(1024),
 	`last_opened_at` timestamp,
 	`created_at` timestamp NOT NULL DEFAULT (now()),
@@ -252,8 +271,7 @@ CREATE TABLE `orders` (
 --> statement-breakpoint
 ALTER TABLE `template_category_links` ADD CONSTRAINT `template_category_links_template_id_templates_id_fk` FOREIGN KEY (`template_id`) REFERENCES `templates`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `template_category_links` ADD CONSTRAINT `template_category_links_category_id_template_categories_id_fk` FOREIGN KEY (`category_id`) REFERENCES `template_categories`(`id`) ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `template_product_links` ADD CONSTRAINT `template_product_links_template_id_templates_id_fk` FOREIGN KEY (`template_id`) REFERENCES `templates`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `template_product_links` ADD CONSTRAINT `template_product_links_product_id_products_id_fk` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `templates` ADD CONSTRAINT `templates_product_id_products_id_fk` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `colour_options` ADD CONSTRAINT `colour_options_product_id_products_id_fk` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `delivery_options` ADD CONSTRAINT `delivery_options_product_id_products_id_fk` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `page_count_options` ADD CONSTRAINT `page_count_options_product_id_products_id_fk` FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON DELETE restrict ON UPDATE no action;--> statement-breakpoint

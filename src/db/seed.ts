@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { sql } from "drizzle-orm";
-import type { AnyMySqlTable } from "drizzle-orm/mysql-core";
+import type { AnyMySqlTable, MySqlColumn } from "drizzle-orm/mysql-core";
 import { db } from "./index";
 import {
   colourOptions,
@@ -12,7 +12,6 @@ import {
   sizeOptions,
   templateCategories,
   templateCategoryLinks,
-  templateProductLinks,
   templates,
 } from "./schema";
 import {
@@ -25,7 +24,6 @@ import {
   buildSizeOptionsSeed,
   buildTemplateCategoriesSeed,
   buildTemplateCategoryLinksSeed,
-  buildTemplateProductLinksSeed,
   buildTemplatesSeed,
 } from "./seedData";
 
@@ -33,7 +31,9 @@ import {
  * `INSERT ... ON DUPLICATE KEY UPDATE col = VALUES(col)` — re-running the
  * seed re-applies every column from the incoming row rather than leaving
  * stale values, which is what makes it idempotent against edits to the
- * src/lib constants.
+ * src/lib constants. MySQL triggers this off ANY unique key collision, not
+ * just the PK, so it works whether the conflicting key is `slug` or a
+ * composite (product_id, slug).
  */
 function valuesOf(table: AnyMySqlTable, ...columns: string[]) {
   const set: Record<string, ReturnType<typeof sql>> = {};
@@ -44,71 +44,114 @@ function valuesOf(table: AnyMySqlTable, ...columns: string[]) {
   return set;
 }
 
+/**
+ * Every catalogue/pricing table uses a surrogate int PK, so a row's id isn't
+ * known until after it's inserted — unlike the old varchar-slug PKs, which
+ * doubled as the FK value. This upserts by `slug`, then re-selects the whole
+ * table to build a slug->id map the next step can resolve its FKs against.
+ */
+async function upsertAndMapBySlug(
+  table: AnyMySqlTable & { id: MySqlColumn; slug: MySqlColumn },
+  rows: Array<Record<string, unknown>>,
+  updateColumns: string[],
+): Promise<Map<string, number>> {
+  if (rows.length > 0) {
+    await db.insert(table).values(rows).onDuplicateKeyUpdate({ set: valuesOf(table, ...updateColumns) });
+  }
+  const all = (await db
+    .select({ id: table.id, slug: table.slug })
+    .from(table as never)) as Array<{ id: number; slug: string }>;
+  return new Map(all.map((row) => [row.slug, row.id]));
+}
+
 async function main() {
-  await db
-    .insert(products)
-    .values(buildProductsSeed())
-    .onDuplicateKeyUpdate({ set: valuesOf(products, "label", "sortOrder", "isActive") });
+  const productBySlug = await upsertAndMapBySlug(products, buildProductsSeed(), [
+    "label",
+    "sortOrder",
+    "isActive",
+  ]);
 
-  await db
-    .insert(templateCategories)
-    .values(buildTemplateCategoriesSeed())
-    .onDuplicateKeyUpdate({
-      set: valuesOf(templateCategories, "label", "accentHex", "sortOrder", "isActive"),
-    });
+  const categoryBySlug = await upsertAndMapBySlug(templateCategories, buildTemplateCategoriesSeed(), [
+    "label",
+    "accentHex",
+    "sortOrder",
+    "isActive",
+  ]);
 
-  await db
-    .insert(templates)
-    .values(buildTemplatesSeed())
-    .onDuplicateKeyUpdate({
-      set: valuesOf(templates, "name", "previewImageUrl", "status", "sortOrder"),
-    });
+  const templateRows = buildTemplatesSeed().map(({ productSlug, ...row }) => {
+    const productId = productBySlug.get(productSlug);
+    if (!productId) throw new Error(`Seed template "${row.slug}" references unknown product "${productSlug}"`);
+    return { ...row, productId };
+  });
+  const templateBySlug = await upsertAndMapBySlug(templates, templateRows, [
+    "name",
+    "productId",
+    "previewImageUrl",
+    "status",
+    "sortOrder",
+  ]);
 
-  await db
-    .insert(templateCategoryLinks)
-    .values(buildTemplateCategoryLinksSeed())
-    .onDuplicateKeyUpdate({ set: valuesOf(templateCategoryLinks, "position") });
-
-  await db
-    .insert(templateProductLinks)
-    .values(buildTemplateProductLinksSeed())
-    .onDuplicateKeyUpdate({ set: valuesOf(templateProductLinks, "productId") });
+  // Pure join table, no data beyond the pair itself — delete-then-insert
+  // fully reconciles to the source instead of only ever accumulating rows
+  // (a plain upsert would leave stale links behind if a template's
+  // categories ever shrink).
+  const categoryLinkRows = buildTemplateCategoryLinksSeed().map(
+    ({ templateSlug, categorySlug, position }) => {
+      const templateId = templateBySlug.get(templateSlug);
+      const categoryId = categoryBySlug.get(categorySlug);
+      if (!templateId || !categoryId) {
+        throw new Error(`Seed link ${templateSlug}/${categorySlug} references an unknown row`);
+      }
+      return { templateId, categoryId, position };
+    },
+  );
+  await db.transaction(async (tx) => {
+    await tx.delete(templateCategoryLinks);
+    if (categoryLinkRows.length > 0) {
+      await tx.insert(templateCategoryLinks).values(categoryLinkRows);
+    }
+  });
 
   const specColumns = ["label", "multiplier", "note", "sortOrder", "isActive"] as const;
 
-  await db
-    .insert(sizeOptions)
-    .values(buildSizeOptionsSeed())
-    .onDuplicateKeyUpdate({ set: valuesOf(sizeOptions, ...specColumns) });
-
-  await db
-    .insert(colourOptions)
-    .values(buildColourOptionsSeed())
-    .onDuplicateKeyUpdate({ set: valuesOf(colourOptions, ...specColumns) });
-
-  await db
-    .insert(paperOptions)
-    .values(buildPaperOptionsSeed())
-    .onDuplicateKeyUpdate({ set: valuesOf(paperOptions, ...specColumns) });
-
-  await db
-    .insert(quantityOptions)
-    .values(buildQuantityOptionsSeed())
-    .onDuplicateKeyUpdate({ set: valuesOf(quantityOptions, ...specColumns, "copies") });
-
-  await db
-    .insert(pageCountOptions)
-    .values(buildPageCountOptionsSeed())
-    .onDuplicateKeyUpdate({
-      set: valuesOf(pageCountOptions, "label", "pageCount", "baseRatePence", "note", "sortOrder", "isActive"),
+  async function upsertPricingTable(
+    table: AnyMySqlTable,
+    rows: Array<{ productSlug: string } & Record<string, unknown>>,
+    updateColumns: string[],
+  ) {
+    const resolved = rows.map(({ productSlug, ...row }) => {
+      const productId = productBySlug.get(productSlug);
+      if (!productId) {
+        throw new Error(`Seed pricing row "${row.slug}" references unknown product "${productSlug}"`);
+      }
+      return { ...row, productId };
     });
+    if (resolved.length === 0) return;
+    await db
+      .insert(table)
+      .values(resolved)
+      .onDuplicateKeyUpdate({ set: valuesOf(table, ...updateColumns) });
+  }
 
-  await db
-    .insert(deliveryOptions)
-    .values(buildDeliveryOptionsSeed())
-    .onDuplicateKeyUpdate({
-      set: valuesOf(deliveryOptions, "label", "pricePence", "note", "sortOrder", "isActive"),
-    });
+  await upsertPricingTable(sizeOptions, buildSizeOptionsSeed(), [...specColumns]);
+  await upsertPricingTable(colourOptions, buildColourOptionsSeed(), [...specColumns]);
+  await upsertPricingTable(paperOptions, buildPaperOptionsSeed(), [...specColumns]);
+  await upsertPricingTable(quantityOptions, buildQuantityOptionsSeed(), [...specColumns, "copies"]);
+  await upsertPricingTable(pageCountOptions, buildPageCountOptionsSeed(), [
+    "label",
+    "pageCount",
+    "baseRatePence",
+    "note",
+    "sortOrder",
+    "isActive",
+  ]);
+  await upsertPricingTable(deliveryOptions, buildDeliveryOptionsSeed(), [
+    "label",
+    "pricePence",
+    "note",
+    "sortOrder",
+    "isActive",
+  ]);
 
   console.log("Seed complete.");
   process.exit(0);

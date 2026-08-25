@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { products, templateCategories, templateCategoryLinks, templateProductLinks, templates } from "./catalogue";
+import { products, templateCategories, templateCategoryLinks, templates } from "./catalogue";
 import { designAssets, designs, designVersions } from "./designs";
 import { orderEvents, orderItems, orderProofs, orders } from "./orders";
 import { colourOptions, deliveryOptions, pageCountOptions, paperOptions, quantityOptions, sizeOptions } from "./pricing";
@@ -11,7 +11,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 }));
 
 export const productsRelations = relations(products, ({ many }) => ({
-  templateLinks: many(templateProductLinks),
+  templates: many(templates),
   sizeOptions: many(sizeOptions),
   colourOptions: many(colourOptions),
   paperOptions: many(paperOptions),
@@ -24,9 +24,9 @@ export const templateCategoriesRelations = relations(templateCategories, ({ many
   templateLinks: many(templateCategoryLinks),
 }));
 
-export const templatesRelations = relations(templates, ({ many }) => ({
+export const templatesRelations = relations(templates, ({ one, many }) => ({
+  product: one(products, { fields: [templates.productId], references: [products.id] }),
   categoryLinks: many(templateCategoryLinks),
-  productLinks: many(templateProductLinks),
   designs: many(designs),
 }));
 
@@ -38,17 +38,6 @@ export const templateCategoryLinksRelations = relations(templateCategoryLinks, (
   category: one(templateCategories, {
     fields: [templateCategoryLinks.categoryId],
     references: [templateCategories.id],
-  }),
-}));
-
-export const templateProductLinksRelations = relations(templateProductLinks, ({ one }) => ({
-  template: one(templates, {
-    fields: [templateProductLinks.templateId],
-    references: [templates.id],
-  }),
-  product: one(products, {
-    fields: [templateProductLinks.productId],
-    references: [products.id],
   }),
 }));
 

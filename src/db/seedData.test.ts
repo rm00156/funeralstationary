@@ -18,7 +18,6 @@ import {
   buildSizeOptionsSeed,
   buildTemplateCategoriesSeed,
   buildTemplateCategoryLinksSeed,
-  buildTemplateProductLinksSeed,
   buildTemplatesSeed,
 } from "./seedData";
 
@@ -35,17 +34,17 @@ describe("catalogue seed coverage", () => {
     }
   });
 
-  it("resolves every category id referenced by a template to a real category row", () => {
-    const categoryIds = new Set(buildTemplateCategoriesSeed().map((c) => c.id));
+  it("resolves every category slug referenced by a template to a real category row", () => {
+    const categorySlugs = new Set(buildTemplateCategoriesSeed().map((c) => c.slug));
     for (const link of buildTemplateCategoryLinksSeed()) {
-      expect(categoryIds.has(link.categoryId)).toBe(true);
+      expect(categorySlugs.has(link.categorySlug)).toBe(true);
     }
   });
 
-  it("resolves every product id referenced by a template to a real product row", () => {
-    const productIds = new Set(buildProductsSeed().map((p) => p.id));
-    for (const link of buildTemplateProductLinksSeed()) {
-      expect(productIds.has(link.productId)).toBe(true);
+  it("resolves every template's product to a real product row", () => {
+    const productSlugs = new Set(buildProductsSeed().map((p) => p.slug));
+    for (const template of buildTemplatesSeed()) {
+      expect(productSlugs.has(template.productSlug)).toBe(true);
     }
   });
 
@@ -53,9 +52,9 @@ describe("catalogue seed coverage", () => {
     const gentleFarewell = TEMPLATES.find((t) => t.id === "gentle-farewell");
     if (!gentleFarewell) throw new Error("fixture template missing");
     const links = buildTemplateCategoryLinksSeed()
-      .filter((l) => l.templateId === "gentle-farewell")
+      .filter((l) => l.templateSlug === "gentle-farewell")
       .sort((a, b) => a.position - b.position);
-    expect(links.map((l) => l.categoryId)).toEqual(gentleFarewell.categories);
+    expect(links.map((l) => l.categorySlug)).toEqual(gentleFarewell.categories);
   });
 });
 
@@ -70,23 +69,23 @@ describe("pricing seed coverage", () => {
   });
 
   it("carries the real copy count onto quantity option rows", () => {
-    const fifty = buildQuantityOptionsSeed().find((o) => o.id === "50");
+    const fifty = buildQuantityOptionsSeed().find((o) => o.slug === "50");
     expect(fifty?.copies).toBe(50);
   });
 
   it("converts pound rates to integer pence", () => {
-    const fourPage = buildPageCountOptionsSeed().find((o) => o.id === "4");
+    const fourPage = buildPageCountOptionsSeed().find((o) => o.slug === "4");
     expect(fourPage?.baseRatePence).toBe(220);
 
-    const nextDay = buildDeliveryOptionsSeed().find((o) => o.id === "next-day");
+    const nextDay = buildDeliveryOptionsSeed().find((o) => o.slug === "next-day");
     expect(nextDay?.pricePence).toBe(1000);
 
-    const standard = buildDeliveryOptionsSeed().find((o) => o.id === "standard");
+    const standard = buildDeliveryOptionsSeed().find((o) => o.slug === "standard");
     expect(standard?.pricePence).toBe(0);
   });
 
   it("keeps multiplier precision as a fixed 4dp string", () => {
-    const fifty = buildQuantityOptionsSeed().find((o) => o.id === "50");
+    const fifty = buildQuantityOptionsSeed().find((o) => o.slug === "50");
     expect(fifty?.multiplier).toBe("0.9000");
   });
 });
