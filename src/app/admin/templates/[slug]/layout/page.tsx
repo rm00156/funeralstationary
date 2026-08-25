@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * The template layout authoring surface: the same editor customers use,
- * mounted in templateAuthoring mode so saves write templates.layout. This
+ * mounted in templateAuthoring mode so saves write templates.draft_layout —
+ * work in progress stays invisible to customers until it's published. This
  * page deliberately sits OUTSIDE the (protected) route group — the editor is
  * full-bleed (h-dvh) and the admin chrome would fight it — so it calls
  * requireAdmin() itself.
@@ -54,7 +55,12 @@ export default async function AdminTemplateLayoutPage({
       productLabel={product.label}
       templates={[]}
       pricing={pricing}
-      templateAuthoring={{ slug: template.slug, initialPages: template.layout }}
+      templateAuthoring={{
+        slug: template.slug,
+        // Resume the draft when one exists; otherwise start from what's live.
+        initialPages: template.draftLayout ?? template.layout,
+        hasDraftLayout: template.hasDraftLayout,
+      }}
     />
   );
 }

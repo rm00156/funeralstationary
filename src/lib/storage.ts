@@ -128,6 +128,28 @@ export async function createUploadUrl(
   );
 }
 
+/**
+ * Direct server-side upload — for bytes the server already holds (e.g. a
+ * headless-Chromium screenshot), unlike createUploadUrl's presigned PUT
+ * which exists specifically to keep browser-uploaded bytes off the server.
+ */
+export async function uploadObject(
+  storageKey: string,
+  body: Buffer,
+  contentType: string,
+): Promise<string> {
+  const config = requireConfig();
+  await getClient(config).send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: storageKey,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+  return publicUrlFor(storageKey);
+}
+
 export async function deleteObject(storageKey: string): Promise<void> {
   const config = requireConfig();
   await getClient(config).send(

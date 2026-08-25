@@ -7,6 +7,7 @@ import {
   BLEED_MM,
   type ProofRequest,
 } from "@/lib/designEditor";
+import { launchHeadlessBrowser } from "@/lib/headlessBrowser.server";
 
 export const runtime = "nodejs";
 // Vercel Pro (or higher) is required in production — a single-digit page
@@ -23,25 +24,6 @@ const BLEED_PT = mmToPt(BLEED_MM);
 
 /** Print-safe ceiling — matches the largest booklet size sold. */
 const MAX_PAGES = 24;
-
-async function launchBrowser() {
-  // Vercel's serverless functions run Linux, which @sparticuz/chromium's
-  // binary targets; a Mac/Windows dev machine needs a real local Chromium
-  // instead, which the full `puppeteer` package downloads on install.
-  if (process.env.VERCEL) {
-    const [{ default: chromium }, { default: puppeteer }] = await Promise.all([
-      import("@sparticuz/chromium"),
-      import("puppeteer-core"),
-    ]);
-    return puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: true,
-    });
-  }
-  const { default: puppeteer } = await import("puppeteer");
-  return puppeteer.launch({ headless: true });
-}
 
 /** Two short ticks per corner, anchored at the trim line, in the bleed margin. */
 function drawCropMarks(page: PDFPage) {
@@ -89,7 +71,7 @@ export async function POST(request: NextRequest) {
   }
 
   const origin = new URL(request.url).origin;
-  const browser = await launchBrowser();
+  const browser = await launchHeadlessBrowser();
 
   try {
     const page = await browser.newPage();

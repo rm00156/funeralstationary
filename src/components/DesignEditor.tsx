@@ -45,6 +45,7 @@ import {
   Package,
   Plus,
   Redo2,
+  RotateCw,
   Save,
   Shapes,
   Share2,
@@ -57,6 +58,7 @@ import {
   TreeDeciduous,
   Type,
   Undo2,
+  UploadCloud,
   X,
 } from "lucide-react";
 
@@ -66,6 +68,7 @@ import {
   BLEED_PX,
   FONT_OPTIONS,
   INK_PALETTE,
+  PAGE_BACKGROUND_PALETTE,
   PAGE_H,
   PAGE_W,
   instantiateLayout,
@@ -213,10 +216,17 @@ export default function DesignEditor({
    * Admin template-authoring mode: the document IS the template's layout.
    * Saves PUT /api/admin/templates/:slug/layout instead of /api/designs, and
    * customer-only chrome (cart, quote, paper, the template picker) is hidden.
+   *
+   * Saves land in templates.draft_layout, never the live layout — an admin can
+   * rework a published template without customers seeing half-finished pages.
+   * The Publish button promotes the draft.
    */
   templateAuthoring?: {
     slug: string;
+    /** The draft if one exists, otherwise the published layout. */
     initialPages: DesignPage[] | null;
+    /** Whether the editor opened on unpublished changes. */
+    hasDraftLayout: boolean;
   };
   /** An existing design loaded server-side from ?design=<id>, if any. */
   savedDesign?: {
@@ -282,6 +292,11 @@ export default function DesignEditor({
   // Renaming happens on /designs; a new design just takes the template's name.
   const [designName, setDesignName] = useState(savedDesign?.name ?? template.name);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  /** Authoring only: the draft holds changes customers can't see yet. */
+  const [draftPending, setDraftPending] = useState(
+    templateAuthoring?.hasDraftLayout ?? false,
+  );
+  const [publishing, setPublishing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(true);
@@ -322,7 +337,8 @@ export default function DesignEditor({
       setSaveState("saving");
       try {
         // Authoring mode: the document IS the template layout — save it to
-        // the template row, never to /api/designs.
+        // the template row's draft, never to /api/designs. Nothing reaches
+        // customers until the draft is published.
         if (templateAuthoring) {
           const response = await fetch(
             `/api/admin/templates/${templateAuthoring.slug}/layout`,
@@ -334,7 +350,8 @@ export default function DesignEditor({
           );
           if (!response.ok) throw new Error(await response.text());
           setSaveState("saved");
-          if (!options.silent) flash("Template layout saved");
+          setDraftPending(true);
+          if (!options.silent) flash("Draft saved — not visible to customers yet");
           return;
         }
 
@@ -376,6 +393,34 @@ export default function DesignEditor({
   };
 
   /**
+   * Authoring only: promote the draft to the live layout. Saves first, so
+   * whatever is on screen — including edits the 1.5s autosave hasn't flushed
+   * — is what gets published.
+   */
+  const publishLayout = async () => {
+    if (!templateAuthoring) return;
+    setPublishing(true);
+    try {
+      await persist({ silent: true });
+      const response = await fetch(
+        `/api/admin/templates/${templateAuthoring.slug}/layout`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "publish" }),
+        },
+      );
+      if (!response.ok) throw new Error(await response.text());
+      setDraftPending(false);
+      flash("Layout published — customers see it now");
+    } catch {
+      flash("Could not publish — please try again");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  /**
    * Once a design exists, its id is the whole address — the row owns its own
    * template and product, and both can change from inside the editor. A
    * lingering ?template=/?product= would start lying the moment a different
@@ -397,16 +442,39 @@ export default function DesignEditor({
 
   /** Debounced autosave — the "saves automatically as you go" promise. */
   const firstRender = useRef(true);
+  // Lets the unmount-flush effect below call the latest persist without
+  // depending on it directly — persist's identity changes on every edit, and
+  // an effect keyed on it would fire its "cleanup" on every keystroke, not
+  // just on a real unmount.
+  const persistRef = useRef(persist);
+  useEffect(() => {
+    persistRef.current = persist;
+  }, [persist]);
+  const pendingAutosaveRef = useRef(false);
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
+    pendingAutosaveRef.current = true;
     const timer = window.setTimeout(() => {
-      void persist({ silent: true });
+      pendingAutosaveRef.current = false;
+      void persistRef.current({ silent: true });
     }, 1500);
     return () => window.clearTimeout(timer);
-  }, [doc, pagesOptionId, paperId, persist]);
+  }, [doc, pagesOptionId, paperId]);
+
+  // Flush a still-pending autosave when the editor unmounts — e.g. clicking
+  // "Templates" or navigating back right after an edit, before the 1.5s
+  // debounce above has fired — so that edit isn't silently dropped.
+  useEffect(() => {
+    return () => {
+      if (pendingAutosaveRef.current) {
+        pendingAutosaveRef.current = false;
+        void persistRef.current({ silent: true });
+      }
+    };
+  }, []);
 
   /* ------------------------------ history --------------------------- */
 
@@ -456,6 +524,16 @@ export default function DesignEditor({
       setSelectedId(element.id);
     },
     [commit, doc, page, pageIndex],
+  );
+
+  const setPageBackground = useCallback(
+    (background: string | undefined) => {
+      commit({
+        ...doc,
+        pages: doc.pages.map((p, index) => (index === pageIndex ? { ...p, background } : p)),
+      });
+    },
+    [commit, doc, pageIndex],
   );
 
   const deleteSelected = useCallback(() => {
@@ -544,7 +622,7 @@ export default function DesignEditor({
   const startDrag = (
     event: React.PointerEvent,
     element: CanvasElement,
-    mode: "move" | "resize",
+    mode: "move" | "resize" | "rotate",
   ) => {
     if (editingId === element.id) return;
     event.preventDefault();
@@ -558,6 +636,43 @@ export default function DesignEditor({
 
     // The zoom level cannot change mid-drag, so capturing it here is safe.
     const dragZoom = zoom;
+
+    if (mode === "rotate") {
+      // Center of the element on screen — stays fixed for the whole drag,
+      // since a CSS rotate() pivots around the element's own center.
+      const rect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
+      const center = rect
+        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+        : { x: startX, y: startY };
+      const SNAP_DEG = [0, 45, 90, 135, 180, 225, 270, 315];
+      const onRotateMove = (move: PointerEvent) => {
+        if (!moved) {
+          moved = true;
+          snapshot();
+        }
+        const dx = move.clientX - center.x;
+        const dy = move.clientY - center.y;
+        // 0deg = handle straight up; positive = clockwise, matching CSS rotate().
+        let angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+        angle = ((angle % 360) + 360) % 360;
+        for (const snapTarget of SNAP_DEG) {
+          if (Math.abs(angle - snapTarget) < 4 || Math.abs(angle - snapTarget - 360) < 4) {
+            angle = snapTarget % 360;
+            break;
+          }
+        }
+        setDoc((current) =>
+          patchElement(current, activePage, element.id, (el) => ({ ...el, rotation: angle })),
+        );
+      };
+      const onRotateUp = () => {
+        window.removeEventListener("pointermove", onRotateMove);
+        window.removeEventListener("pointerup", onRotateUp);
+      };
+      window.addEventListener("pointermove", onRotateMove);
+      window.addEventListener("pointerup", onRotateUp);
+      return;
+    }
 
     const onMove = (move: PointerEvent) => {
       if (!moved) {
@@ -911,11 +1026,18 @@ export default function DesignEditor({
             {saveState === "saving"
               ? "Saving…"
               : saveState === "saved"
-                ? "All changes saved"
+                ? authoring
+                  ? "Draft saved"
+                  : "All changes saved"
                 : saveState === "error"
                   ? "Not saved"
                   : ""}
           </span>
+          {authoring && draftPending && (
+            <span className="hidden rounded-full bg-surface-container px-3 py-1 font-body text-xs font-medium text-on-surface-variant lg:inline">
+              Unpublished changes
+            </span>
+          )}
           <button
             type="button"
             onClick={saveDesign}
@@ -923,8 +1045,28 @@ export default function DesignEditor({
             className="flex items-center gap-2 rounded-lg bg-secondary p-2.5 font-body text-sm font-medium text-on-secondary transition-colors hover:bg-on-secondary-container disabled:opacity-60 sm:px-4"
           >
             <Save size={16} aria-hidden />
-            <span className="hidden md:inline">Save Design</span>
+            <span className="hidden md:inline">
+              {authoring ? "Save Draft" : "Save Design"}
+            </span>
           </button>
+          {authoring && (
+            <button
+              type="button"
+              onClick={() => void publishLayout()}
+              disabled={!draftPending || publishing || saveState === "saving"}
+              title={
+                draftPending
+                  ? "Make this layout live for customers"
+                  : "No unpublished changes"
+              }
+              className="flex items-center gap-2 rounded-lg bg-primary-container p-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-primary disabled:opacity-40 sm:px-4"
+            >
+              <UploadCloud size={16} aria-hidden />
+              <span className="hidden md:inline">
+                {publishing ? "Publishing…" : "Publish"}
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={shareLink}
@@ -1372,6 +1514,26 @@ export default function DesignEditor({
           {tab === "elements" && (
             <div className="flex flex-col gap-6">
               <div>
+                <PanelHeading>Page background</PanelHeading>
+                <div className="flex items-center gap-2">
+                  {PAGE_BACKGROUND_PALETTE.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      aria-label={`Page background ${color}`}
+                      onClick={() => setPageBackground(color === "#ffffff" ? undefined : color)}
+                      className={`h-7 w-7 rounded-full border ${
+                        (page.background ?? "#ffffff") === color
+                          ? "border-primary ring-2 ring-primary-container/40"
+                          : "border-outline-variant/60"
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <PanelHeading>Shapes</PanelHeading>
                 <div className="grid grid-cols-3 gap-2">
                   <ElementSwatch
@@ -1427,6 +1589,48 @@ export default function DesignEditor({
                     }
                   >
                     <Circle size={26} strokeWidth={1.5} aria-hidden />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Divider"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-flourish.png",
+                        x: 30,
+                        y: 49.5,
+                        w: 40,
+                        h: 3.06,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-flourish.png"
+                      alt=""
+                      aria-hidden
+                      className="w-full opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Sprig"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/floral-sprig.png",
+                        x: 43,
+                        y: 40,
+                        w: 14,
+                        h: 19,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/floral-sprig.png"
+                      alt=""
+                      aria-hidden
+                      className="h-8 w-auto opacity-80"
+                    />
                   </ElementSwatch>
                 </div>
               </div>
@@ -1819,7 +2023,7 @@ export function PageCanvas({
   onStartDrag: (
     event: React.PointerEvent,
     element: CanvasElement,
-    mode: "move" | "resize",
+    mode: "move" | "resize" | "rotate",
   ) => void;
   onStartEdit: (element: CanvasElement) => void;
   onEditText: (id: string, text: string) => void;
@@ -1837,8 +2041,9 @@ export function PageCanvas({
           height: ARTBOARD_H,
           transform: `scale(${zoom})`,
           transformOrigin: "top left",
+          backgroundColor: page.background ?? "#ffffff",
         }}
-        className="absolute left-0 top-0 bg-white shadow-[0_8px_40px_rgba(31,26,30,0.18)]"
+        className="absolute left-0 top-0 shadow-[0_8px_40px_rgba(31,26,30,0.18)]"
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) onBackgroundClick();
         }}
@@ -1935,7 +2140,7 @@ function ElementView({
   onStartDrag: (
     event: React.PointerEvent,
     element: CanvasElement,
-    mode: "move" | "resize",
+    mode: "move" | "resize" | "rotate",
   ) => void;
   onStartEdit: () => void;
   onEditText: (text: string) => void;
@@ -1947,6 +2152,7 @@ function ElementView({
     top: `${element.y}%`,
     width: `${element.w}%`,
     height: isText ? "auto" : `${element.h}%`,
+    transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
   };
 
   return (
@@ -1977,6 +2183,17 @@ function ElementView({
           onPointerDown={(event) => onStartDrag(event, element, "resize")}
           className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize touch-none rounded-full border-2 border-white bg-[#6b2d6a]"
         />
+      )}
+
+      {selected && !editing && (
+        <div
+          role="presentation"
+          aria-label="Rotate"
+          onPointerDown={(event) => onStartDrag(event, element, "rotate")}
+          className="absolute -top-7 left-1/2 flex h-5 w-5 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded-full border-2 border-white bg-[#6b2d6a] text-white active:cursor-grabbing"
+        >
+          <RotateCw size={11} aria-hidden />
+        </div>
       )}
     </div>
   );
@@ -2146,8 +2363,9 @@ function StaticPage({ page, scale }: { page: DesignPage; scale: number }) {
           height: PAGE_H,
           transform: `scale(${scale})`,
           transformOrigin: "top left",
+          backgroundColor: page.background ?? "#ffffff",
         }}
-        className="absolute left-0 top-0 bg-white"
+        className="absolute left-0 top-0"
       >
         {page.elements.map((element) => (
           <div
@@ -2158,6 +2376,7 @@ function StaticPage({ page, scale }: { page: DesignPage; scale: number }) {
               top: `${element.y}%`,
               width: `${element.w}%`,
               height: element.type === "text" ? "auto" : `${element.h}%`,
+              transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
             }}
           >
             <ElementContent
