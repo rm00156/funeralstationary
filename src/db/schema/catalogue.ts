@@ -56,11 +56,18 @@ export const templates = mysqlTable("templates", {
     .references(() => products.id, { onDelete: "restrict" }),
   previewImageUrl: varchar("preview_image_url", { length: 1024 }).notNull(),
   /**
-   * Real per-template starter content. Null means "no layout authored yet" —
-   * callers fall back to the generic makeStarterDoc(), preserving today's
-   * behaviour until real layouts are filled in.
+   * The *published* per-template starter content — what customers actually
+   * get. Null means "no layout authored yet": callers fall back to the
+   * generic makeStarterDoc(), preserving the pre-authoring behaviour.
    */
   layout: json("layout").$type<DesignPage[]>(),
+  /**
+   * The admin's work-in-progress copy of `layout`. The authoring editor
+   * autosaves here, so reworking a live template never changes what customers
+   * see mid-edit; publishing copies this into `layout` and nulls it again.
+   * Null therefore means "no unpublished layout changes", NOT "no layout".
+   */
+  draftLayout: json("draft_layout").$type<DesignPage[]>(),
   status: mysqlEnum("status", templateStatusValues).notNull().default("published"),
   sortOrder: smallint("sort_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),

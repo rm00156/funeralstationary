@@ -11,7 +11,7 @@
  * tables with ON DELETE RESTRICT, so rows are retired with is_active = false
  * (or status = "archived" for templates) instead.
  */
-import { asc, eq, and } from "drizzle-orm";
+import { asc, eq, and, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   colourOptions,
@@ -419,6 +419,8 @@ export interface AdminTemplate {
   sortOrder: number;
   /** Category slugs in position order. */
   categories: string[];
+  /** True when draft_layout holds edits not yet published to customers. */
+  hasDraftLayout: boolean;
   updatedAt: Date;
 }
 
@@ -451,6 +453,9 @@ const templateSelection = {
   previewImageUrl: templates.previewImageUrl,
   status: templates.status,
   sortOrder: templates.sortOrder,
+  // Tested in SQL rather than selected: a listing only needs to know whether
+  // there are unpublished changes, not haul every template's layout blob.
+  hasDraftLayout: sql<number>`(${templates.draftLayout} is not null)`,
   updatedAt: templates.updatedAt,
 };
 
@@ -463,28 +468,41 @@ export async function adminListTemplates(): Promise<AdminTemplate[]> {
       .orderBy(asc(templates.sortOrder), asc(templates.id)),
     loadTemplateCategories(),
   ]);
-  return rows.map(({ id, ...row }) => ({
+  return rows.map(({ id, hasDraftLayout, ...row }) => ({
     ...row,
+    hasDraftLayout: !!hasDraftLayout,
     categories: categoriesByTemplate.get(id) ?? [],
   }));
 }
 
-export async function adminGetTemplate(
-  slug: string,
-): Promise<(AdminTemplate & { layout: DesignPage[] | null }) | null> {
+export async function adminGetTemplate(slug: string): Promise<
+  | (AdminTemplate & {
+      /** The live layout customers get; null = generic starter pages. */
+      layout: DesignPage[] | null;
+      /** Unpublished edits; null = the draft matches what's live. */
+      draftLayout: DesignPage[] | null;
+    })
+  | null
+> {
   const [row] = await db
-    .select({ ...templateSelection, layout: templates.layout })
+    .select({
+      ...templateSelection,
+      layout: templates.layout,
+      draftLayout: templates.draftLayout,
+    })
     .from(templates)
     .innerJoin(products, eq(templates.productId, products.id))
     .where(eq(templates.slug, slug))
     .limit(1);
   if (!row) return null;
   const categoriesByTemplate = await loadTemplateCategories();
-  const { id, ...rest } = row;
+  const { id, hasDraftLayout, ...rest } = row;
   return {
     ...rest,
+    hasDraftLayout: !!hasDraftLayout,
     categories: categoriesByTemplate.get(id) ?? [],
     layout: row.layout ?? null,
+    draftLayout: row.draftLayout ?? null,
   };
 }
 
@@ -536,6 +554,7 @@ export async function adminCreateTemplate(input: {
     status: input.status,
     sortOrder: input.sortOrder,
     layout: null,
+    draftLayout: null,
   });
   const templateId = (await resolveTemplateId(input.slug))!;
   await setTemplateCategories(templateId, input.categories);
@@ -581,13 +600,73 @@ export async function adminUpdateTemplate(
   return adminGetTemplate(slug);
 }
 
-/** Store (or clear) a template's authored layout. False when slug unknown. */
-export async function adminSetTemplateLayout(
+/**
+ * Save the authoring editor's work-in-progress layout. This deliberately
+ * never touches `layout` — a published template keeps serving its current
+ * pages to customers until an admin explicitly publishes the draft.
+ * False when the slug is unknown.
+ */
+export async function adminSaveTemplateDraftLayout(
   slug: string,
-  pages: DesignPage[] | null,
+  pages: DesignPage[],
 ): Promise<boolean> {
   const templateId = await resolveTemplateId(slug);
   if (!templateId) return false;
-  await db.update(templates).set({ layout: pages }).where(eq(templates.id, templateId));
+  await db
+    .update(templates)
+    .set({ draftLayout: pages })
+    .where(eq(templates.id, templateId));
+  return true;
+}
+
+/**
+ * Promote the draft to the live layout. "nothing" when there are no
+ * unpublished changes, so the UI can say so rather than silently no-op.
+ * Returns the published pages on success — the caller uses page 0 of these
+ * to regenerate the preview thumbnail, without a second read.
+ */
+export async function adminPublishTemplateLayout(
+  slug: string,
+): Promise<
+  | { status: "published"; pages: DesignPage[] }
+  | { status: "nothing" }
+  | { status: "not-found" }
+> {
+  const [row] = await db
+    .select({ id: templates.id, draftLayout: templates.draftLayout })
+    .from(templates)
+    .where(eq(templates.slug, slug))
+    .limit(1);
+  if (!row) return { status: "not-found" };
+  if (!row.draftLayout) return { status: "nothing" };
+  await db
+    .update(templates)
+    .set({ layout: row.draftLayout, draftLayout: null })
+    .where(eq(templates.id, row.id));
+  return { status: "published", pages: row.draftLayout };
+}
+
+/** Throw away unpublished changes, leaving the live layout untouched. */
+export async function adminDiscardTemplateDraftLayout(slug: string): Promise<boolean> {
+  const templateId = await resolveTemplateId(slug);
+  if (!templateId) return false;
+  await db
+    .update(templates)
+    .set({ draftLayout: null })
+    .where(eq(templates.id, templateId));
+  return true;
+}
+
+/**
+ * Remove the authored layout entirely — live copy and draft — reverting the
+ * template to the generic makeStarterDoc() starter pages.
+ */
+export async function adminClearTemplateLayout(slug: string): Promise<boolean> {
+  const templateId = await resolveTemplateId(slug);
+  if (!templateId) return false;
+  await db
+    .update(templates)
+    .set({ layout: null, draftLayout: null })
+    .where(eq(templates.id, templateId));
   return true;
 }

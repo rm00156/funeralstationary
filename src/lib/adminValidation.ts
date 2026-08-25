@@ -272,6 +272,17 @@ export function parseLayoutPages(
   return { ok: true, pages: value as import("@/lib/designEditor").DesignPage[] };
 }
 
+/**
+ * The non-save operations on a template layout: promote the draft to live,
+ * throw the draft away, or remove the authored layout altogether.
+ */
+export const LAYOUT_ACTIONS = ["publish", "discard", "clear"] as const;
+export type LayoutAction = (typeof LAYOUT_ACTIONS)[number];
+
+export function parseLayoutAction(value: unknown): LayoutAction | null {
+  return LAYOUT_ACTIONS.includes(value as LayoutAction) ? (value as LayoutAction) : null;
+}
+
 /** Category slugs for a template — unique, ordered (order becomes position). */
 export function parseCategorySlugs(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;

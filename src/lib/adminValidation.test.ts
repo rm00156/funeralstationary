@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseHexColour,
+  parseLayoutAction,
   parseLayoutPages,
   parseMultiplier,
   parseOptionInput,
@@ -185,5 +186,20 @@ describe("parseLayoutPages", () => {
     expect(parseLayoutPages([{ id: 1, elements: [] }]).ok).toBe(false);
     expect(parseLayoutPages([{ id: "p", elements: "nope" }]).ok).toBe(false);
     expect(parseLayoutPages("pages").ok).toBe(false);
+  });
+});
+
+describe("parseLayoutAction", () => {
+  it("accepts the three layout actions", () => {
+    expect(parseLayoutAction("publish")).toBe("publish");
+    expect(parseLayoutAction("discard")).toBe("discard");
+    expect(parseLayoutAction("clear")).toBe("clear");
+  });
+
+  it("rejects anything else", () => {
+    expect(parseLayoutAction("save")).toBeNull();
+    expect(parseLayoutAction("")).toBeNull();
+    expect(parseLayoutAction(undefined)).toBeNull();
+    expect(parseLayoutAction({ action: "publish" })).toBeNull();
   });
 });

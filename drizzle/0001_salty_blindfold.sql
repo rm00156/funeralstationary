@@ -1,0 +1,1 @@
+ALTER TABLE `templates` ADD `draft_layout` json;

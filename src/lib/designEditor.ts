@@ -29,7 +29,57 @@ export const ARTBOARD_H_MM = PAGE_H_MM + BLEED_MM * 2;
 export const ARTBOARD_W = PAGE_W + BLEED_PX * 2;
 export const ARTBOARD_H = PAGE_H + BLEED_PX * 2;
 
-export type FontFamilyId = "display" | "body" | "script";
+export type FontFamilyId =
+  | "display"
+  | "body"
+  | "script"
+  | "playfair"
+  | "cormorant"
+  | "lora"
+  | "ebGaramond"
+  | "cormorantAlt"
+  | "libreBaskerville"
+  | "marcellus"
+  | "prata"
+  | "spectral"
+  | "vollkorn"
+  | "domine"
+  | "ptSerif"
+  | "merriweather"
+  | "cardo"
+  | "alegreya"
+  | "inter"
+  | "lato"
+  | "karla"
+  | "nunitoSans"
+  | "raleway"
+  | "josefinSans"
+  | "cabin"
+  | "quicksand"
+  | "mulish"
+  | "dancing"
+  | "alexBrush"
+  | "tangerine"
+  | "sacramento"
+  | "parisienne"
+  | "allura"
+  | "petitFormalScript"
+  | "mrsSaintDelafield"
+  | "pinyonScript"
+  | "italianno"
+  | "meddon"
+  | "herrVonMuellerhoff"
+  | "meaCulpa"
+  | "windsong"
+  | "marckScript"
+  | "yesteryear"
+  | "leagueScript"
+  | "rougeScript"
+  | "ballet"
+  | "laBelleAurore"
+  | "courgette"
+  | "satisfy"
+  | "kristi";
 
 export interface FontOption {
   id: FontFamilyId;
@@ -37,10 +87,63 @@ export interface FontOption {
   css: string;
 }
 
+/** ~50 Google Fonts grouped serif / sans / script to match the picker's layout. */
 export const FONT_OPTIONS: FontOption[] = [
+  // Serif / display
   { id: "display", label: "Source Serif", css: "var(--font-display)" },
+  { id: "playfair", label: "Playfair Display", css: "var(--font-playfair), serif" },
+  { id: "cormorant", label: "Cormorant Garamond", css: "var(--font-cormorant), serif" },
+  { id: "lora", label: "Lora", css: "var(--font-lora), serif" },
+  { id: "ebGaramond", label: "EB Garamond", css: "var(--font-eb-garamond), serif" },
+  { id: "cormorantAlt", label: "Cormorant", css: "var(--font-cormorant-alt), serif" },
+  { id: "libreBaskerville", label: "Libre Baskerville", css: "var(--font-libre-baskerville), serif" },
+  { id: "marcellus", label: "Marcellus", css: "var(--font-marcellus), serif" },
+  { id: "prata", label: "Prata", css: "var(--font-prata), serif" },
+  { id: "spectral", label: "Spectral", css: "var(--font-spectral), serif" },
+  { id: "vollkorn", label: "Vollkorn", css: "var(--font-vollkorn), serif" },
+  { id: "domine", label: "Domine", css: "var(--font-domine), serif" },
+  { id: "ptSerif", label: "PT Serif", css: "var(--font-pt-serif), serif" },
+  { id: "merriweather", label: "Merriweather", css: "var(--font-merriweather), serif" },
+  { id: "cardo", label: "Cardo", css: "var(--font-cardo), serif" },
+  { id: "alegreya", label: "Alegreya", css: "var(--font-alegreya), serif" },
+
+  // Sans body
   { id: "body", label: "Work Sans", css: "var(--font-body)" },
+  { id: "inter", label: "Inter", css: "var(--font-inter), sans-serif" },
+  { id: "lato", label: "Lato", css: "var(--font-lato), sans-serif" },
+  { id: "karla", label: "Karla", css: "var(--font-karla), sans-serif" },
+  { id: "nunitoSans", label: "Nunito Sans", css: "var(--font-nunito-sans), sans-serif" },
+  { id: "raleway", label: "Raleway", css: "var(--font-raleway), sans-serif" },
+  { id: "josefinSans", label: "Josefin Sans", css: "var(--font-josefin-sans), sans-serif" },
+  { id: "cabin", label: "Cabin", css: "var(--font-cabin), sans-serif" },
+  { id: "quicksand", label: "Quicksand", css: "var(--font-quicksand), sans-serif" },
+  { id: "mulish", label: "Mulish", css: "var(--font-mulish), sans-serif" },
+
+  // Script / decorative
   { id: "script", label: "Script", css: "var(--font-script), cursive" },
+  { id: "dancing", label: "Dancing Script", css: "var(--font-dancing), cursive" },
+  { id: "alexBrush", label: "Alex Brush", css: "var(--font-alex-brush), cursive" },
+  { id: "tangerine", label: "Tangerine", css: "var(--font-tangerine), cursive" },
+  { id: "sacramento", label: "Sacramento", css: "var(--font-sacramento), cursive" },
+  { id: "parisienne", label: "Parisienne", css: "var(--font-parisienne), cursive" },
+  { id: "allura", label: "Allura", css: "var(--font-allura), cursive" },
+  { id: "petitFormalScript", label: "Petit Formal Script", css: "var(--font-petit-formal-script), cursive" },
+  { id: "mrsSaintDelafield", label: "Mrs Saint Delafield", css: "var(--font-mrs-saint-delafield), cursive" },
+  { id: "pinyonScript", label: "Pinyon Script", css: "var(--font-pinyon-script), cursive" },
+  { id: "italianno", label: "Italianno", css: "var(--font-italianno), cursive" },
+  { id: "meddon", label: "Meddon", css: "var(--font-meddon), cursive" },
+  { id: "herrVonMuellerhoff", label: "Herr Von Muellerhoff", css: "var(--font-herr-von-muellerhoff), cursive" },
+  { id: "meaCulpa", label: "Mea Culpa", css: "var(--font-mea-culpa), cursive" },
+  { id: "windsong", label: "WindSong", css: "var(--font-windsong), cursive" },
+  { id: "marckScript", label: "Marck Script", css: "var(--font-marck-script), cursive" },
+  { id: "yesteryear", label: "Yesteryear", css: "var(--font-yesteryear), cursive" },
+  { id: "leagueScript", label: "League Script", css: "var(--font-league-script), cursive" },
+  { id: "rougeScript", label: "Rouge Script", css: "var(--font-rouge-script), cursive" },
+  { id: "ballet", label: "Ballet", css: "var(--font-ballet), cursive" },
+  { id: "laBelleAurore", label: "La Belle Aurore", css: "var(--font-la-belle-aurore), cursive" },
+  { id: "courgette", label: "Courgette", css: "var(--font-courgette), cursive" },
+  { id: "satisfy", label: "Satisfy", css: "var(--font-satisfy), cursive" },
+  { id: "kristi", label: "Kristi", css: "var(--font-kristi), cursive" },
 ];
 
 /** Muted ink palette for on-page content ("Serene Legacy" friendly). */
@@ -56,12 +159,24 @@ export const INK_PALETTE = [
   "#ffffff",
 ];
 
+/** Paper-tone options for a page's background (print canvas, not site theme). */
+export const PAGE_BACKGROUND_PALETTE = [
+  "#ffffff",
+  "#f4f1ee",
+  "#faf6ef",
+  "#f2ede9",
+  "#eef0ea",
+  "#f0ecec",
+];
+
 interface ElementBase {
   id: string;
   x: number;
   y: number;
   w: number;
   h: number;
+  /** Rotation in degrees, clockwise, around the element's center. Undefined means 0. */
+  rotation?: number;
 }
 
 export interface TextElement extends ElementBase {
@@ -113,6 +228,8 @@ export type CanvasElement =
 export interface DesignPage {
   id: string;
   elements: CanvasElement[];
+  /** Page background colour (hex). Absent/undefined means white. */
+  background?: string;
 }
 
 export interface DesignDoc {
@@ -353,6 +470,7 @@ export function instantiateLayout(
 ): DesignDoc {
   const pages: DesignPage[] = layout.map((page) => ({
     id: uid("page"),
+    background: page.background,
     elements: page.elements.map(
       (element) => ({ ...structuredClone(element), id: uid(element.type) }) as CanvasElement,
     ),

@@ -29,6 +29,7 @@ export default async function AdminTemplatesPage() {
       <p className="mb-8 max-w-2xl font-body text-on-surface-variant">
         The template catalogue. Draft and archived templates are hidden from
         customers; open a template to edit its details or author its layout.
+        Layout edits save to a draft and only reach customers once published.
       </p>
 
       <div className="mb-8 overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
@@ -82,6 +83,11 @@ export default async function AdminTemplatesPage() {
                   >
                     {template.status}
                   </span>
+                  {template.hasDraftLayout && (
+                    <span className="mt-1 block text-xs text-on-surface-variant">
+                      Unpublished layout
+                    </span>
+                  )}
                 </td>
                 <td className="px-5 py-3 text-on-surface-variant">{template.sortOrder}</td>
                 <td className="px-5 py-3 text-right">
