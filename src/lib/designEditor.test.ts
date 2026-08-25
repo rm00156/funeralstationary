@@ -8,7 +8,13 @@ import {
 import type { Template } from "@/lib/templates";
 
 function makeTemplate(categories: string[]): Template {
-  return { id: "t1", name: "Test Template", categories, products: [], image: "" };
+  return {
+    id: "t1",
+    name: "Test Template",
+    categories,
+    productId: "order-of-service",
+    image: "",
+  };
 }
 
 describe("templateAccent", () => {

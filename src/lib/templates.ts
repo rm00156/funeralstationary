@@ -21,8 +21,13 @@ export interface Template {
   name: string;
   /** Category ids this design belongs to. */
   categories: string[];
-  /** Product ids this design can be printed on. */
-  products: string[];
+  /**
+   * The single product this design's starter content is built for — its
+   * layout (cover / running order / back page, via makeStarterDoc) is
+   * specific to that product's format, so a template belongs to exactly one
+   * product, not many.
+   */
+  productId: string;
   image: string;
 }
 
@@ -71,125 +76,123 @@ const ARTWORK = {
     "https://lh3.googleusercontent.com/aida/AEtjO1XGRA15bxfdZGx-tkY3uvMAUbCBxACvNcM-tlt2iSONF3fSLTJpip4R31iftHFJrAT5cg2Ap00L-MGLjXt9FHeAEWlAJ7mAIPR7ickpsgkyOTQRsL21xFT-fbRN4waZKlNzbikFkmBlWDGxUuO3EKfmUrvEioUU45eYBVFqErMXtJvDyNUzpfOD_Eh6Agnzc9sYOu4FfUfK-DEO2m7kQsmOn7UjbzWe_9CdR7jKqRz86pekAc6-jVBhWRvy",
 } as const;
 
-const ALL_PRODUCTS = PRODUCTS.map((product) => product.id);
-const PRINTED_KEEPSAKES = [
-  "order-of-service",
-  "memorial-cards",
-  "bookmarks",
-  "thank-you-cards",
-];
+// All 16 starter layouts are order-of-service booklet content (cover /
+// running order / back page — see makeStarterDoc in src/lib/designEditor.ts).
+// Give the other products their own starter content before assigning any
+// template to them.
+const STARTER_PRODUCT = DEFAULT_PRODUCT;
 
 export const TEMPLATES: Template[] = [
   {
     id: "gentle-farewell",
     name: "Gentle Farewell",
     categories: ["classic", "minimalistic", "simple"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.classic,
   },
   {
     id: "evergreen-peace",
     name: "Evergreen Peace",
     categories: ["nature", "calm", "simple"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.nature,
   },
   {
     id: "eternal-lilies",
     name: "Eternal Lilies",
     categories: ["floral", "classic"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.floral,
   },
   {
     id: "quiet-devotion",
     name: "Quiet Devotion",
     categories: ["religious", "classic"],
-    products: PRINTED_KEEPSAKES,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.religious,
   },
   {
     id: "meadow-serenity",
     name: "Meadow Serenity",
     categories: ["nature", "calm", "colourful"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.themes,
   },
   {
     id: "morning-birdsong",
     name: "Morning Birdsong",
     categories: ["birds", "nature", "calm"],
-    products: PRINTED_KEEPSAKES,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.nature,
   },
   {
     id: "final-whistle",
     name: "Final Whistle",
     categories: ["sport", "modern", "colourful"],
-    products: PRINTED_KEEPSAKES,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.sport,
   },
   {
     id: "service-and-honour",
     name: "Service and Honour",
     categories: ["military", "classic"],
-    products: PRINTED_KEEPSAKES,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.classic,
   },
   {
     id: "soft-linen",
     name: "Soft Linen",
     categories: ["minimalistic", "simple", "modern"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.themes,
   },
   {
     id: "rose-elegance",
     name: "Rose Elegance",
     categories: ["floral", "classic", "colourful"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.floral,
   },
   {
     id: "last-encore",
     name: "Last Encore",
     categories: ["modern", "colourful"],
-    products: PRINTED_KEEPSAKES,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.music,
   },
   {
     id: "little-star",
     name: "Little Star",
     categories: ["calm", "colourful", "simple"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.children,
   },
   {
     id: "still-waters",
     name: "Still Waters",
     categories: ["calm", "nature", "minimalistic"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.nature,
   },
   {
     id: "sacred-light",
     name: "Sacred Light",
     categories: ["religious", "simple"],
-    products: PRINTED_KEEPSAKES,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.religious,
   },
   {
     id: "wildflower-tribute",
     name: "Wildflower Tribute",
     categories: ["floral", "nature", "colourful"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.floral,
   },
   {
     id: "quiet-modern",
     name: "Quiet Modern",
     categories: ["modern", "minimalistic"],
-    products: ALL_PRODUCTS,
+    productId: STARTER_PRODUCT,
     image: ARTWORK.themes,
   },
 ];
@@ -197,7 +200,7 @@ export const TEMPLATES: Template[] = [
 export function filterTemplates(productId: string, categoryId: string | null) {
   return TEMPLATES.filter(
     (template) =>
-      template.products.includes(productId) &&
+      template.productId === productId &&
       (categoryId === null || template.categories.includes(categoryId)),
   );
 }

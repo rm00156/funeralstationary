@@ -69,7 +69,6 @@ import {
   PAGE_H,
   PAGE_W,
   makeStarterDoc,
-  storageKey,
   templateAccent,
   uid,
   withPageCount,
@@ -180,12 +179,25 @@ function withElements(
 
 export default function DesignEditor({
   template,
+  productId,
   productLabel,
+  savedDesign,
 }: {
   template: Template;
+  productId: string;
   productLabel: string;
+  /** An existing design loaded server-side from ?design=<id>, if any. */
+  savedDesign?: {
+    id: string;
+    name: string;
+    doc: DesignDoc;
+    pagesOptionId: string;
+    paperId: string;
+  };
 }) {
-  const [doc, setDoc] = useState<DesignDoc>(() => makeStarterDoc(template, 4));
+  const [doc, setDoc] = useState<DesignDoc>(
+    () => savedDesign?.doc ?? makeStarterDoc(template, 4),
+  );
   const [history, setHistory] = useState<DesignDoc[]>([]);
   const [future, setFuture] = useState<DesignDoc[]>([]);
   const [pageIndex, setPageIndex] = useState(0);
@@ -195,9 +207,21 @@ export default function DesignEditor({
   const [zoom, setZoom] = useState(0.85);
   const [showCut, setShowCut] = useState(true);
   const [showSafe, setShowSafe] = useState(true);
-  const [pagesOptionId, setPagesOptionId] = useState("4");
-  const [paperId, setPaperId] = useState("silk");
+  const [pagesOptionId, setPagesOptionId] = useState(savedDesign?.pagesOptionId ?? "4");
+  const [paperId, setPaperId] = useState(savedDesign?.paperId ?? "silk");
   const [uploads, setUploads] = useState<string[]>([]);
+  const [designId, setDesignId] = useState<string | null>(savedDesign?.id ?? null);
+  /**
+   * The template currently applied to the cover. Seeded from the `template`
+   * prop (which the server already resolves from a saved design's own
+   * templateId), then kept in sync by applyTemplate — the prop itself never
+   * changes, so anything that read it directly would go stale the moment a
+   * different template was picked.
+   */
+  const [activeTemplate, setActiveTemplate] = useState<Template>(template);
+  // Renaming happens on /designs; a new design just takes the template's name.
+  const [designName, setDesignName] = useState(savedDesign?.name ?? template.name);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [toast, setToast] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(true);
@@ -216,45 +240,90 @@ export default function DesignEditor({
 
   /* ------------------------------ persistence ----------------------- */
 
-  useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect --
-       One-time, hydration-safe restore of the saved design from
-       localStorage; it can only run on the client, after first paint. */
-    try {
-      const raw = window.localStorage.getItem(storageKey(template.id));
-      if (!raw) return;
-      const saved = JSON.parse(raw) as {
-        doc?: DesignDoc;
-        pagesOptionId?: string;
-        paperId?: string;
-      };
-      if (saved.doc?.pages?.length) {
-        setDoc(saved.doc);
-        if (saved.pagesOptionId) setPagesOptionId(saved.pagesOptionId);
-        if (saved.paperId) setPaperId(saved.paperId);
-      }
-    } catch {
-      // A corrupt saved design should never block the editor from opening.
-    }
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [template.id]);
-
   const flash = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 2200);
   }, []);
 
+  /**
+   * Persist to the server. A design row is created lazily on the first save
+   * rather than on page load, so simply opening the editor never litters the
+   * database; once created we swap the id into the URL so a refresh (or a
+   * shared link) reopens the same design.
+   */
+  const persist = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      setSaveState("saving");
+      try {
+        const payload = {
+          doc,
+          pagesOptionId,
+          paperId,
+          name: designName,
+          templateId: activeTemplate.id,
+        };
+        const response = designId
+          ? await fetch(`/api/designs/${designId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            })
+          : await fetch("/api/designs", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...payload, productId }),
+            });
+
+        if (!response.ok) throw new Error(await response.text());
+        const saved = (await response.json()) as { id: string };
+
+        if (!designId) setDesignId(saved.id);
+        setSaveState("saved");
+        if (!options.silent) flash("Design saved to your account");
+      } catch {
+        setSaveState("error");
+        if (!options.silent) flash("Could not save — please try again");
+      }
+    },
+    [doc, pagesOptionId, paperId, designName, designId, activeTemplate.id, productId, flash],
+  );
+
   const saveDesign = () => {
-    try {
-      window.localStorage.setItem(
-        storageKey(template.id),
-        JSON.stringify({ doc, pagesOptionId, paperId }),
-      );
-      flash("Design saved on this device");
-    } catch {
-      flash("Could not save — storage is full");
-    }
+    void persist();
   };
+
+  /**
+   * Once a design exists, its id is the whole address — the row owns its own
+   * template and product, and both can change from inside the editor. A
+   * lingering ?template=/?product= would start lying the moment a different
+   * template was applied, so they're dropped here (they only ever seed a new
+   * design, from /templates).
+   */
+  useEffect(() => {
+    if (!designId) return;
+    const url = new URL(window.location.href);
+    const alreadyClean =
+      url.searchParams.get("design") === designId &&
+      !url.searchParams.has("template") &&
+      !url.searchParams.has("product");
+    if (alreadyClean) return;
+    url.search = "";
+    url.searchParams.set("design", designId);
+    window.history.replaceState(null, "", url);
+  }, [designId]);
+
+  /** Debounced autosave — the "saves automatically as you go" promise. */
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void persist({ silent: true });
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [doc, pagesOptionId, paperId, persist]);
 
   /* ------------------------------ history --------------------------- */
 
@@ -446,36 +515,76 @@ export default function DesignEditor({
 
   /* ------------------------------ photos ------------------------------ */
 
+  /**
+   * Upload a photo and return its public URL.
+   *
+   * The bytes go straight from the browser to object storage via a presigned
+   * PUT — they never pass through a Route Handler, which keeps uploads clear
+   * of Vercel's 4.5MB serverless request-body cap and keeps the saved
+   * DesignDoc small enough to autosave (it stores a URL, not base64).
+   */
+  const uploadPhoto = async (file: File): Promise<string> => {
+    const reserve = await fetch("/api/assets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contentType: file.type,
+        byteSize: file.size,
+        designId,
+      }),
+    });
+    if (!reserve.ok) {
+      const { error } = (await reserve.json().catch(() => ({}))) as { error?: string };
+      throw new Error(error ?? "Could not start the upload");
+    }
+    const { uploadUrl, url } = (await reserve.json()) as {
+      uploadUrl: string;
+      url: string;
+    };
+
+    const put = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!put.ok) throw new Error("Could not upload the photo");
+    return url;
+  };
+
   const readFiles = (files: FileList | null) => {
     if (!files?.length) return;
     const targetId = replaceTargetRef.current;
     replaceTargetRef.current = null;
-    Array.from(files).forEach((file, index) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const src = typeof reader.result === "string" ? reader.result : null;
-        if (!src) return;
-        setUploads((current) => [src, ...current]);
-        if (index === 0 && targetId) {
+
+    void (async () => {
+      const chosen = Array.from(files);
+      try {
+        const urls = await Promise.all(chosen.map((file) => uploadPhoto(file)));
+        setUploads((current) => [...urls, ...current]);
+
+        const [first] = urls;
+        if (!first) return;
+        if (targetId) {
           commit(
             patchElement(doc, pageIndex, targetId, (el) =>
-              el.type === "image" ? { ...el, src } : el,
+              el.type === "image" ? { ...el, src: first } : el,
             ),
           );
-        } else if (index === 0) {
+        } else {
           addElement({
             id: uid("image"),
             type: "image",
-            src,
+            src: first,
             x: 30,
             y: 30,
             w: 40,
             h: 28,
           });
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (error) {
+        flash(error instanceof Error ? error.message : "Could not upload the photo");
+      }
+    })();
   };
 
   const openPhotoPicker = (replaceId?: string) => {
@@ -509,7 +618,17 @@ export default function DesignEditor({
 
   const applyTemplate = (next: Template) => {
     const starter = makeStarterDoc(next, doc.pages.length);
-    commit(withElements(doc, 0, starter.pages[0].elements));
+    // templateId has to move with the cover: it's what gets persisted to
+    // designs.template_id, so leaving it behind would save the design under
+    // whichever template happened to be open first.
+    commit({
+      ...withElements(doc, 0, starter.pages[0].elements),
+      templateId: next.id,
+    });
+    setActiveTemplate(next);
+    // Follow the template name only while it's still the auto-derived one —
+    // a name the user set themselves on /designs is left alone.
+    setDesignName((current) => (current === activeTemplate.name ? next.name : current));
     setPageIndex(0);
     setSelectedId(null);
     flash(`Applied “${next.name}” to your cover`);
@@ -560,7 +679,7 @@ export default function DesignEditor({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${template.id}-proof.pdf`;
+      link.download = `${activeTemplate.id}-proof.pdf`;
       link.click();
       URL.revokeObjectURL(url);
       setProofState("idle");
@@ -643,10 +762,23 @@ export default function DesignEditor({
         </ToolbarButton>
 
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <span
+            aria-live="polite"
+            className="hidden font-body text-xs text-on-surface-variant lg:inline"
+          >
+            {saveState === "saving"
+              ? "Saving…"
+              : saveState === "saved"
+                ? "All changes saved"
+                : saveState === "error"
+                  ? "Not saved"
+                  : ""}
+          </span>
           <button
             type="button"
             onClick={saveDesign}
-            className="flex items-center gap-2 rounded-lg bg-secondary p-2.5 font-body text-sm font-medium text-on-secondary transition-colors hover:bg-on-secondary-container sm:px-4"
+            disabled={saveState === "saving"}
+            className="flex items-center gap-2 rounded-lg bg-secondary p-2.5 font-body text-sm font-medium text-on-secondary transition-colors hover:bg-on-secondary-container disabled:opacity-60 sm:px-4"
           >
             <Save size={16} aria-hidden />
             <span className="hidden md:inline">Save Design</span>
@@ -947,8 +1079,9 @@ export default function DesignEditor({
                     key={item.id}
                     type="button"
                     onClick={() => applyTemplate(item)}
+                    aria-current={item.id === activeTemplate.id}
                     className={`overflow-hidden rounded-lg border text-left transition-colors ${
-                      item.id === template.id
+                      item.id === activeTemplate.id
                         ? "border-secondary"
                         : "border-outline-variant/40 hover:border-primary-container"
                     }`}
@@ -1023,7 +1156,7 @@ export default function DesignEditor({
                         id: uid("clipart"),
                         type: "clipart",
                         icon: id,
-                        color: templateAccent(template),
+                        color: templateAccent(activeTemplate),
                         x: 42,
                         y: 42,
                         w: 16,

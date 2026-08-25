@@ -127,7 +127,7 @@ export function uid(prefix = "el") {
 }
 
 /** Accent colour a template's starter layout uses, keyed off its first category. */
-const CATEGORY_ACCENTS: Record<string, string> = {
+export const CATEGORY_ACCENTS: Record<string, string> = {
   floral: "#6b2d6a",
   nature: "#226b3d",
   calm: "#226b3d",
@@ -347,8 +347,6 @@ export function withPageCount(doc: DesignDoc, pageCount: number): DesignDoc {
   while (pages.length < pageCount) pages.push(makeBlankPage());
   return { ...doc, pages };
 }
-
-export const storageKey = (templateId: string) => `tfs-design:${templateId}`;
 
 /** POST body for /api/proof — everything /proof-render needs to reproduce the canvas. */
 export interface ProofRequest {

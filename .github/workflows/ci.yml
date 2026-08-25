@@ -5,9 +5,27 @@ on:
     branches: [master]
   pull_request:
 
+env:
+  CI_DATABASE_URL: mysql://root:root@127.0.0.1:3306/funeralstationary
+
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: funeralstationary
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -22,4 +40,31 @@ jobs:
 
       - run: npm test
 
+      # Deliberately run WITHOUT DATABASE_URL. A build imports every Route
+      # Handler to read its config exports, so this also guards against the
+      # database client being constructed at module scope again — a build
+      # must never require a reachable database.
       - run: npm run build
+
+      - name: Apply migrations to a fresh database
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+
+      - name: Seed the catalogue
+        run: npm run db:seed
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+
+      # Re-running must be a no-op: the seed upserts by slug and rebuilds the
+      # category links, so a second pass proves it reconciles rather than
+      # accumulating duplicate rows.
+      - name: Seed is idempotent
+        run: npm run db:seed
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+
+      - name: Verify seeded catalogue
+        run: npx tsx scripts/verify-seed.ts
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
