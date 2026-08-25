@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  CATEGORIES,
   COLOUR_OPTIONS,
   DELIVERY_OPTIONS,
   PAGE_OPTIONS,
   PAPER_OPTIONS,
+  PRODUCTS,
   QUANTITY_OPTIONS,
   SIZE_OPTIONS,
-} from "@/lib/orderOfServicePricing";
-import { CATEGORIES, PRODUCTS, TEMPLATES } from "@/lib/templates";
+  TEMPLATES,
+} from "./seedCatalogue";
 import {
   buildColourOptionsSeed,
   buildDeliveryOptionsSeed,

@@ -4,15 +4,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ChevronDown, Truck } from "lucide-react";
 import {
-  COLOUR_OPTIONS,
-  DEFAULT_SELECTION,
-  DELIVERY_OPTIONS,
-  PAGE_OPTIONS,
-  PAPER_OPTIONS,
-  QUANTITY_OPTIONS,
-  SIZE_OPTIONS,
-  formatPrice,
+  defaultSelection,
+  formatPence,
   getQuote,
+  type PricingData,
   type Selection,
 } from "@/lib/orderOfServicePricing";
 
@@ -60,9 +55,15 @@ function ConfigField({ id, label, value, note, options, onChange }: FieldProps) 
   );
 }
 
-export default function OrderOfServiceConfigurator() {
-  const [selection, setSelection] = useState<Selection>(DEFAULT_SELECTION);
-  const quote = useMemo(() => getQuote(selection), [selection]);
+export default function OrderOfServiceConfigurator({
+  pricing,
+}: {
+  pricing: PricingData;
+}) {
+  const [selection, setSelection] = useState<Selection>(() =>
+    defaultSelection(pricing),
+  );
+  const quote = useMemo(() => getQuote(pricing, selection), [pricing, selection]);
 
   const update = (key: keyof Selection) => (value: string) =>
     setSelection((current) => ({ ...current, [key]: value }));
@@ -82,7 +83,7 @@ export default function OrderOfServiceConfigurator() {
           id="oos-quantity"
           label="Quantity"
           value={selection.quantity}
-          options={QUANTITY_OPTIONS}
+          options={pricing.quantity}
           onChange={update("quantity")}
           note={
             quote.quantity.multiplier < 1
@@ -94,7 +95,7 @@ export default function OrderOfServiceConfigurator() {
           id="oos-size"
           label="Size"
           value={selection.size}
-          options={SIZE_OPTIONS}
+          options={pricing.size}
           onChange={update("size")}
           note={quote.size.note}
         />
@@ -102,7 +103,7 @@ export default function OrderOfServiceConfigurator() {
           id="oos-colour"
           label="Colour"
           value={selection.colour}
-          options={COLOUR_OPTIONS}
+          options={pricing.colour}
           onChange={update("colour")}
           note={quote.colour.note}
         />
@@ -110,7 +111,7 @@ export default function OrderOfServiceConfigurator() {
           id="oos-pages"
           label="No. of Pages"
           value={selection.pages}
-          options={PAGE_OPTIONS}
+          options={pricing.pages}
           onChange={update("pages")}
           note={quote.pages.note}
         />
@@ -118,7 +119,7 @@ export default function OrderOfServiceConfigurator() {
           id="oos-paper"
           label="Paper Type"
           value={selection.paper}
-          options={PAPER_OPTIONS}
+          options={pricing.paper}
           onChange={update("paper")}
           note={quote.paper.note}
         />
@@ -126,7 +127,7 @@ export default function OrderOfServiceConfigurator() {
           id="oos-delivery"
           label="Delivery"
           value={selection.delivery}
-          options={DELIVERY_OPTIONS}
+          options={pricing.delivery}
           onChange={update("delivery")}
           note={quote.delivery.note}
         />
@@ -138,17 +139,17 @@ export default function OrderOfServiceConfigurator() {
             <dt>
               {quote.quantity.value} x {quote.pages.label} booklets
               <span className="block text-sm">
-                {formatPrice(quote.unitPrice)} each
+                {formatPence(quote.unitPricePence)} each
               </span>
             </dt>
-            <dd className="text-on-surface">{formatPrice(quote.printCost)}</dd>
+            <dd className="text-on-surface">{formatPence(quote.printCostPence)}</dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt>{quote.delivery.label}</dt>
             <dd className="text-on-surface">
-              {quote.delivery.price === 0
+              {quote.delivery.pricePence === 0
                 ? "Free"
-                : formatPrice(quote.delivery.price)}
+                : formatPence(quote.delivery.pricePence)}
             </dd>
           </div>
         </dl>
@@ -159,7 +160,7 @@ export default function OrderOfServiceConfigurator() {
             aria-live="polite"
             className="font-display text-4xl font-semibold text-primary"
           >
-            {formatPrice(quote.total)}
+            {formatPence(quote.totalPence)}
           </span>
         </div>
         <p className="mt-2 text-right font-body text-sm text-on-surface-variant">

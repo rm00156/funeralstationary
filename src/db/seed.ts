@@ -65,6 +65,20 @@ async function upsertAndMapBySlug(
 }
 
 async function main() {
+  // Once the admin area has been used, the DATABASE is the source of truth —
+  // a blind re-seed would silently revert every price and label an admin has
+  // changed. Seeding is therefore bootstrap-only: it refuses to touch a
+  // populated catalogue unless explicitly forced. (Template `layout` is
+  // excluded from the upsert's update columns below, so even a forced reseed
+  // never clobbers admin-authored layouts.)
+  const [existingProduct] = await db.select({ id: products.id }).from(products).limit(1);
+  if (existingProduct && process.env.SEED_FORCE !== "1") {
+    console.log(
+      "Catalogue already seeded — admin edits are authoritative. Re-run with SEED_FORCE=1 to overwrite.",
+    );
+    process.exit(0);
+  }
+
   const productBySlug = await upsertAndMapBySlug(products, buildProductsSeed(), [
     "label",
     "sortOrder",

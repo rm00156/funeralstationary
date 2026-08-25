@@ -12,14 +12,17 @@
  */
 import { CATEGORY_ACCENTS } from "@/lib/designEditor";
 import {
+  CATEGORIES,
   COLOUR_OPTIONS,
+  DEFAULT_PRODUCT,
   DELIVERY_OPTIONS,
   PAGE_OPTIONS,
   PAPER_OPTIONS,
+  PRODUCTS,
   QUANTITY_OPTIONS,
   SIZE_OPTIONS,
-} from "@/lib/orderOfServicePricing";
-import { CATEGORIES, DEFAULT_PRODUCT, PRODUCTS, TEMPLATES } from "@/lib/templates";
+  TEMPLATES,
+} from "./seedCatalogue";
 
 const toPence = (pounds: number) => Math.round(pounds * 100);
 const toMultiplier = (value: number) => value.toFixed(4);

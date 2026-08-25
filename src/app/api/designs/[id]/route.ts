@@ -1,12 +1,13 @@
 import type { NextRequest } from "next/server";
+import { templateExists } from "@/lib/catalogue.server";
 import {
   deleteDesign,
   getDesign,
   updateDesign,
   validateDesignPayload,
 } from "@/lib/designs.server";
+import { getPageCountOption } from "@/lib/pricing.server";
 import { getOrCreateOwner } from "@/lib/session";
-import { TEMPLATES } from "@/lib/templates";
 
 export const runtime = "nodejs";
 
@@ -48,30 +49,46 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/design
   // The editor's template picker rewrites the cover, so the design's template
   // can change after creation — otherwise the row would keep pointing at
   // whichever template the editor happened to open with.
-  if (templateId !== undefined && !TEMPLATES.some((template) => template.id === templateId)) {
-    return Response.json({ error: "Unknown templateId" }, { status: 400 });
+  if (templateId !== undefined) {
+    if (typeof templateId !== "string" || !(await templateExists(templateId))) {
+      return Response.json({ error: "Unknown templateId" }, { status: 400 });
+    }
   }
 
   const spec = {
     pagesOptionId: String(pagesOptionId ?? existing.pagesOptionId),
     paperId: String(paperId ?? existing.paperId),
   };
+  const pageOption = await getPageCountOption(existing.productId, spec.pagesOptionId);
+  if (!pageOption) {
+    return Response.json({ error: "Unknown page count option" }, { status: 400 });
+  }
 
   // A doc is optional (a rename alone is valid), but if present it must be
   // consistent with the spec it is being saved alongside.
   let nextDoc = undefined;
   if (doc !== undefined) {
-    const validated = validateDesignPayload(doc, spec);
+    const validated = validateDesignPayload(doc, pageOption.pageCount);
     if (!validated.ok) return Response.json({ error: validated.error }, { status: 400 });
     nextDoc = validated.doc;
   }
 
-  const updated = await updateDesign(owner, id, {
-    doc: nextDoc,
-    spec,
-    name: typeof name === "string" ? name.trim().slice(0, 200) || "Untitled design" : undefined,
-    templateId: typeof templateId === "string" ? templateId : undefined,
-  });
+  let updated;
+  try {
+    updated = await updateDesign(owner, id, {
+      doc: nextDoc,
+      spec,
+      name: typeof name === "string" ? name.trim().slice(0, 200) || "Untitled design" : undefined,
+      templateId: typeof templateId === "string" ? templateId : undefined,
+    });
+  } catch (error) {
+    // Resolver misses (e.g. an unknown paper slug for this product) are
+    // client errors.
+    if (error instanceof Error && error.message.startsWith("Unknown")) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
   if (!updated) return Response.json({ error: "Design not found" }, { status: 404 });
 
   return Response.json({

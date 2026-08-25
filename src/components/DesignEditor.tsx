@@ -68,6 +68,7 @@ import {
   INK_PALETTE,
   PAGE_H,
   PAGE_W,
+  instantiateLayout,
   makeStarterDoc,
   templateAccent,
   uid,
@@ -84,12 +85,12 @@ import {
   type TextElement,
 } from "@/lib/designEditor";
 import {
-  PAGE_OPTIONS,
-  PAPER_OPTIONS,
-  formatPrice,
+  defaultSelection,
+  formatPence,
   getQuote,
+  type PricingData,
 } from "@/lib/orderOfServicePricing";
-import { TEMPLATES, type Template } from "@/lib/templates";
+import type { Template } from "@/lib/templates";
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -134,6 +135,18 @@ const fontCss = (id: FontFamilyId) =>
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+/** Distance (screen px) within which a dragged element snaps to a guide. */
+const SNAP_PX = 6;
+
+/** Active center guides to draw over the canvas while dragging. */
+interface CanvasGuides {
+  /** Vertical line at the page's horizontal center (element's x is centered). */
+  v: boolean;
+  /** Horizontal line at the page's vertical center (element's y is centered). */
+  h: boolean;
+}
+const NO_GUIDES: CanvasGuides = { v: false, h: false };
 
 /* ------------------------------------------------------------------ */
 /* Pure document helpers                                               */
@@ -181,11 +194,30 @@ export default function DesignEditor({
   template,
   productId,
   productLabel,
+  templates,
+  pricing,
+  initialLayout,
+  templateAuthoring,
   savedDesign,
 }: {
   template: Template;
   productId: string;
   productLabel: string;
+  /** The published template catalogue, for the template picker panel. */
+  templates: Template[];
+  /** This product's pricing options, loaded from the DB by the page. */
+  pricing: PricingData;
+  /** The initial template's authored layout (templates.layout), if any. */
+  initialLayout?: DesignPage[] | null;
+  /**
+   * Admin template-authoring mode: the document IS the template's layout.
+   * Saves PUT /api/admin/templates/:slug/layout instead of /api/designs, and
+   * customer-only chrome (cart, quote, paper, the template picker) is hidden.
+   */
+  templateAuthoring?: {
+    slug: string;
+    initialPages: DesignPage[] | null;
+  };
   /** An existing design loaded server-side from ?design=<id>, if any. */
   savedDesign?: {
     id: string;
@@ -195,9 +227,33 @@ export default function DesignEditor({
     paperId: string;
   };
 }) {
-  const [doc, setDoc] = useState<DesignDoc>(
-    () => savedDesign?.doc ?? makeStarterDoc(template, 4),
-  );
+  const authoring = !!templateAuthoring;
+  // The page-count option and the document's page count must agree from the
+  // first render (autosave validates doc.pages.length against the option), so
+  // both initialisers derive from this one resolution.
+  const startingPages = templateAuthoring
+    ? templateAuthoring.initialPages
+    : savedDesign
+      ? null
+      : (initialLayout ?? null);
+  const initialPageOption =
+    (savedDesign
+      ? pricing.pages.find((option) => option.id === savedDesign.pagesOptionId)
+      : startingPages
+        ? pricing.pages.find((option) => option.pages === startingPages.length)
+        : undefined) ?? pricing.pages[0];
+  const [doc, setDoc] = useState<DesignDoc>(() => {
+    if (savedDesign && !templateAuthoring) return savedDesign.doc;
+    if (startingPages) {
+      // Authoring keeps the authored length even when no page option matches;
+      // a customer document is reconciled to its page option.
+      const pageCount = authoring
+        ? startingPages.length
+        : (initialPageOption?.pages ?? startingPages.length);
+      return instantiateLayout(template.id, startingPages, pageCount);
+    }
+    return makeStarterDoc(template, initialPageOption?.pages ?? 4);
+  });
   const [history, setHistory] = useState<DesignDoc[]>([]);
   const [future, setFuture] = useState<DesignDoc[]>([]);
   const [pageIndex, setPageIndex] = useState(0);
@@ -207,8 +263,12 @@ export default function DesignEditor({
   const [zoom, setZoom] = useState(0.85);
   const [showCut, setShowCut] = useState(true);
   const [showSafe, setShowSafe] = useState(true);
-  const [pagesOptionId, setPagesOptionId] = useState(savedDesign?.pagesOptionId ?? "4");
-  const [paperId, setPaperId] = useState(savedDesign?.paperId ?? "silk");
+  const [pagesOptionId, setPagesOptionId] = useState(
+    savedDesign?.pagesOptionId ?? initialPageOption?.id ?? "",
+  );
+  const [paperId, setPaperId] = useState(
+    savedDesign?.paperId ?? pricing.paper[0]?.id ?? "",
+  );
   const [uploads, setUploads] = useState<string[]>([]);
   const [designId, setDesignId] = useState<string | null>(savedDesign?.id ?? null);
   /**
@@ -228,6 +288,8 @@ export default function DesignEditor({
   const [proofState, setProofState] = useState<"idle" | "generating">("idle");
   /** Whether the active panel is open as a bottom sheet (mobile only). */
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  /** Center guide lines shown while dragging an element (see startDrag). */
+  const [guides, setGuides] = useState<CanvasGuides>(NO_GUIDES);
 
   const clipboardRef = useRef<CanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -237,6 +299,10 @@ export default function DesignEditor({
   const page = doc.pages[Math.min(pageIndex, doc.pages.length - 1)];
   const selected =
     page?.elements.find((element) => element.id === selectedId) ?? null;
+
+  // Authoring a template hides the picker — applying a template on top of the
+  // layout being authored would overwrite the very thing being made.
+  const visibleTabs = authoring ? TABS.filter(({ id }) => id !== "templates") : TABS;
 
   /* ------------------------------ persistence ----------------------- */
 
@@ -255,6 +321,23 @@ export default function DesignEditor({
     async (options: { silent?: boolean } = {}) => {
       setSaveState("saving");
       try {
+        // Authoring mode: the document IS the template layout — save it to
+        // the template row, never to /api/designs.
+        if (templateAuthoring) {
+          const response = await fetch(
+            `/api/admin/templates/${templateAuthoring.slug}/layout`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ pages: doc.pages }),
+            },
+          );
+          if (!response.ok) throw new Error(await response.text());
+          setSaveState("saved");
+          if (!options.silent) flash("Template layout saved");
+          return;
+        }
+
         const payload = {
           doc,
           pagesOptionId,
@@ -285,7 +368,7 @@ export default function DesignEditor({
         if (!options.silent) flash("Could not save — please try again");
       }
     },
-    [doc, pagesOptionId, paperId, designName, designId, activeTemplate.id, productId, flash],
+    [doc, pagesOptionId, paperId, designName, designId, activeTemplate.id, productId, templateAuthoring, flash],
   );
 
   const saveDesign = () => {
@@ -484,15 +567,40 @@ export default function DesignEditor({
       }
       const dx = ((move.clientX - startX) / (PAGE_W * dragZoom)) * 100;
       const dy = ((move.clientY - startY) / (PAGE_H * dragZoom)) * 100;
+
+      if (mode === "move") {
+        let nextX = clamp(origin.x + dx, -30, 96);
+        let nextY = clamp(origin.y + dy, -20, 97);
+
+        // Snap the element's center to the page center when close, and show
+        // a guide line while it's snapped. The snap distance is defined in
+        // screen pixels (not page percent) so it feels the same at any zoom
+        // level. Text elements store h=0 (their height is auto, set by
+        // content) — for them the horizontal guide snaps the top edge to
+        // center rather than a true vertical center, since the rendered
+        // height isn't known during drag.
+        const snapThresholdX = (SNAP_PX / (PAGE_W * dragZoom)) * 100;
+        const snapThresholdY = (SNAP_PX / (PAGE_H * dragZoom)) * 100;
+        const centerX = nextX + origin.w / 2;
+        const centerY = nextY + origin.h / 2;
+        const snapV = Math.abs(centerX - 50) <= snapThresholdX;
+        const snapH = Math.abs(centerY - 50) <= snapThresholdY;
+        if (snapV) nextX = 50 - origin.w / 2;
+        if (snapH) nextY = 50 - origin.h / 2;
+        setGuides({ v: snapV, h: snapH });
+
+        setDoc((current) =>
+          patchElement(current, activePage, element.id, (el) => ({
+            ...el,
+            x: nextX,
+            y: nextY,
+          })),
+        );
+        return;
+      }
+
       setDoc((current) =>
         patchElement(current, activePage, element.id, (el) => {
-          if (mode === "move") {
-            return {
-              ...el,
-              x: clamp(origin.x + dx, -30, 96),
-              y: clamp(origin.y + dy, -20, 97),
-            };
-          }
           const w = Math.max(4, origin.w + dx);
           if (el.type === "text" && origin.type === "text") {
             const fontSize = Math.max(
@@ -508,6 +616,7 @@ export default function DesignEditor({
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      setGuides(NO_GUIDES);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -616,26 +725,62 @@ export default function DesignEditor({
     } as TextElement);
   };
 
-  const applyTemplate = (next: Template) => {
-    const starter = makeStarterDoc(next, doc.pages.length);
-    // templateId has to move with the cover: it's what gets persisted to
-    // designs.template_id, so leaving it behind would save the design under
-    // whichever template happened to be open first.
-    commit({
-      ...withElements(doc, 0, starter.pages[0].elements),
-      templateId: next.id,
-    });
+  const applyTemplate = async (next: Template) => {
+    // A template with an admin-authored layout is a genuinely different
+    // multi-page design, so applying it replaces the whole document (behind a
+    // confirm). Without one, keep the historical behaviour: regenerate just
+    // the cover and leave the customer's other pages alone.
+    let layout: DesignPage[] | null = null;
+    try {
+      const response = await fetch(`/api/templates/${next.id}/layout`);
+      if (response.ok) {
+        layout = ((await response.json()) as { layout: DesignPage[] | null }).layout;
+      }
+    } catch {
+      // Treat a failed fetch like an unauthored template.
+    }
+
+    if (layout && layout.length > 0) {
+      const confirmed = window.confirm(
+        `Apply “${next.name}”? This replaces every page of your design with the template's layout.`,
+      );
+      if (!confirmed) return;
+      // Keep the page-count invariant: adopt the layout's own length when a
+      // page option matches it, otherwise fit the layout to the current one.
+      const matchingOption = pricing.pages.find(
+        (option) => option.pages === layout.length,
+      );
+      if (matchingOption) setPagesOptionId(matchingOption.id);
+      commit(
+        instantiateLayout(
+          next.id,
+          layout,
+          matchingOption ? layout.length : doc.pages.length,
+        ),
+      );
+      flash(`Applied “${next.name}”`);
+    } else {
+      const starter = makeStarterDoc(next, doc.pages.length);
+      // templateId has to move with the cover: it's what gets persisted to
+      // designs.template_id, so leaving it behind would save the design under
+      // whichever template happened to be open first.
+      commit({
+        ...withElements(doc, 0, starter.pages[0].elements),
+        templateId: next.id,
+      });
+      flash(`Applied “${next.name}” to your cover`);
+    }
+
     setActiveTemplate(next);
     // Follow the template name only while it's still the auto-derived one —
     // a name the user set themselves on /designs is left alone.
     setDesignName((current) => (current === activeTemplate.name ? next.name : current));
     setPageIndex(0);
     setSelectedId(null);
-    flash(`Applied “${next.name}” to your cover`);
   };
 
   const setPageCount = (optionId: string) => {
-    const option = PAGE_OPTIONS.find((o) => o.id === optionId);
+    const option = pricing.pages.find((o) => o.id === optionId);
     if (!option) return;
     setPagesOptionId(optionId);
     commit(withPageCount(doc, option.pages));
@@ -691,15 +836,12 @@ export default function DesignEditor({
 
   const quote = useMemo(
     () =>
-      getQuote({
-        quantity: "15",
-        size: "a5",
-        colour: "full-colour-both",
+      getQuote(pricing, {
+        ...defaultSelection(pricing),
         pages: pagesOptionId,
         paper: paperId,
-        delivery: "standard",
       }),
-    [pagesOptionId, paperId],
+    [pricing, pagesOptionId, paperId],
   );
 
   const reorderSelectedWith = (from: number, to: number) => {
@@ -728,11 +870,11 @@ export default function DesignEditor({
       {/* ------------------------------ top bar ------------------------ */}
       <header className="flex items-center gap-1 border-b border-outline-variant/40 bg-surface-container-lowest px-3 py-2">
         <Link
-          href="/templates"
+          href={authoring ? "/admin/templates" : "/templates"}
           className="flex items-center gap-2 rounded-lg border border-outline-variant/60 px-2.5 py-2 font-body text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary sm:px-3"
         >
           <Home size={16} aria-hidden />
-          <span className="hidden sm:inline">Home</span>
+          <span className="hidden sm:inline">{authoring ? "Templates" : "Home"}</span>
         </Link>
 
         <div className="mx-1 h-7 w-px bg-outline-variant/50 sm:mx-2" aria-hidden />
@@ -799,14 +941,16 @@ export default function DesignEditor({
             <Eye size={16} aria-hidden />
             <span className="hidden md:inline">Preview</span>
           </button>
-          <Link
-            href="/order-of-service"
-            className="flex items-center gap-2 rounded-lg bg-primary-container p-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-primary sm:px-4"
-          >
-            <ShoppingCart size={16} aria-hidden className="md:hidden" />
-            <span className="hidden md:inline">Add To Cart</span>
-            <ArrowRight size={16} aria-hidden className="hidden md:block" />
-          </Link>
+          {!authoring && (
+            <Link
+              href="/order-of-service"
+              className="flex items-center gap-2 rounded-lg bg-primary-container p-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-primary sm:px-4"
+            >
+              <ShoppingCart size={16} aria-hidden className="md:hidden" />
+              <span className="hidden md:inline">Add To Cart</span>
+              <ArrowRight size={16} aria-hidden className="hidden md:block" />
+            </Link>
+          )}
         </div>
       </header>
 
@@ -938,7 +1082,7 @@ export default function DesignEditor({
           aria-label="Editor panels"
           className="hidden w-[76px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-outline-variant/40 bg-surface-container-lowest py-3 md:flex"
         >
-          {TABS.map(({ id, label, Icon }) => (
+          {visibleTabs.map(({ id, label, Icon }) => (
             <button
               key={id}
               type="button"
@@ -974,7 +1118,7 @@ export default function DesignEditor({
         >
           <div className="mb-3 flex items-center justify-between md:hidden">
             <span className="font-body text-sm font-medium capitalize text-on-surface">
-              {TABS.find((item) => item.id === tab)?.label}
+              {visibleTabs.find((item) => item.id === tab)?.label}
             </span>
             <button
               type="button"
@@ -1003,7 +1147,7 @@ export default function DesignEditor({
               <div>
                 <PanelHeading>Number of pages</PanelHeading>
                 <div className="flex flex-col gap-2">
-                  {PAGE_OPTIONS.map((option) => (
+                  {pricing.pages.map((option) => (
                     <button
                       key={option.id}
                       type="button"
@@ -1021,10 +1165,11 @@ export default function DesignEditor({
                 </div>
               </div>
 
+              {!authoring && (
               <div>
                 <PanelHeading>Paper stock</PanelHeading>
                 <div className="flex flex-col gap-2">
-                  {PAPER_OPTIONS.map((option) => (
+                  {pricing.paper.map((option) => (
                     <button
                       key={option.id}
                       type="button"
@@ -1048,16 +1193,19 @@ export default function DesignEditor({
                   ))}
                 </div>
               </div>
+              )}
 
+              {!authoring && (
               <div className="rounded-xl border border-soft-sage bg-surface-container-lowest p-4 ambient-shadow">
                 <p className="font-body text-sm text-on-surface-variant">
                   15 copies from{" "}
                   <span className="font-semibold text-secondary">
-                    {formatPrice(quote.total)}
+                    {formatPence(quote.totalPence)}
                   </span>{" "}
                   with free UK delivery.
                 </p>
               </div>
+              )}
 
               <p className="font-body text-xs leading-relaxed text-on-surface-variant">
                 Our funeral order of service booklets are available as 4, 8, 12,
@@ -1071,14 +1219,15 @@ export default function DesignEditor({
             <div>
               <PanelHeading>Start from a template</PanelHeading>
               <p className="mb-3 font-body text-xs text-on-surface-variant">
-                Applies to your front cover — your other pages are kept.
+                Templates with a full page design replace your whole document
+                (we&apos;ll ask first); the rest refresh just your front cover.
               </p>
               <div className="grid grid-cols-2 gap-3">
-                {TEMPLATES.map((item) => (
+                {templates.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => applyTemplate(item)}
+                    onClick={() => void applyTemplate(item)}
                     aria-current={item.id === activeTemplate.id}
                     className={`overflow-hidden rounded-lg border text-left transition-colors ${
                       item.id === activeTemplate.id
@@ -1417,6 +1566,7 @@ export default function DesignEditor({
               zoom={zoom}
               showCut={showCut}
               showSafe={showSafe}
+              guides={guides}
               selectedId={selectedId}
               editingId={editingId}
               onSelect={setSelectedId}
@@ -1540,7 +1690,7 @@ export default function DesignEditor({
         aria-label="Editor panels"
         className="flex shrink-0 items-stretch gap-1 overflow-x-auto border-t border-outline-variant/40 bg-surface-container-lowest px-2 py-1.5 md:hidden"
       >
-        {TABS.map(({ id, label, Icon }) => (
+        {visibleTabs.map(({ id, label, Icon }) => (
           <button
             key={id}
             type="button"
@@ -1616,13 +1766,15 @@ export default function DesignEditor({
                 <FileDown size={16} aria-hidden />
                 {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
               </button>
-              <Link
-                href="/order-of-service"
-                className="flex items-center gap-2 rounded-lg bg-primary-container px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-primary"
-              >
-                <ShoppingCart size={16} aria-hidden />
-                Continue to order
-              </Link>
+              {!authoring && (
+                <Link
+                  href="/order-of-service"
+                  className="flex items-center gap-2 rounded-lg bg-primary-container px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-primary"
+                >
+                  <ShoppingCart size={16} aria-hidden />
+                  Continue to order
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -1645,6 +1797,7 @@ export function PageCanvas({
   zoom,
   showCut,
   showSafe,
+  guides,
   selectedId,
   editingId,
   onSelect,
@@ -1658,6 +1811,8 @@ export function PageCanvas({
   zoom: number;
   showCut: boolean;
   showSafe: boolean;
+  /** Center guide lines to draw while an element is being dragged. */
+  guides?: CanvasGuides;
   selectedId: string | null;
   editingId: string | null;
   onSelect: (id: string) => void;
@@ -1718,6 +1873,22 @@ export function PageCanvas({
               aria-hidden
               className="pointer-events-none absolute border border-dashed"
               style={{ inset: 16, borderColor: "#226b3d" }}
+            />
+          )}
+
+          {/* center snap guides — shown only while dragging near center */}
+          {guides?.v && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed"
+              style={{ borderColor: "#ec4899" }}
+            />
+          )}
+          {guides?.h && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed"
+              style={{ borderColor: "#ec4899" }}
             />
           )}
         </div>
