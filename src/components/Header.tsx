@@ -49,10 +49,13 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <button className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors duration-300 text-sm font-medium tracking-wide">
+          <Link
+            href="/designs"
+            className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors duration-300 text-sm font-medium tracking-wide"
+          >
             <CircleUserRound size={18} />
-            My Account
-          </button>
+            My Designs
+          </Link>
           <button
             className="md:hidden text-primary p-2"
             onClick={() => setMenuOpen((open) => !open)}
@@ -80,10 +83,14 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
-          <button className="flex items-center justify-center gap-2 px-6 py-2.5 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors duration-300 text-sm font-medium tracking-wide">
+          <Link
+            href="/designs"
+            onClick={() => setMenuOpen(false)}
+            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors duration-300 text-sm font-medium tracking-wide"
+          >
             <CircleUserRound size={18} />
-            My Account
-          </button>
+            My Designs
+          </Link>
         </nav>
       )}
     </header>

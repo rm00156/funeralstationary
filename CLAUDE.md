@@ -8,8 +8,10 @@ A marketing/product frontend for a funeral stationery business, built on Next.js
 - **Build:** `npm run build`
 - **Start (prod):** `npm run start`
 - **Linting:** `npm run lint`
+- **Tests:** `npm test` (Vitest)
+- **Database:** `npm run db:generate` / `db:migrate` / `db:push` / `db:seed` / `db:studio` (Drizzle Kit) — see **Data Layer** below.
 
-There is no test runner, database, or auth layer configured yet — do not assume `npm run typecheck` or `npm test` exist as scripts. `npm run dev`/`npm run build` also drive the proof-generation Route Handler below; it needs no extra setup locally (Puppeteer downloads its own Chromium on `npm install`).
+There is still no `npm run typecheck` script — do not assume one exists. `npm run dev`/`npm run build` also drive the proof-generation Route Handler below; it needs no extra setup locally (Puppeteer downloads its own Chromium on `npm install`).
 
 ## Architecture & Tech Stack Rules
 
@@ -33,11 +35,37 @@ This exists specifically so the PDF is guaranteed pixel-identical to what the cu
 
 **Local vs production Chromium:** `puppeteer` (devDependency, downloads a real Chromium locally) is used when `process.env.VERCEL` is unset; `puppeteer-core` + `@sparticuz/chromium` (Linux-only) is used on Vercel. `next.config.ts`'s `outputFileTracingExcludes` keeps the dev-only package out of the deployed function. **Requires Vercel Pro or higher** — the route's `maxDuration` exceeds the Hobby plan's 10s ceiling.
 
+## Data Layer
+
+Drizzle ORM + MySQL 8 (`mysql2` driver). Schema lives in `src/db/schema/*.ts`, the client in `src/db/index.ts` (`db`, an HMR-safe pooled singleton — throws if `DATABASE_URL` is unset). No app route imports `src/db` yet; this is schema/migrations only, laid down ahead of wiring the editor and a cart/checkout flow to it.
+
+- **Slug PKs for catalogue rows, UUID PKs for user data.** `products`, `template_categories`, `templates` and the pricing tables keep the human-readable ids already used in URLs and in `DesignDoc.templateId` (`src/lib/templates.ts`) as `varchar(64)` primary keys. `users`, `designs`, `orders`, etc. use `char(36)` UUIDs (`crypto.randomUUID()`).
+- **Money is integer pence**, never floats (`vat_pence`, `unit_price_pence`, ...). Multiplier columns are `decimal(6,4)`.
+- **Live rows reference the catalogue; order rows snapshot it.** `designs` FKs into the pricing tables (`size_options`/`colour_options`/`paper_options`/`quantity_options`/`page_count_options`/`delivery_options`), each scoped by `product_id` with a composite FK — see `designs.ts` for why size/colour/paper are three tables, not one polymorphic table (MySQL FKs must target an exact unique key). `order_items`/`orders` instead store the resolved spec as plain snapshot columns with **no FK**, plus a `quote_snapshot`/`doc_snapshot` JSON blob of exactly what the customer saw — so a later catalogue or price change can never rewrite order history.
+- **No cart table** — a cart is an `orders` row with `status = 'draft'`.
+- `src/db/seedData.ts` holds pure seed-row builders (no DB import, so they're unit-testable — see `seedData.test.ts`) derived directly from the `src/lib/templates.ts` / `src/lib/orderOfServicePricing.ts` constants; `src/db/seed.ts` is the thin runner (`npm run db:seed`) that idempotently upserts them.
+- `templates.layout` is nullable — null means "fall back to `makeStarterDoc()`" (today's behaviour for all 16 seeded templates); a per-template `DesignPage[]` can be filled in later with no code change.
+- `designs.doc` is the `DesignDoc` JSON blob. `ImageElement.src` holds an object-storage **URL**, not base64 — see **Photo Uploads** below.
+
+## Design Persistence
+
+`/design` saves server-side; there is no `localStorage` fallback any more.
+
+- **Ownership without auth.** `src/lib/session.ts` issues an httpOnly `tfs_guest` cookie and returns an `Owner`. Every query in `src/lib/designs.server.ts` is scoped by it, so one visitor can never read or mutate another's design (a cross-owner fetch 404s rather than 403s — don't leak existence). When accounts land, registration claims rows by setting `user_id` and clearing `guest_token`; no data migration needed.
+- **Routes:** `GET`/`POST /api/designs`, `GET`/`PATCH`/`DELETE /api/designs/[id]`. `DELETE` is a **soft** delete (`deleted_at`), so an `order_item` pointing at the design still reads.
+- **Lazy creation.** Opening the editor does *not* insert a row. The first save (autosave or the Save button) POSTs, then swaps the new id into the URL with `history.replaceState`. Don't "fix" this into an eager insert — it would litter the table on every visit.
+- **Validation lives in `validateDesignPayload`.** It enforces the page-count invariant (`doc.pages.length` must equal the chosen `PAGE_OPTIONS` entry's `pages`, because `setPageCount` drives both). MySQL `CHECK` can't reach another table, so this function is the only enforcement point — keep new spec fields validated there.
+- Autosave is debounced 1.5s in `DesignEditor.tsx`; the Save button calls the same `persist()`.
+
+## Photo Uploads
+
+`POST /api/assets` returns a **presigned PUT**; the browser uploads bytes straight to object storage. Bytes must never pass through a Route Handler — Vercel caps serverless request bodies at 4.5MB and print-resolution photos exceed it. `src/lib/storage.ts` is written against the plain S3 API so AWS S3, Cloudflare R2 and MinIO all work (set `S3_ENDPOINT` for the latter two); the bucket needs a CORS rule permitting `PUT` from the site origin. Uploads are capped at `MAX_UPLOAD_BYTES` and restricted to `ALLOWED_IMAGE_TYPES`. With no `S3_*` env vars set the route returns 503 and the rest of the editor still works.
+
 ## Claude Code Execution Directives
 
 1. **Targeted Edits Only:** Do NOT rewrite entire files for localized changes. Use surgical diffs.
-2. **Verification Loop:** Run `npm run lint` after changes. There is no typecheck script or test suite to run — do not invent one or assume it exists.
-3. **No Unrequested Packages:** Never run `npm install` for new libraries unless explicitly requested. This project has no database or auth layer — don't introduce them speculatively. (It does have one server-side feature, proof generation — see **Proof Generation** above — that's an intentional, already-approved exception, not precedent for adding other backend infrastructure unasked.)
+2. **Verification Loop:** Run `npm run lint` and `npm test` after changes. There is still no typecheck script — do not invent one or assume it exists (run `npx tsc --noEmit` directly if you need one).
+3. **No Unrequested Packages:** Never run `npm install` for new libraries unless explicitly requested. (Proof generation and the Drizzle/MySQL data layer — see **Proof Generation** and **Data Layer** above — are intentional, already-approved exceptions, not precedent for adding other backend infrastructure unasked. There is still no auth provider — don't add one speculatively.)
 4. **Design Fidelity:** When building new UI, check `DESIGN.md` and the existing `globals.css` tokens first. Don't hardcode raw hex colors or arbitrary spacing values in components when an equivalent token already exists.
 5. **No Ad-Hoc Manual Verification Rigs:** For small, low-risk UI/layout changes, do NOT stand up a throwaway verification rig (spinning up a dev server, screenshotting) just to confirm something answerable by reading the code/diff. Answer directly, or ask the user if they'd rather share a screenshot. Reserve real browser verification for changes where correctness can't be judged by reading the code, and even then, ask first before standing up that kind of rig.
 
