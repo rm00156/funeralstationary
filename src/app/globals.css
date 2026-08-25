@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  --color-surface: #fff7fa;
+  --color-surface-dim: #e2d7dd;
+  --color-surface-bright: #fff7fa;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #fcf0f7;
+  --color-surface-container: #f7ebf1;
+  --color-surface-container-high: #f1e5eb;
+  --color-surface-container-highest: #ebdfe5;
+  --color-on-surface: #1f1a1e;
+  --color-on-surface-variant: #4f434c;
+  --color-inverse-surface: #352f33;
+  --color-inverse-on-surface: #faeef4;
+  --color-outline: #81737d;
+  --color-outline-variant: #d3c2cd;
+  --color-primary: #511552;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #6b2d6a;
+  --color-on-primary-container: #e69adf;
+  --color-primary-fixed: #ffd6f7;
+  --color-secondary: #226b3d;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #a9f4b9;
+  --color-on-secondary-container: #297143;
+  --color-background: #fff7fa;
+  --color-on-background: #1f1a1e;
+  --color-canvas-cream: #f4f1ee;
+  --color-soft-sage: #e8f0ea;
+  --color-mourning-gray: #4a4a4a;
+
+  --font-display: "Source Serif 4", serif;
+  --font-body: "Work Sans", sans-serif;
+
+  --spacing-margin-mobile: 16px;
+  --spacing-gutter: 24px;
+  --spacing-element-gap: 24px;
+  --spacing-section-gap: 80px;
+
+  --container-max-width: 1200px;
+}
+
+@theme inline {
+  --color-surface: var(--color-surface);
+  --color-surface-dim: var(--color-surface-dim);
+  --color-surface-bright: var(--color-surface-bright);
+  --color-surface-container-lowest: var(--color-surface-container-lowest);
+  --color-surface-container-low: var(--color-surface-container-low);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-high: var(--color-surface-container-high);
+  --color-surface-container-highest: var(--color-surface-container-highest);
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  --color-inverse-surface: var(--color-inverse-surface);
+  --color-inverse-on-surface: var(--color-inverse-on-surface);
+  --color-outline: var(--color-outline);
+  --color-outline-variant: var(--color-outline-variant);
+  --color-primary: var(--color-primary);
+  --color-on-primary: var(--color-on-primary);
+  --color-primary-container: var(--color-primary-container);
+  --color-on-primary-container: var(--color-on-primary-container);
+  --color-primary-fixed: var(--color-primary-fixed);
+  --color-secondary: var(--color-secondary);
+  --color-on-secondary: var(--color-on-secondary);
+  --color-secondary-container: var(--color-secondary-container);
+  --color-on-secondary-container: var(--color-on-secondary-container);
+  --color-background: var(--color-background);
+  --color-on-background: var(--color-on-background);
+  --color-canvas-cream: var(--color-canvas-cream);
+  --color-soft-sage: var(--color-soft-sage);
+  --color-mourning-gray: var(--color-mourning-gray);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+
+  --spacing-margin-mobile: var(--spacing-margin-mobile);
+  --spacing-gutter: var(--spacing-gutter);
+  --spacing-element-gap: var(--spacing-element-gap);
+  --spacing-section-gap: var(--spacing-section-gap);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.ambient-shadow {
+  box-shadow: 0 4px 20px rgba(107, 45, 106, 0.04);
+}
