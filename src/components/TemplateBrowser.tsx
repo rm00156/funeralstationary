@@ -16,13 +16,20 @@ export default function TemplateBrowser({
   products,
   categories,
   templates: allTemplates,
+  initialProductId = null,
+  initialCategoryId = null,
 }: {
   products: Product[];
   categories: TemplateCategory[];
   templates: Template[];
+  /** ?product= / ?category= from the URL, already validated server-side. */
+  initialProductId?: string | null;
+  initialCategoryId?: string | null;
 }) {
-  const [productId, setProductId] = useState(products[0]?.id ?? "");
-  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [productId, setProductId] = useState(
+    initialProductId ?? products[0]?.id ?? "",
+  );
+  const [categoryId, setCategoryId] = useState<string | null>(initialCategoryId);
   const [favourites, setFavourites] = useState<string[]>([]);
 
   const templates = useMemo(

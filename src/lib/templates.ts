@@ -50,3 +50,14 @@ export function filterTemplates(
       (categoryId === null || template.categories.includes(categoryId)),
   );
 }
+
+/**
+ * A category as shown on the home page's product range grid: the real
+ * category row plus a preview image borrowed from its first published
+ * template, so the tiles can never drift from the actual catalogue.
+ */
+export interface CategoryShowcase extends TemplateCategory {
+  /** Preview image of the first published template in this category. */
+  image: string;
+  templateCount: number;
+}
