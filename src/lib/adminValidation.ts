@@ -10,6 +10,7 @@ import type {
   AdminOptionPatch,
   OptionKind,
 } from "@/lib/adminCatalogue.server";
+import { TEMPLATE_PAGE_COUNT, type DesignPage } from "@/lib/designEditor";
 import { MAX_PAGES } from "@/lib/designs.server";
 
 /** Slugs are public identifiers and order-history snapshots — locked format. */
@@ -245,19 +246,24 @@ export function parseOptionPatch(
 }
 
 /**
- * A template layout payload: null (clear the authored layout) or 1..MAX_PAGES
- * structurally valid pages. Depth of checking mirrors validateDesignPayload —
- * page shape only, element internals are trusted from the editor.
+ * A template layout payload: null (clear the authored layout) or exactly the
+ * cover/middle/back triple — the middle page is what repeats to fill a
+ * customer's chosen page count, so any other length has no meaning. Depth of
+ * checking mirrors validateDesignPayload — page shape only, element internals
+ * are trusted from the editor.
  */
 export function parseLayoutPages(
   value: unknown,
-): { ok: true; pages: import("@/lib/designEditor").DesignPage[] | null } | { ok: false; error: string } {
+): { ok: true; pages: DesignPage[] | null } | { ok: false; error: string } {
   if (value === null) return { ok: true, pages: null };
-  if (!Array.isArray(value) || value.length === 0) {
-    return { ok: false, error: "pages must be null or a non-empty array" };
+  if (!Array.isArray(value)) {
+    return { ok: false, error: "pages must be null or an array" };
   }
-  if (value.length > MAX_PAGES) {
-    return { ok: false, error: `A layout can have at most ${MAX_PAGES} pages` };
+  if (value.length !== TEMPLATE_PAGE_COUNT) {
+    return {
+      ok: false,
+      error: `A layout must have exactly ${TEMPLATE_PAGE_COUNT} pages (cover, middle, back)`,
+    };
   }
   for (const page of value) {
     if (
@@ -269,7 +275,7 @@ export function parseLayoutPages(
       return { ok: false, error: "pages contains a malformed page" };
     }
   }
-  return { ok: true, pages: value as import("@/lib/designEditor").DesignPage[] };
+  return { ok: true, pages: value as DesignPage[] };
 }
 
 /**
