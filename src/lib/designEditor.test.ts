@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  PAGE_H,
   PAGE_W,
+  RESIZE_HANDLES,
   TEMPLATE_PAGE_COUNT,
   imageShape,
   instantiateLayout,
@@ -14,6 +16,7 @@ import {
   toTemplateLayout,
   withPageCount,
   type ImageElement,
+  type ResizeHandle,
 } from "@/lib/designEditor";
 import type { Template } from "@/lib/templates";
 
@@ -269,4 +272,69 @@ describe("resizeBox", () => {
       h: 0,
     });
   });
+
+  it("leaves an unrotated box untouched by the rotation path", () => {
+    expect(resizeBox(origin, "se", 10, 5, { rotation: 0 })).toEqual({
+      x: 20,
+      y: 30,
+      w: 50,
+      h: 25,
+    });
+  });
+
+  it("maps the pointer delta into a rotated element's own axes", () => {
+    // At 90deg the on-screen "down" drag runs along the element's own width.
+    const box = resizeBox(origin, "se", 0, 20, { rotation: 90 });
+    expect(box.w).toBeGreaterThan(origin.w);
+    expect(box.h).toBeCloseTo(origin.h, 6);
+  });
+
+  it("inverts the delta for a 180deg element, so the handle still follows the cursor", () => {
+    // Upside down, the south-east handle sits at the top-left on screen —
+    // dragging it further up/left has to grow the box, not shrink it.
+    const box = resizeBox(origin, "se", -10, -5, { rotation: 180 });
+    expect(box.w).toBeCloseTo(50, 6);
+    expect(box.h).toBeCloseTo(25, 6);
+  });
+
+  it("keeps the opposite corner pinned on screen while rotated", () => {
+    for (const rotation of [30, 90, 137, 200, 315]) {
+      for (const handle of RESIZE_HANDLES) {
+        const box = resizeBox(origin, handle, 7, -4, { rotation });
+        const anchor = oppositeCorner(handle);
+        const before = screenCorner(origin, rotation, anchor);
+        const after = screenCorner(box, rotation, anchor);
+        expect(after.x).toBeCloseTo(before.x, 6);
+        expect(after.y).toBeCloseTo(before.y, 6);
+      }
+    }
+  });
 });
+
+/** The corner a resize from `handle` is supposed to leave pinned. */
+function oppositeCorner(handle: ResizeHandle): ResizeHandle {
+  return { nw: "se", ne: "sw", sw: "ne", se: "nw" }[handle] as ResizeHandle;
+}
+
+/**
+ * Where a box corner actually lands on screen, in pixels, once the browser has
+ * applied `rotate()` around the box's centre — the thing a pinned corner has
+ * to hold still.
+ */
+function screenCorner(
+  box: { x: number; y: number; w: number; h: number },
+  rotation: number,
+  corner: ResizeHandle,
+) {
+  const rad = (rotation * Math.PI) / 180;
+  const cx = ((box.x + box.w / 2) / 100) * PAGE_W;
+  const cy = ((box.y + box.h / 2) / 100) * PAGE_H;
+  const px = ((corner === "nw" || corner === "sw" ? box.x : box.x + box.w) / 100) * PAGE_W;
+  const py = ((corner === "nw" || corner === "ne" ? box.y : box.y + box.h) / 100) * PAGE_H;
+  const dx = px - cx;
+  const dy = py - cy;
+  return {
+    x: cx + dx * Math.cos(rad) - dy * Math.sin(rad),
+    y: cy + dx * Math.sin(rad) + dy * Math.cos(rad),
+  };
+}

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { Check, ChevronRight, Clock, Heart, Palette } from "lucide-react";
 
@@ -7,6 +6,10 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import HowItWorks from "@/components/HowItWorks";
 import OrderOfServiceConfigurator from "@/components/OrderOfServiceConfigurator";
+import OrderOfServicePreviewGallery, {
+  type PreviewTemplate,
+} from "@/components/OrderOfServicePreviewGallery";
+import { getTemplates } from "@/lib/catalogue.server";
 import {
   defaultSelection,
   formatPence,
@@ -24,7 +27,8 @@ export const metadata: Metadata = {
     "Personalised order of service booklets from 15 copies. Choose your size, page count, colour and paper, see the price instantly, and have them delivered next day.",
 };
 
-const PREVIEW_IMAGE =
+// Fallback if the order-of-service product has no published templates yet.
+const FALLBACK_PREVIEW_IMAGE =
   "https://lh3.googleusercontent.com/aida/AEtjO1UZ-qKw2zOQhr6QfvfFb6-r7WRdHlE5U6j6qJ4Jxt5AXS6AttERQGRnTr-bQ31v31ImAw5oTaLC7K1q50_udIDPuwWb447CYNK9zlP7V_wVKYQ5AGIvyLv-zU8qO0IMYTggeWp-DjGBVk_FCW-Bdr-c_7QPoDeXB_L4DRQ_JrtH6vGb4PZ2iVqU5XghErR0rG9B4IsvrIiLvwOtZc9VoEkpyMQ6BttDshSqfHGFKCVdbTPGBuyZVYDiJluA";
 
 const THEMES = [
@@ -68,12 +72,24 @@ const SPECS = [
 ];
 
 export default async function OrderOfServicePage() {
-  const pricing = await getPricingData("order-of-service");
+  const [pricing, templates] = await Promise.all([
+    getPricingData("order-of-service"),
+    getTemplates(),
+  ]);
   // The cheapest configuration: first option on every axis, mono colour.
   const startingQuote = getQuote(pricing, {
     ...defaultSelection(pricing),
     colour: "mono",
   });
+  const oosTemplates = templates.filter(
+    (template) => template.productId === "order-of-service",
+  );
+  const previewTemplates: PreviewTemplate[] =
+    oosTemplates.length > 0
+      ? oosTemplates
+          .slice(0, 5)
+          .map(({ id, name, image }) => ({ id, name, image }))
+      : [{ id: "fallback", name: "Example", image: FALLBACK_PREVIEW_IMAGE }];
 
   return (
     <>
@@ -105,16 +121,7 @@ export default async function OrderOfServicePage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 lg:gap-x-16 gap-y-6 items-start">
               <div className="order-2 lg:order-1 lg:sticky lg:top-28">
-                <div className="relative w-full aspect-4/3 rounded-xl bg-surface-container-low ambient-shadow overflow-hidden">
-                  <Image
-                    src={PREVIEW_IMAGE}
-                    alt="An example order of service booklet"
-                    fill
-                    priority
-                    sizes="(min-width: 1024px) 50vw, 100vw"
-                    className="object-contain p-6"
-                  />
-                </div>
+                <OrderOfServicePreviewGallery templates={previewTemplates} />
 
                 <p className="font-body text-sm uppercase tracking-[0.18em] text-secondary mt-8 mb-4">
                   Available themes

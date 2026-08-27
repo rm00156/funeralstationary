@@ -20,7 +20,12 @@ import {
   templates,
 } from "@/db/schema";
 import type { DesignPage } from "@/lib/designEditor";
-import type { Product, Template, TemplateCategory } from "@/lib/templates";
+import type {
+  CategoryShowcase,
+  Product,
+  Template,
+  TemplateCategory,
+} from "@/lib/templates";
 
 export const getProducts = cache(async (): Promise<Product[]> => {
   const rows = await db
@@ -39,6 +44,60 @@ export const getCategories = cache(async (): Promise<TemplateCategory[]> => {
     .orderBy(asc(templateCategories.sortOrder), asc(templateCategories.id));
   return rows.map((row) => ({ id: row.slug, label: row.label }));
 });
+
+/**
+ * Active categories that actually have published templates, each carrying the
+ * preview image of its first template — what the home page's product range
+ * grid renders, so those tiles are the real catalogue rather than a parallel
+ * hardcoded list. Categories with no published template are omitted: a tile
+ * that leads to an empty results page is worse than no tile.
+ */
+export const getCategoryShowcase = cache(
+  async (): Promise<CategoryShowcase[]> => {
+    const rows = await db
+      .select({
+        slug: templateCategories.slug,
+        label: templateCategories.label,
+        image: templates.previewImageUrl,
+      })
+      .from(templateCategories)
+      .innerJoin(
+        templateCategoryLinks,
+        eq(templateCategoryLinks.categoryId, templateCategories.id),
+      )
+      .innerJoin(templates, eq(templateCategoryLinks.templateId, templates.id))
+      .where(
+        and(
+          eq(templateCategories.isActive, true),
+          eq(templates.status, "published"),
+        ),
+      )
+      .orderBy(
+        asc(templateCategories.sortOrder),
+        asc(templateCategories.id),
+        asc(templates.sortOrder),
+        asc(templates.id),
+      );
+
+    // Rows arrive category-ordered then template-ordered, so the first row of
+    // each group is both the tile's image and the start of its count.
+    const byCategory = new Map<string, CategoryShowcase>();
+    for (const row of rows) {
+      const existing = byCategory.get(row.slug);
+      if (existing) {
+        existing.templateCount += 1;
+        continue;
+      }
+      byCategory.set(row.slug, {
+        id: row.slug,
+        label: row.label,
+        image: row.image,
+        templateCount: 1,
+      });
+    }
+    return [...byCategory.values()];
+  },
+);
 
 /**
  * Category links for a set of template ids, in position order (position is

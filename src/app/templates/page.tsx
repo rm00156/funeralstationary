@@ -18,12 +18,21 @@ export const metadata: Metadata = {
     "Browse our funeral order of service templates and personalise the wording, photographs, colours and pages. Design it yourself, or send us your content and we will put every page together for you.",
 };
 
-export default async function TemplatesPage() {
-  const [products, categories, templates] = await Promise.all([
-    getProducts(),
-    getCategories(),
-    getTemplates(),
-  ]);
+export default async function TemplatesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ product?: string; category?: string }>;
+}) {
+  const [{ product: productParam, category: categoryParam }, products, categories, templates] =
+    await Promise.all([searchParams, getProducts(), getCategories(), getTemplates()]);
+
+  // The home page's category tiles and product pills deep-link in here.
+  // Unknown slugs fall back to the defaults rather than 404ing — a stale
+  // bookmark for an archived category should still show the browser.
+  const initialProductId =
+    products.find((product) => product.id === productParam)?.id ?? null;
+  const initialCategoryId =
+    categories.find((category) => category.id === categoryParam)?.id ?? null;
 
   return (
     <>
@@ -79,6 +88,8 @@ export default async function TemplatesPage() {
                 products={products}
                 categories={categories}
                 templates={templates}
+                initialProductId={initialProductId}
+                initialCategoryId={initialCategoryId}
               />
             </div>
           </div>
