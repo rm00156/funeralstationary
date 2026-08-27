@@ -268,13 +268,46 @@ export interface ElementBox {
 }
 
 /**
+ * Re-pin the corner a resize is anchored on, for a rotated box.
+ *
+ * `resizeBox` keeps the opposite corner fixed in the element's *own* axes, but
+ * CSS `rotate()` pivots around the box centre — so as the box grows, that
+ * centre moves and swings the supposedly-pinned corner across the screen.
+ * Offsetting the box by the screen-space drift of the centre cancels it out.
+ * With no rotation this is a no-op (`cos = 1`, `sin = 0`).
+ */
+function pinRotatedAnchor(
+  origin: ElementBox,
+  box: ElementBox,
+  cos: number,
+  sin: number,
+): ElementBox {
+  // Percent units are relative to different page dimensions, so the rotation
+  // maths has to happen in pixels and convert back one axis at a time.
+  const driftX = ((origin.x + origin.w / 2 - (box.x + box.w / 2)) / 100) * PAGE_W;
+  const driftY = ((origin.y + origin.h / 2 - (box.y + box.h / 2)) / 100) * PAGE_H;
+  const offsetX = driftX - (driftX * cos - driftY * sin);
+  const offsetY = driftY - (driftX * sin + driftY * cos);
+  return {
+    ...box,
+    x: box.x + (offsetX / PAGE_W) * 100,
+    y: box.y + (offsetY / PAGE_H) * 100,
+  };
+}
+
+/**
  * Resize a box by dragging one of its four corner handles.
  *
- * `dx`/`dy` are the pointer delta in page percent. The corner opposite the
- * dragged handle stays pinned, so a west handle moves `x` as it changes `w`
- * (and a north handle moves `y` as it changes `h`) rather than shifting the
- * whole element. Clamping to the minimum size pins that opposite edge too —
- * dragging past it parks the box instead of flipping it inside out.
+ * `dx`/`dy` are the pointer delta in page percent, in *screen* axes. The corner
+ * opposite the dragged handle stays pinned, so a west handle moves `x` as it
+ * changes `w` (and a north handle moves `y` as it changes `h`) rather than
+ * shifting the whole element. Clamping to the minimum size pins that opposite
+ * edge too — dragging past it parks the box instead of flipping it inside out.
+ *
+ * `rotation` (degrees, matching `CanvasElement.rotation`) makes the handles
+ * follow the element rather than the page: the pointer delta is mapped back
+ * into the element's own axes so a corner still grows towards the cursor, and
+ * the anchored corner is re-pinned against the centre-pivot drift.
  *
  * `autoHeight` is for text elements, whose rendered height is set by their
  * content (they store `h = 0`): there the vertical delta is ignored entirely
@@ -285,8 +318,22 @@ export function resizeBox(
   handle: ResizeHandle,
   dx: number,
   dy: number,
-  { autoHeight = false }: { autoHeight?: boolean } = {},
+  { autoHeight = false, rotation = 0 }: { autoHeight?: boolean; rotation?: number } = {},
 ): ElementBox {
+  // The unrotated case is by far the common one, and routing it through the
+  // trig below would only add floating-point noise to exact percentages.
+  const rotated = rotation % 360 !== 0;
+  const rad = (rotation * Math.PI) / 180;
+  const cos = rotated ? Math.cos(rad) : 1;
+  const sin = rotated ? Math.sin(rad) : 0;
+
+  // Screen-space delta -> the element's own axes (an inverse rotation), again
+  // via pixels because the two percent axes aren't the same scale.
+  const pixelDx = (dx / 100) * PAGE_W;
+  const pixelDy = (dy / 100) * PAGE_H;
+  const localDx = rotated ? ((pixelDx * cos + pixelDy * sin) / PAGE_W) * 100 : dx;
+  const localDy = rotated ? ((-pixelDx * sin + pixelDy * cos) / PAGE_H) * 100 : dy;
+
   const west = handle === "nw" || handle === "sw";
   const north = handle === "nw" || handle === "ne";
 
@@ -294,25 +341,27 @@ export function resizeBox(
   let w: number;
   if (west) {
     const right = origin.x + origin.w;
-    w = Math.max(MIN_ELEMENT_W, right - (origin.x + dx));
+    w = Math.max(MIN_ELEMENT_W, right - (origin.x + localDx));
     x = right - w;
   } else {
-    w = Math.max(MIN_ELEMENT_W, origin.w + dx);
+    w = Math.max(MIN_ELEMENT_W, origin.w + localDx);
   }
 
-  if (autoHeight) return { x, y: origin.y, w, h: origin.h };
+  if (autoHeight) {
+    return pinRotatedAnchor(origin, { x, y: origin.y, w, h: origin.h }, cos, sin);
+  }
 
   let y = origin.y;
   let h: number;
   if (north) {
     const bottom = origin.y + origin.h;
-    h = Math.max(MIN_ELEMENT_H, bottom - (origin.y + dy));
+    h = Math.max(MIN_ELEMENT_H, bottom - (origin.y + localDy));
     y = bottom - h;
   } else {
-    h = Math.max(MIN_ELEMENT_H, origin.h + dy);
+    h = Math.max(MIN_ELEMENT_H, origin.h + localDy);
   }
 
-  return { x, y, w, h };
+  return pinRotatedAnchor(origin, { x, y, w, h }, cos, sin);
 }
 
 export interface DesignPage {

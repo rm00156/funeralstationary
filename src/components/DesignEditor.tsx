@@ -730,13 +730,18 @@ export default function DesignEditor({
       setDoc((current) =>
         patchElement(current, activePage, element.id, (el) => {
           const isText = el.type === "text" && origin.type === "text";
-          const box = resizeBox(origin, handle, dx, dy, { autoHeight: isText });
+          const box = resizeBox(origin, handle, dx, dy, {
+            autoHeight: isText,
+            rotation: origin.rotation ?? 0,
+          });
           if (el.type === "text" && origin.type === "text") {
             const fontSize = Math.max(
               6,
               Math.round(origin.fontSize * (box.w / origin.w)),
             );
-            return { ...el, x: box.x, w: box.w, fontSize };
+            // `y` still moves for a rotated box: the centre pivot shifts it
+            // even though the height itself is content-driven.
+            return { ...el, x: box.x, y: box.y, w: box.w, fontSize };
           }
           return { ...el, ...box };
         }),
