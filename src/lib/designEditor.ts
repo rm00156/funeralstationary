@@ -192,11 +192,36 @@ export interface TextElement extends ElementBase {
   uppercase?: boolean;
 }
 
+export type PhotoShape = "rect" | "oval" | "arch";
+
 export interface ImageElement extends ElementBase {
   type: "image";
   /** Data/blob URL, or null for an empty photo placeholder. */
   src: string | null;
+  /** @deprecated superseded by `shape`; kept so old saved docs still render. */
   round?: boolean;
+  shape?: PhotoShape;
+}
+
+/** The effective window shape, honouring the legacy `round` flag. */
+export function imageShape(el: ImageElement): PhotoShape {
+  return el.shape ?? (el.round ? "oval" : "rect");
+}
+
+/**
+ * CSS border-radius clipping the photo (and its placeholder border) to its
+ * window shape. The arch radius is half the box width in base-page px — a
+ * true semicircular top regardless of box aspect — which stays correct at
+ * any zoom because pages scale via CSS transform, never by relayout.
+ */
+export function photoBorderRadius(el: ImageElement): string | undefined {
+  const shape = imageShape(el);
+  if (shape === "oval") return "50%";
+  if (shape === "arch") {
+    const r = ((el.w / 100) * PAGE_W) / 2;
+    return `${r}px ${r}px 0 0`;
+  }
+  return undefined;
 }
 
 export interface ShapeElement extends ElementBase {
@@ -224,6 +249,71 @@ export type CanvasElement =
   | ShapeElement
   | ClipartElement
   | FrameElement;
+
+/** The four corner handles a selected element can be resized from. */
+export type ResizeHandle = "nw" | "ne" | "sw" | "se";
+
+export const RESIZE_HANDLES: readonly ResizeHandle[] = ["nw", "ne", "sw", "se"];
+
+/** Minimum element footprint, in page percent, so a box can't be dragged away. */
+export const MIN_ELEMENT_W = 4;
+export const MIN_ELEMENT_H = 1;
+
+/** The positional part of a CanvasElement — everything a resize touches. */
+export interface ElementBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Resize a box by dragging one of its four corner handles.
+ *
+ * `dx`/`dy` are the pointer delta in page percent. The corner opposite the
+ * dragged handle stays pinned, so a west handle moves `x` as it changes `w`
+ * (and a north handle moves `y` as it changes `h`) rather than shifting the
+ * whole element. Clamping to the minimum size pins that opposite edge too —
+ * dragging past it parks the box instead of flipping it inside out.
+ *
+ * `autoHeight` is for text elements, whose rendered height is set by their
+ * content (they store `h = 0`): there the vertical delta is ignored entirely
+ * and only the width — which the caller turns into a font size — responds.
+ */
+export function resizeBox(
+  origin: ElementBox,
+  handle: ResizeHandle,
+  dx: number,
+  dy: number,
+  { autoHeight = false }: { autoHeight?: boolean } = {},
+): ElementBox {
+  const west = handle === "nw" || handle === "sw";
+  const north = handle === "nw" || handle === "ne";
+
+  let x = origin.x;
+  let w: number;
+  if (west) {
+    const right = origin.x + origin.w;
+    w = Math.max(MIN_ELEMENT_W, right - (origin.x + dx));
+    x = right - w;
+  } else {
+    w = Math.max(MIN_ELEMENT_W, origin.w + dx);
+  }
+
+  if (autoHeight) return { x, y: origin.y, w, h: origin.h };
+
+  let y = origin.y;
+  let h: number;
+  if (north) {
+    const bottom = origin.y + origin.h;
+    h = Math.max(MIN_ELEMENT_H, bottom - (origin.y + dy));
+    y = bottom - h;
+  } else {
+    h = Math.max(MIN_ELEMENT_H, origin.h + dy);
+  }
+
+  return { x, y, w, h };
+}
 
 export interface DesignPage {
   id: string;
@@ -315,7 +405,7 @@ function coverElements(template: Template): CanvasElement[] {
       id: uid("image"),
       type: "image",
       src: null,
-      round: true,
+      shape: "oval",
       x: 30,
       y: 27.5,
       w: 40,
@@ -440,7 +530,7 @@ export function makeBlankPage(): DesignPage {
   return { id: uid("page"), elements: [] };
 }
 
-/** Starter document for a template: cover, order pages, back page. */
+/** Starter document for a template: cover, the order page repeated to fill, back page. */
 export function makeStarterDoc(template: Template, pageCount: number): DesignDoc {
   const pages: DesignPage[] = [];
   for (let index = 0; index < pageCount; index += 1) {
@@ -448,13 +538,60 @@ export function makeStarterDoc(template: Template, pageCount: number): DesignDoc
       pages.push({ id: uid("page"), elements: coverElements(template) });
     } else if (index === pageCount - 1) {
       pages.push({ id: uid("page"), elements: backPageElements() });
-    } else if (index === 1) {
-      pages.push({ id: uid("page"), elements: orderPageElements() });
     } else {
-      pages.push(makeBlankPage());
+      pages.push({ id: uid("page"), elements: orderPageElements() });
     }
   }
   return { templateId: template.id, pages };
+}
+
+/**
+ * A template layout is exactly three authored pages: cover, one middle page,
+ * and back. Per print-shop convention the middle page is the one that repeats
+ * to fill whichever page-count option (4, 8, 12, …) the customer picks, so
+ * authoring more than one of it would have nowhere to go in the finished
+ * booklet — withPageCount() performs that expansion.
+ */
+export const TEMPLATE_PAGE_COUNT = 3;
+
+/** Display names for the three authored template pages, by index. */
+export const TEMPLATE_PAGE_LABELS = ["Cover", "Middle", "Back"] as const;
+
+export function templatePageLabel(index: number): string {
+  return TEMPLATE_PAGE_LABELS[index] ?? `Page ${index + 1}`;
+}
+
+/** The starting point for authoring a template that has no layout yet. */
+export function makeTemplateLayout(template: Template): DesignPage[] {
+  return makeStarterDoc(template, TEMPLATE_PAGE_COUNT).pages;
+}
+
+/**
+ * Coerce a stored layout to the canonical cover/middle/back triple. Layouts
+ * authored before this structure existed can be any length, so the authoring
+ * editor normalises on load rather than rejecting them: the first page is the
+ * cover, the last is the back, and the first interior page (when there is
+ * one) becomes the middle that repeats.
+ */
+export function toTemplateLayout(pages: DesignPage[] | null): DesignPage[] | null {
+  if (!pages || pages.length === 0) return null;
+  if (pages.length === TEMPLATE_PAGE_COUNT) return pages;
+  return [
+    pages[0],
+    pages.length >= 3 ? pages[1] : makeBlankPage(),
+    pages.length >= 2 ? pages[pages.length - 1] : makeBlankPage(),
+  ];
+}
+
+/** Deep-clones a page with fresh page and element ids — two pages must never share ids. */
+function clonePageWithFreshIds(page: DesignPage): DesignPage {
+  return {
+    id: uid("page"),
+    background: page.background,
+    elements: page.elements.map(
+      (element) => ({ ...structuredClone(element), id: uid(element.type) }) as CanvasElement,
+    ),
+  };
 }
 
 /**
@@ -468,24 +605,37 @@ export function instantiateLayout(
   layout: DesignPage[],
   pageCount: number,
 ): DesignDoc {
-  const pages: DesignPage[] = layout.map((page) => ({
-    id: uid("page"),
-    background: page.background,
-    elements: page.elements.map(
-      (element) => ({ ...structuredClone(element), id: uid(element.type) }) as CanvasElement,
-    ),
-  }));
+  const pages = layout.map(clonePageWithFreshIds);
   return withPageCount({ templateId, pages }, pageCount);
 }
 
-/** Grow or shrink a document to the requested page count. */
+/**
+ * Grow or shrink a document to the requested page count. Per print-shop
+ * convention, a template only ever needs a cover, one middle page and a back
+ * page: the cover (page 0) and back page (last) stay fixed, and interior
+ * pages are filled by repeating the existing middle page — never blank-filled
+ * on grow, and the back page is never truncated away on shrink.
+ */
 export function withPageCount(doc: DesignDoc, pageCount: number): DesignDoc {
   if (doc.pages.length === pageCount) return doc;
-  if (doc.pages.length > pageCount) {
-    return { ...doc, pages: doc.pages.slice(0, pageCount) };
+  if (doc.pages.length < 2 || pageCount < 2) {
+    if (doc.pages.length > pageCount) {
+      return { ...doc, pages: doc.pages.slice(0, Math.max(pageCount, 0)) };
+    }
+    const pages = [...doc.pages];
+    while (pages.length < pageCount) pages.push(makeBlankPage());
+    return { ...doc, pages };
   }
-  const pages = [...doc.pages];
-  while (pages.length < pageCount) pages.push(makeBlankPage());
+  const cover = doc.pages[0];
+  const back = doc.pages[doc.pages.length - 1];
+  const interior = doc.pages.slice(1, -1);
+  const middle = interior[0] ?? makeBlankPage();
+  const targetInteriorCount = pageCount - 2;
+  const pages: DesignPage[] = [cover];
+  for (let index = 0; index < targetInteriorCount; index += 1) {
+    pages.push(index < interior.length ? interior[index] : clonePageWithFreshIds(middle));
+  }
+  pages.push(back);
   return { ...doc, pages };
 }
 

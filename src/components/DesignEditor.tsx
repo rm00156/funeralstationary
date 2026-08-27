@@ -43,6 +43,7 @@ import {
   Minus,
   Music,
   Package,
+  Pipette,
   Plus,
   Redo2,
   RotateCw,
@@ -67,13 +68,20 @@ import {
   ARTBOARD_W,
   BLEED_PX,
   FONT_OPTIONS,
+  imageShape,
+  photoBorderRadius,
   INK_PALETTE,
   PAGE_BACKGROUND_PALETTE,
   PAGE_H,
   PAGE_W,
+  RESIZE_HANDLES,
   instantiateLayout,
   makeStarterDoc,
+  makeTemplateLayout,
+  resizeBox,
   templateAccent,
+  templatePageLabel,
+  toTemplateLayout,
   uid,
   withPageCount,
   type CanvasElement,
@@ -83,7 +91,9 @@ import {
   type FontFamilyId,
   type FrameElement,
   type ImageElement,
+  type PhotoShape,
   type ProofRequest,
+  type ResizeHandle,
   type ShapeElement,
   type TextElement,
 } from "@/lib/designEditor";
@@ -241,8 +251,10 @@ export default function DesignEditor({
   // The page-count option and the document's page count must agree from the
   // first render (autosave validates doc.pages.length against the option), so
   // both initialisers derive from this one resolution.
+  // Authoring always works on exactly cover/middle/back, normalising any
+  // older layout that was authored at a different length.
   const startingPages = templateAuthoring
-    ? templateAuthoring.initialPages
+    ? (toTemplateLayout(templateAuthoring.initialPages) ?? makeTemplateLayout(template))
     : savedDesign
       ? null
       : (initialLayout ?? null);
@@ -623,6 +635,7 @@ export default function DesignEditor({
     event: React.PointerEvent,
     element: CanvasElement,
     mode: "move" | "resize" | "rotate",
+    handle: ResizeHandle = "se",
   ) => {
     if (editingId === element.id) return;
     event.preventDefault();
@@ -716,15 +729,16 @@ export default function DesignEditor({
 
       setDoc((current) =>
         patchElement(current, activePage, element.id, (el) => {
-          const w = Math.max(4, origin.w + dx);
+          const isText = el.type === "text" && origin.type === "text";
+          const box = resizeBox(origin, handle, dx, dy, { autoHeight: isText });
           if (el.type === "text" && origin.type === "text") {
             const fontSize = Math.max(
               6,
-              Math.round(origin.fontSize * (w / origin.w)),
+              Math.round(origin.fontSize * (box.w / origin.w)),
             );
-            return { ...el, w, fontSize };
+            return { ...el, x: box.x, w: box.w, fontSize };
           }
-          return { ...el, w, h: Math.max(1, origin.h + dy) };
+          return { ...el, ...box };
         }),
       );
     };
@@ -814,6 +828,19 @@ export default function DesignEditor({
   const openPhotoPicker = (replaceId?: string) => {
     replaceTargetRef.current = replaceId ?? null;
     fileInputRef.current?.click();
+  };
+
+  const addPhotoPlaceholder = () => {
+    addElement({
+      id: uid("image"),
+      type: "image",
+      src: null,
+      shape: "oval",
+      x: 30,
+      y: 30,
+      w: 40,
+      h: 28,
+    });
   };
 
   /* ------------------------------ misc actions ------------------------ */
@@ -1017,6 +1044,11 @@ export default function DesignEditor({
         <ToolbarButton label="Add photo" onClick={() => openPhotoPicker()}>
           <ImagePlus size={18} aria-hidden />
         </ToolbarButton>
+        {authoring && (
+          <ToolbarButton label="Add photo placeholder" onClick={() => addPhotoPlaceholder()}>
+            <ImageIcon size={18} aria-hidden />
+          </ToolbarButton>
+        )}
 
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
           <span
@@ -1171,21 +1203,28 @@ export default function DesignEditor({
             selected.type === "shape" ||
             selected.type === "clipart" ||
             selected.type === "frame") && (
-            <div className="flex items-center gap-1">
-              {INK_PALETTE.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  aria-label={`Colour ${color}`}
-                  onClick={() => updateSelected({ color })}
-                  className={`h-5 w-5 rounded-full border ${
-                    selected.color === color
-                      ? "border-primary ring-2 ring-primary-container/40"
-                      : "border-outline-variant/60"
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {INK_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`Colour ${color}`}
+                    onClick={() => updateSelected({ color })}
+                    className={`h-5 w-5 rounded-full border ${
+                      selected.color === color
+                        ? "border-primary ring-2 ring-primary-container/40"
+                        : "border-outline-variant/60"
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              <div className="h-5 w-px bg-outline-variant/50" aria-hidden />
+              <ColorPicker
+                value={selected.color}
+                onChange={(color) => updateSelected({ color })}
+              />
             </div>
           )}
 
@@ -1199,13 +1238,16 @@ export default function DesignEditor({
                 <ImagePlus size={15} aria-hidden />
                 {selected.src ? "Replace photo" : "Upload photo"}
               </button>
-              <ToolbarButton
-                label="Round photo"
-                active={!!selected.round}
-                onClick={() => updateSelected({ round: !selected.round })}
-              >
-                <Circle size={16} aria-hidden />
-              </ToolbarButton>
+              {PHOTO_SHAPE_OPTIONS.map(({ id, label, Icon }) => (
+                <ToolbarButton
+                  key={id}
+                  label={label}
+                  active={imageShape(selected) === id}
+                  onClick={() => updateSelected({ shape: id })}
+                >
+                  <Icon size={16} aria-hidden />
+                </ToolbarButton>
+              ))}
             </>
           )}
 
@@ -1286,6 +1328,41 @@ export default function DesignEditor({
                 </div>
               </div>
 
+              {authoring ? (
+                <div>
+                  <PanelHeading>Template structure</PanelHeading>
+                  <ol className="flex flex-col gap-2">
+                    {doc.pages.map((structurePage, index) => (
+                      <li key={structurePage.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPageIndex(index);
+                            setSelectedId(null);
+                          }}
+                          aria-pressed={pageIndex === index}
+                          className={`w-full rounded-lg border px-4 py-2.5 text-left transition-colors ${
+                            pageIndex === index
+                              ? "border-secondary bg-soft-sage"
+                              : "border-outline-variant/60 bg-surface-container-lowest hover:bg-surface-container"
+                          }`}
+                        >
+                          <span className="block font-body text-sm font-medium text-on-surface">
+                            {templatePageLabel(index)}
+                          </span>
+                          <span className="block font-body text-xs text-on-surface-variant">
+                            {index === 1
+                              ? "Repeats to fill every inside page"
+                              : index === 0
+                                ? "Front of the booklet"
+                                : "Back of the booklet"}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ) : (
               <div>
                 <PanelHeading>Number of pages</PanelHeading>
                 <div className="flex flex-col gap-2">
@@ -1306,6 +1383,7 @@ export default function DesignEditor({
                   ))}
                 </div>
               </div>
+              )}
 
               {!authoring && (
               <div>
@@ -1350,9 +1428,9 @@ export default function DesignEditor({
               )}
 
               <p className="font-body text-xs leading-relaxed text-on-surface-variant">
-                Our funeral order of service booklets are available as 4, 8, 12,
-                16, 20 and 24 page printed booklets, with premium card covers,
-                full-colour printing and free UK delivery.
+                {authoring
+                  ? "Customers choose 4, 8, 12, 16, 20 or 24 pages. The cover and back stay where they are and the middle page repeats to fill everything in between."
+                  : "Our funeral order of service booklets are available as 4, 8, 12, 16, 20 and 24 page printed booklets, with premium card covers, full-colour printing and free UK delivery."}
               </p>
             </div>
           )}
@@ -1475,6 +1553,16 @@ export default function DesignEditor({
                 <ImagePlus size={18} aria-hidden />
                 Upload a photo
               </button>
+              {authoring && (
+                <button
+                  type="button"
+                  onClick={addPhotoPlaceholder}
+                  className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-outline-variant px-4 py-6 font-body text-sm font-medium text-on-surface-variant transition-colors hover:border-primary-container hover:text-primary"
+                >
+                  <ImageIcon size={18} aria-hidden />
+                  Add a placeholder
+                </button>
+              )}
               {uploads.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {uploads.map((src, index) => (
@@ -1591,7 +1679,7 @@ export default function DesignEditor({
                     <Circle size={26} strokeWidth={1.5} aria-hidden />
                   </ElementSwatch>
                   <ElementSwatch
-                    label="Divider"
+                    label="Flourish divider"
                     onClick={() =>
                       addElement({
                         id: uid("image"),
@@ -1606,6 +1694,69 @@ export default function DesignEditor({
                   >
                     <img
                       src="/elements/divider-flourish.png"
+                      alt=""
+                      aria-hidden
+                      className="w-full opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Floral divider"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-floral-spray.png",
+                        x: 30,
+                        y: 49.5,
+                        w: 40,
+                        h: 5.3,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-floral-spray.png"
+                      alt=""
+                      aria-hidden
+                      className="w-full opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Dot divider"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-dot.png",
+                        x: 30,
+                        y: 49.5,
+                        w: 40,
+                        h: 2.27,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-dot.png"
+                      alt=""
+                      aria-hidden
+                      className="w-full opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Heart divider"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-heart.png",
+                        x: 30,
+                        y: 49.5,
+                        w: 40,
+                        h: 4.95,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-heart.png"
                       alt=""
                       aria-hidden
                       className="w-full opacity-80"
@@ -1627,6 +1778,132 @@ export default function DesignEditor({
                   >
                     <img
                       src="/elements/floral-sprig.png"
+                      alt=""
+                      aria-hidden
+                      className="h-8 w-auto opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Peony"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/floral-peony.png",
+                        x: 33,
+                        y: 40,
+                        w: 34,
+                        h: 17.93,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/floral-peony.png"
+                      alt=""
+                      aria-hidden
+                      className="h-8 w-auto opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Gold dot divider"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-dot-gold.png",
+                        x: 30,
+                        y: 49.5,
+                        w: 40,
+                        h: 2.35,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-dot-gold.png"
+                      alt=""
+                      aria-hidden
+                      className="w-full opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Gold scroll divider"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-scroll-floral.png",
+                        x: 30,
+                        y: 49.5,
+                        w: 40,
+                        h: 8.46,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-scroll-floral.png"
+                      alt=""
+                      aria-hidden
+                      className="w-full opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Gold swirl divider"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-swirl.png",
+                        x: 30,
+                        y: 49.5,
+                        w: 40,
+                        h: 5.69,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-swirl.png"
+                      alt=""
+                      aria-hidden
+                      className="w-full opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Gold bar accent"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-bar-accent.png",
+                        x: 38,
+                        y: 49.5,
+                        w: 24,
+                        h: 5.14,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-bar-accent.png"
+                      alt=""
+                      aria-hidden
+                      className="w-full opacity-80"
+                    />
+                  </ElementSwatch>
+                  <ElementSwatch
+                    label="Gold vertical bar"
+                    onClick={() =>
+                      addElement({
+                        id: uid("image"),
+                        type: "image",
+                        src: "/elements/divider-bar-vertical.png",
+                        x: 41.9,
+                        y: 34,
+                        w: 16.2,
+                        h: 32,
+                      })
+                    }
+                  >
+                    <img
+                      src="/elements/divider-bar-vertical.png"
                       alt=""
                       aria-hidden
                       className="h-8 w-auto opacity-80"
@@ -1679,7 +1956,9 @@ export default function DesignEditor({
           {tab === "layers" && (
             <div>
               <PanelHeading>
-                Layers — page {pageIndex + 1}
+                {authoring
+                  ? `Layers — ${templatePageLabel(pageIndex).toLowerCase()}`
+                  : `Layers — page ${pageIndex + 1}`}
               </PanelHeading>
               {page.elements.length === 0 ? (
                 <p className="font-body text-sm text-on-surface-variant">
@@ -1804,7 +2083,7 @@ export default function DesignEditor({
               <Lightbulb size={20} className="mt-0.5 shrink-0 text-secondary" aria-hidden />
               <div className="font-body text-xs leading-relaxed text-on-surface-variant">
                 <p>— Double-click text to edit the wording</p>
-                <p>— Drag to move, corner handle to resize</p>
+                <p>— Drag to move, corner handles to resize</p>
                 <p>— Double-click a photo frame to upload</p>
               </div>
               <button
@@ -1833,7 +2112,7 @@ export default function DesignEditor({
               <ArrowUp size={16} aria-hidden />
             </button>
             <span className="font-body text-sm text-on-surface-variant tabular-nums">
-              {pageIndex + 1}/{doc.pages.length}
+              {authoring ? templatePageLabel(pageIndex) : `${pageIndex + 1}/${doc.pages.length}`}
             </span>
             <button
               type="button"
@@ -1955,7 +2234,7 @@ export default function DesignEditor({
                 <div key={previewPage.id} className="flex flex-col items-center gap-2">
                   <StaticPage page={previewPage} scale={0.45} />
                   <span className="font-body text-xs text-on-surface-variant">
-                    Page {index + 1}
+                    {authoring ? templatePageLabel(index) : `Page ${index + 1}`}
                   </span>
                 </div>
               ))}
@@ -2024,6 +2303,7 @@ export function PageCanvas({
     event: React.PointerEvent,
     element: CanvasElement,
     mode: "move" | "resize" | "rotate",
+    handle?: ResizeHandle,
   ) => void;
   onStartEdit: (element: CanvasElement) => void;
   onEditText: (id: string, text: string) => void;
@@ -2123,6 +2403,21 @@ export function PageCanvas({
   );
 }
 
+/** Corner placement + cursor for each resize handle. */
+const RESIZE_HANDLE_CLASS: Record<ResizeHandle, string> = {
+  nw: "-top-2 -left-2 cursor-nwse-resize",
+  ne: "-top-2 -right-2 cursor-nesw-resize",
+  sw: "-bottom-2 -left-2 cursor-nesw-resize",
+  se: "-bottom-2 -right-2 cursor-nwse-resize",
+};
+
+const RESIZE_HANDLE_LABELS: Record<ResizeHandle, string> = {
+  nw: "Resize from top left",
+  ne: "Resize from top right",
+  sw: "Resize from bottom left",
+  se: "Resize from bottom right",
+};
+
 function ElementView({
   element,
   selected,
@@ -2141,6 +2436,7 @@ function ElementView({
     event: React.PointerEvent,
     element: CanvasElement,
     mode: "move" | "resize" | "rotate",
+    handle?: ResizeHandle,
   ) => void;
   onStartEdit: () => void;
   onEditText: (text: string) => void;
@@ -2177,13 +2473,17 @@ function ElementView({
         onEndEdit={onEndEdit}
       />
 
-      {selected && !editing && (
-        <div
-          role="presentation"
-          onPointerDown={(event) => onStartDrag(event, element, "resize")}
-          className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize touch-none rounded-full border-2 border-white bg-[#6b2d6a]"
-        />
-      )}
+      {selected &&
+        !editing &&
+        RESIZE_HANDLES.map((handle) => (
+          <div
+            key={handle}
+            role="presentation"
+            aria-label={RESIZE_HANDLE_LABELS[handle]}
+            onPointerDown={(event) => onStartDrag(event, element, "resize", handle)}
+            className={`absolute h-4 w-4 touch-none rounded-full border-2 border-white bg-[#6b2d6a] ${RESIZE_HANDLE_CLASS[handle]}`}
+          />
+        ))}
 
       {selected && !editing && (
         <div
@@ -2272,8 +2572,9 @@ function ImageContent({ element }: { element: ImageElement }) {
   return (
     <div
       className={`h-full w-full overflow-hidden ${
-        element.round ? "rounded-full" : ""
-      } ${element.src ? "" : "border-2 border-dashed border-[#d3c2cd] bg-[#faf6f8]"}`}
+        element.src ? "" : "border-2 border-dashed border-[#d3c2cd] bg-[#faf6f8]"
+      }`}
+      style={{ borderRadius: photoBorderRadius(element) }}
     >
       {element.src ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -2396,6 +2697,34 @@ function StaticPage({ page, scale }: { page: DesignPage; scale: number }) {
 /* Small building blocks                                               */
 /* ------------------------------------------------------------------ */
 
+function ArchIcon({ size = 16 }: { size?: number | string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M5 21v-9a7 7 0 0 1 14 0v9z" />
+    </svg>
+  );
+}
+
+const PHOTO_SHAPE_OPTIONS: {
+  id: PhotoShape;
+  label: string;
+  Icon: ComponentType<{ size?: number | string; "aria-hidden"?: boolean }>;
+}[] = [
+  { id: "rect", label: "Rectangular photo", Icon: Square },
+  { id: "oval", label: "Oval photo", Icon: Circle },
+  { id: "arch", label: "Arch photo", Icon: ArchIcon },
+];
+
 function ToolbarButton({
   label,
   onClick,
@@ -2424,6 +2753,78 @@ function ToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+/** 3- or 6-digit hex (with or without `#`) → lowercase `#rrggbb`, or null if invalid. */
+function normalizeHex(raw: string): string | null {
+  const withHash = raw.trim().startsWith("#") ? raw.trim() : `#${raw.trim()}`;
+  if (/^#[0-9a-f]{6}$/i.test(withHash)) return withHash.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(withHash)) {
+    const [r, g, b] = withHash.slice(1).split("");
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return null;
+}
+
+function ColorPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (color: string) => void;
+}) {
+  const [prevValue, setPrevValue] = useState(value);
+  const [text, setText] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setText(value);
+  }
+
+  const commit = (raw: string) => {
+    const normalized = normalizeHex(raw);
+    if (normalized) onChange(normalized);
+    else setText(value);
+  };
+
+  const swatchColor = normalizeHex(value) ?? "#000000";
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <label
+        className="relative flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border border-outline-variant/60"
+        style={{
+          background:
+            "conic-gradient(from 180deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444)",
+        }}
+        title="Custom colour"
+      >
+        <input
+          type="color"
+          value={swatchColor}
+          onChange={(event) => onChange(event.target.value)}
+          aria-label="Pick a custom colour"
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+        <Pipette size={11} aria-hidden className="pointer-events-none text-white drop-shadow" />
+      </label>
+      <input
+        type="text"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={(event) => commit(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          commit(event.currentTarget.value);
+          event.currentTarget.blur();
+        }}
+        aria-label="Hex colour value"
+        placeholder="#000000"
+        spellCheck={false}
+        className="w-[4.5rem] rounded-md border border-outline-variant/50 bg-transparent px-1.5 py-1 font-mono text-xs text-on-surface-variant focus:border-primary focus:outline-none"
+      />
+    </div>
   );
 }
 

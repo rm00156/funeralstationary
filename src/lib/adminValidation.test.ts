@@ -174,17 +174,23 @@ describe("parseOptionPatch", () => {
 
 describe("parseLayoutPages", () => {
   const page = { id: "page-1", elements: [] };
+  const triple = [page, { id: "page-2", elements: [] }, { id: "page-3", elements: [] }];
 
-  it("accepts null (clear) and well-formed page arrays", () => {
+  it("accepts null (clear) and a cover/middle/back triple", () => {
     expect(parseLayoutPages(null)).toEqual({ ok: true, pages: null });
-    expect(parseLayoutPages([page])).toEqual({ ok: true, pages: [page] });
+    expect(parseLayoutPages(triple)).toEqual({ ok: true, pages: triple });
   });
 
-  it("rejects empty, oversized and malformed arrays", () => {
+  it("rejects any length other than the three-page structure", () => {
     expect(parseLayoutPages([]).ok).toBe(false);
-    expect(parseLayoutPages(Array.from({ length: 25 }, () => page)).ok).toBe(false);
-    expect(parseLayoutPages([{ id: 1, elements: [] }]).ok).toBe(false);
-    expect(parseLayoutPages([{ id: "p", elements: "nope" }]).ok).toBe(false);
+    expect(parseLayoutPages([page]).ok).toBe(false);
+    expect(parseLayoutPages([page, page]).ok).toBe(false);
+    expect(parseLayoutPages(Array.from({ length: 4 }, () => page)).ok).toBe(false);
+  });
+
+  it("rejects malformed pages and non-arrays", () => {
+    expect(parseLayoutPages([{ id: 1, elements: [] }, page, page]).ok).toBe(false);
+    expect(parseLayoutPages([{ id: "p", elements: "nope" }, page, page]).ok).toBe(false);
     expect(parseLayoutPages("pages").ok).toBe(false);
   });
 });
