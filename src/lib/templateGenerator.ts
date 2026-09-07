@@ -147,8 +147,12 @@ export type TypeSetId = keyof typeof TEMPLATE_TYPE_SETS;
 /** Placeholder copy — an admin or customer replaces these on their own document. */
 const PLACEHOLDER_NAME = "Robert Bayne";
 const PLACEHOLDER_DATES = "1971 – 2024";
-const RUNNING_ORDER =
-  "Opening Music\n\nWelcome & Introduction\n\nHymn — Abide With Me\n\nEulogy\n\nReading\n\nPrayers\n\nClosing Words";
+/**
+ * The interior page's placeholder. Matches the seeded catalogue's convention
+ * (`YOUR TEXT HERE`): the page that repeats must be generic, so it carries
+ * decoration and an invitation to type, never specific content.
+ */
+const PLACEHOLDER_INTERIOR = "YOUR TEXT HERE";
 const FAREWELL = "Forever in our hearts";
 /**
  * Where and when the service is. Every competitor cover carries this under
@@ -854,37 +858,36 @@ const BORDERED_INTERIORS: ReadonlySet<ArchetypeId> = new Set<ArchetypeId>(["fram
 
 /**
  * The page that repeats to fill everything between cover and back — see
- * withPageCount. It carries the running order, so it has to read well both as
- * a single spread and repeated a dozen times.
+ * withPageCount.
+ *
+ * It must be **generic**, because whatever is on it appears on every interior
+ * page: at the minimum 4-page option it already lands twice, and at 24 pages
+ * twenty-two times. So it carries the design's own decoration and a single
+ * placeholder, and nothing service-specific. An order of service is singular
+ * — there is one service in one order — so putting the running order here
+ * produced booklets asserting the service happens six times over. The seeded
+ * catalogue has always done it this way; this brings generated templates into
+ * line with it.
  */
 function middlePage(style: TemplateStyle, archetype: ArchetypeId): CanvasElement[] {
   return [
     ...(BORDERED_INTERIORS.has(archetype)
       ? [border({ variant: "single", color: style.accent, x: 6, y: 5, w: 88, h: 90 })]
       : []),
+    rule({ color: style.accent, strokeWidth: 1, x: 35, y: 41, w: 30, h: 0.3 }),
     text({
-      text: "Order of Service",
+      text: PLACEHOLDER_INTERIOR,
       fontFamily: style.heading,
-      fontSize: 24,
-      align: "center",
-      color: style.ink,
-      x: 10,
-      y: 11,
-      w: 80,
-      h: 0,
-    }),
-    rule({ color: style.accent, strokeWidth: 1, x: 35, y: 17.5, w: 30, h: 0.3 }),
-    text({
-      text: RUNNING_ORDER,
-      fontFamily: style.body,
-      fontSize: 13,
+      fontSize: 26,
       align: "center",
       color: style.muted,
+      letterSpacing: 2,
       x: 12,
-      y: 23,
+      y: 46,
       w: 76,
       h: 0,
     }),
+    rule({ color: style.accent, strokeWidth: 1, x: 35, y: 57, w: 30, h: 0.3 }),
   ];
 }
 

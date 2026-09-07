@@ -46,11 +46,17 @@ describe("buildTemplateLayout", () => {
     for (const archetype of ARCHETYPE_IDS) {
       const pages = buildTemplateLayout(spec({ archetype }));
       expect(pages, archetype).toHaveLength(TEMPLATE_PAGE_COUNT);
-      // The middle page is what repeats, so it must carry the running order.
+      // The middle page is what repeats, so it must stay generic — see
+      // middlePage. Anything service-specific here lands on every interior
+      // page, twice over even at the smallest page count.
       expect(
-        pages[1].elements.some((el) => el.type === "text" && el.text === "Order of Service"),
+        pages[1].elements.some((el) => el.type === "text" && el.text === "YOUR TEXT HERE"),
         archetype,
       ).toBe(true);
+      expect(
+        pages[1].elements.some((el) => el.type === "text" && /Order of Service|Hymn|Eulogy/.test(el.text)),
+        archetype,
+      ).toBe(false);
     }
   });
 
