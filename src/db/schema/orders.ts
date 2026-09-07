@@ -81,6 +81,13 @@ export const orders = mysqlTable(
     stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }).unique(),
     stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
     paidAt: timestamp("paid_at"),
+    /**
+     * Opaque token for the read-only proof share page, minted lazily the
+     * first time the customer shares it. Deliberately not the order id:
+     * the share page shows artwork only, never price, address or status,
+     * so a forwarded link can't leak the order itself.
+     */
+    shareToken: char("share_token", { length: 36 }).unique(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },
@@ -138,6 +145,19 @@ export const orderProofStatusValues = [
   "approved",
 ] as const;
 
+/**
+ * One row per proof *version* — the approval record, not a file.
+ *
+ * The customer reviews page images (order_proof_pages below); the
+ * print-ready PDF is a press artefact generated on demand for the admin,
+ * so pdfUrl/storageKey stay null until someone asks for one.
+ *
+ * docSnapshot is the artwork this version was rendered from, and it is why
+ * the column lives here rather than only on order_items. When a customer
+ * requests a change, the corrected artwork needs somewhere to go, and
+ * order_items.docSnapshot must not move — that is the frozen record of
+ * what was paid for. So v1 carries what they bought, v2 carries the fix.
+ */
 export const orderProofs = mysqlTable(
   "order_proofs",
   {
@@ -146,8 +166,11 @@ export const orderProofs = mysqlTable(
       .notNull()
       .references(() => orderItems.id, { onDelete: "cascade" }),
     version: int("version").notNull(),
-    pdfUrl: varchar("pdf_url", { length: 1024 }).notNull(),
-    storageKey: varchar("storage_key", { length: 512 }).notNull(),
+    /** The artwork this version shows — see the note above. */
+    docSnapshot: json("doc_snapshot").$type<DesignDoc>().notNull(),
+    /** Both null until the print PDF is generated for the press. */
+    pdfUrl: varchar("pdf_url", { length: 1024 }),
+    storageKey: varchar("storage_key", { length: 512 }),
     status: mysqlEnum("status", orderProofStatusValues).notNull().default("generated"),
     sentAt: timestamp("sent_at"),
     respondedAt: timestamp("responded_at"),
@@ -155,6 +178,22 @@ export const orderProofs = mysqlTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("order_proofs_item_version_uq").on(t.orderItemId, t.version)],
+);
+
+/** The page images the customer actually reviews, one row per page. */
+export const orderProofPages = mysqlTable(
+  "order_proof_pages",
+  {
+    id: char("id", { length: 36 }).primaryKey(),
+    proofId: char("proof_id", { length: 36 })
+      .notNull()
+      .references(() => orderProofs.id, { onDelete: "cascade" }),
+    pageIndex: smallint("page_index").notNull(),
+    imageUrl: varchar("image_url", { length: 1024 }).notNull(),
+    storageKey: varchar("storage_key", { length: 512 }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("order_proof_pages_proof_page_uq").on(t.proofId, t.pageIndex)],
 );
 
 export const orderEvents = mysqlTable(

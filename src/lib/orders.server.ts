@@ -20,7 +20,7 @@
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
-import { designs, orderEvents, orderItems, orderProofs, orders } from "@/db/schema";
+import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders } from "@/db/schema";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
 import type { DesignDoc } from "@/lib/designEditor";
 import { getDesign } from "@/lib/designs.server";
@@ -117,10 +117,20 @@ export interface Cart {
 
 export type OrderProofStatus = "generated" | "sent" | "changes_requested" | "approved";
 
+export interface OrderProofPageImage {
+  pageIndex: number;
+  imageUrl: string;
+}
+
 export interface OrderProofSummary {
   id: string;
   version: number;
-  pdfUrl: string;
+  /**
+   * The print-ready PDF, which is a press artefact — null until an admin
+   * generates one. Never surfaced to the customer; they review `pages`.
+   */
+  pdfUrl: string | null;
+  pages: OrderProofPageImage[];
   status: OrderProofStatus;
   createdAt: Date;
 }
@@ -866,6 +876,26 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       .orderBy(desc(orderEvents.createdAt), desc(orderEvents.id)),
   ]);
 
+  // Only worth a round trip once there is something to page through.
+  const pageRows = proofRows.length
+    ? await db
+        .select()
+        .from(orderProofPages)
+        .where(
+          inArray(
+            orderProofPages.proofId,
+            proofRows.map((proof) => proof.id),
+          ),
+        )
+        .orderBy(asc(orderProofPages.pageIndex))
+    : [];
+  const pagesByProof = new Map<string, OrderProofPageImage[]>();
+  for (const row of pageRows) {
+    const list = pagesByProof.get(row.proofId) ?? [];
+    list.push({ pageIndex: row.pageIndex, imageUrl: row.imageUrl });
+    pagesByProof.set(row.proofId, list);
+  }
+
   const proofsByItem = new Map<string, OrderProofSummary[]>();
   for (const proof of proofRows) {
     const list = proofsByItem.get(proof.orderItemId) ?? [];
@@ -873,6 +903,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       id: proof.id,
       version: proof.version,
       pdfUrl: proof.pdfUrl,
+      pages: pagesByProof.get(proof.id) ?? [],
       status: proof.status,
       createdAt: proof.createdAt,
     });

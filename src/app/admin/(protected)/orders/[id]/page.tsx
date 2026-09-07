@@ -101,19 +101,31 @@ export default async function AdminOrderPage({
                       <p className="font-body text-sm text-on-surface-variant">No proof yet.</p>
                     ) : (
                       <ul className="flex flex-wrap gap-2">
-                        {item.proofs.map((proof) => (
-                          <li key={proof.id}>
-                            <a
-                              href={proof.pdfUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5 font-body text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high"
-                            >
-                              <FileDown size={14} aria-hidden />
-                              v{proof.version} · {PROOF_STATUS_LABELS[proof.status] ?? proof.status}
-                            </a>
-                          </li>
-                        ))}
+                        {item.proofs.map((proof) => {
+                          const label = `v${proof.version} \u00b7 ${PROOF_STATUS_LABELS[proof.status] ?? proof.status}`;
+                          // The print PDF is generated on demand, so a
+                          // version the customer has already reviewed may
+                          // not have one yet.
+                          return (
+                            <li key={proof.id}>
+                              {proof.pdfUrl ? (
+                                <a
+                                  href={proof.pdfUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5 font-body text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high"
+                                >
+                                  <FileDown size={14} aria-hidden />
+                                  {label}
+                                </a>
+                              ) : (
+                                <span className="inline-flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5 font-body text-xs font-medium text-on-surface-variant">
+                                  {label}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                     <AdminOrderProofActions

@@ -55,6 +55,10 @@ export async function generateOrderItemProof(
     id: crypto.randomUUID(),
     orderItemId: itemId,
     version,
+    // The artwork this version shows. Copied from the item for v1; a later
+    // version raised after a change request carries the corrected doc, and
+    // the item's own snapshot stays the frozen record of what was paid for.
+    docSnapshot: item.docSnapshot,
     pdfUrl,
     storageKey,
     status: "generated",
