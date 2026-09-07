@@ -65,6 +65,20 @@ export interface BackgroundSpec {
   wash?: number;
   /** How strongly to tint toward the palette accent, 0–1. Default 0.2. */
   tint?: number;
+  /**
+   * Cut this specimen out of its ground as a transparent PNG, for use as a
+   * corner or edge spray over a photo-led layout. Only suitable for a plate
+   * on plain, even ground. `tolerance` is the RGB distance from the sampled
+   * ground colour that still counts as background — raise it for a foxed or
+   * mottled scan, lower it if pale petals start disappearing.
+   */
+  spray?: {
+    tolerance: number;
+    /** Fraction of the plate's height dropped before cutting, to lose the engraved caption. */
+    cropBottom?: number;
+    /** Smallest enclosed ground pocket to clear, as a fraction of the image. 0 disables. */
+    minEnclosedRegion?: number;
+  };
   /** Which zone compositions should put the name and dates in. */
   textZone: TextZone;
   /** Palettes to render a tinted variant for. */
@@ -74,6 +88,8 @@ export interface BackgroundSpec {
 export const DEFAULT_WASH = 0.32;
 export const DEFAULT_TINT = 0.2;
 export const DEFAULT_INSET = 0.05;
+export const DEFAULT_SPRAY_CROP_BOTTOM = 0.1;
+export const DEFAULT_SPRAY_MIN_ENCLOSED = 0.002;
 
 /**
  * Rendered assets are keyed deterministically so the generator can compute a
@@ -82,6 +98,16 @@ export const DEFAULT_INSET = 0.05;
  */
 export function backgroundAssetKey(id: string, palette: PaletteId): string {
   return `templates/backgrounds/${id}-${palette}.jpg`;
+}
+
+/**
+ * Sprays are **not** rendered per palette. A cutout keeps the specimen's own
+ * colour — that's the whole point of it — and tinting a pink rose toward a
+ * forest accent would just look wrong. Cohesion comes from curation instead:
+ * pair a spray with palettes that suit it.
+ */
+export function sprayAssetKey(id: string): string {
+  return `templates/sprays/${id}.png`;
 }
 
 /**
@@ -97,6 +123,29 @@ export function backgroundElement(src: string): ImageElement {
     shape: "rect",
     locked: true,
     ...FULL_BLEED_BOX,
+  };
+}
+
+/**
+ * A cutout spray placed on the page. Locked like a background, but sized and
+ * positioned by the composition rather than covering the artboard.
+ */
+export function sprayElement(
+  src: string,
+  box: { x: number; y: number; w: number; h: number },
+  rotation?: number,
+): ImageElement {
+  return {
+    id: uid("image"),
+    type: "image",
+    src,
+    shape: "rect",
+    // A cutout must never be cropped or stretched — its silhouette is the
+    // artwork — so it fits inside its box rather than filling it.
+    fit: "contain",
+    locked: true,
+    rotation,
+    ...box,
   };
 }
 
@@ -116,6 +165,7 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, ‘Empress Josephine’ or Frankfort Rose, from Les Roses. The Metropolitan Museum of Art.",
     focus: { x: 0.5, y: 0.35 },
     fade: { edge: "bottom", start: 52, end: 78 },
+    spray: { tolerance: 40 },
     textZone: "bottom",
     palettes: BOTANICAL_PALETTES,
   },
@@ -127,6 +177,7 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, Crown Imperial (Fritillaria imperialis), from Les Liliacées. The Metropolitan Museum of Art.",
     focus: { x: 0.5, y: 0.3 },
     fade: { edge: "bottom", start: 50, end: 78 },
+    spray: { tolerance: 40 },
     textZone: "bottom",
     palettes: BOTANICAL_PALETTES,
   },
@@ -138,6 +189,7 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, Gloriosa Superba (Climbing Lily). The Metropolitan Museum of Art.",
     focus: { x: 0.5, y: 0.35 },
     fade: { edge: "bottom", start: 52, end: 78 },
+    spray: { tolerance: 40 },
     textZone: "bottom",
     palettes: BOTANICAL_PALETTES,
   },
@@ -149,6 +201,7 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, Erica Fulgida. The Metropolitan Museum of Art.",
     focus: { x: 0.5, y: 0.4 },
     fade: { edge: "bottom", start: 52, end: 78 },
+    spray: { tolerance: 38 },
     textZone: "bottom",
     palettes: BOTANICAL_PALETTES,
   },
@@ -160,6 +213,7 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, Rosa centifolia Burgundiaca, from Les Roses. Via Wikimedia Commons.",
     focus: { x: 0.5, y: 0.35 },
     fade: { edge: "bottom", start: 52, end: 78 },
+    spray: { tolerance: 38 },
     textZone: "bottom",
     palettes: BOTANICAL_PALETTES,
   },
@@ -171,6 +225,7 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, Rosa centifolia foliacea, from Les Roses. Via Wikimedia Commons.",
     focus: { x: 0.5, y: 0.35 },
     fade: { edge: "bottom", start: 52, end: 78 },
+    spray: { tolerance: 38 },
     textZone: "bottom",
     palettes: BOTANICAL_PALETTES,
   },
@@ -184,6 +239,8 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     // covered by the fade's solid-paper zone below `end`.
     focus: { x: 0.5, y: 0.28 },
     fade: { edge: "bottom", start: 50, end: 76 },
+    // No spray: white petals on cream ground are too close to separate, and
+    // this scan's canvas weave survives any tolerance loose enough to work.
     textZone: "bottom",
     palettes: ["stone", "bronze", "forest", "slate"],
   },
@@ -195,6 +252,7 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, Lilium martagon (Lis Martagon), from Les Liliacées. Via Wikimedia Commons.",
     focus: { x: 0.5, y: 0.32 },
     fade: { edge: "bottom", start: 52, end: 78 },
+    spray: { tolerance: 42 },
     textZone: "bottom",
     palettes: ["plum", "slate", "bronze", "ink"],
   },

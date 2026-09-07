@@ -25,6 +25,8 @@ import path from "node:path";
 import {
   BACKGROUND_SPECS,
   DEFAULT_INSET,
+  DEFAULT_SPRAY_CROP_BOTTOM,
+  DEFAULT_SPRAY_MIN_ENCLOSED,
   DEFAULT_TINT,
   DEFAULT_WASH,
   type BackgroundSourceRef,
@@ -33,6 +35,8 @@ import {
 import {
   backgroundAssetExists,
   saveBackgroundAsset,
+  saveSprayAsset,
+  sprayAssetExists,
   writeBackgroundCredits,
 } from "@/lib/backgroundAssets.server";
 import { createBackgroundRenderer, type BackgroundRenderer } from "@/lib/backgroundRender.server";
@@ -176,14 +180,37 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
   for (const palette of palettes) {
     if (force || !(await backgroundAssetExists(spec.id, palette))) pending.push(palette);
   }
+  const needsSpray = !!spec.spray && (force || !(await sprayAssetExists(spec.id)));
 
   const source = await resolveSource(spec.source);
-  if (pending.length === 0) {
+  if (pending.length === 0 && !needsSpray) {
     console.log(`  - ${spec.id} (all ${palettes.length} variants exist — pass --force to re-render)`);
     return { spec, sourceUrl: source.sourceUrl, rendered: 0 };
   }
 
   const image = await download(spec, source);
+
+  // Cutout spray, if this plate supports one. Not per palette — see
+  // sprayAssetKey. Best-effort: a failed cut leaves the backgrounds usable.
+  if (spec.spray && (force || !(await sprayAssetExists(spec.id)))) {
+    try {
+      const png = await renderer.renderSpray(image, {
+        tolerance: spec.spray.tolerance,
+        inset: spec.inset ?? DEFAULT_INSET,
+        cropBottom: spec.spray.cropBottom ?? DEFAULT_SPRAY_CROP_BOTTOM,
+        minEnclosedRegion: spec.spray.minEnclosedRegion ?? DEFAULT_SPRAY_MIN_ENCLOSED,
+      });
+      if (png) {
+        const url = await saveSprayAsset(spec.id, png);
+        console.log(`  ✓ ${spec.id} spray → ${url} (${Math.round(png.length / 1024)} KB)`);
+      } else {
+        console.warn(`  ! ${spec.id} spray: nothing survived the cut`);
+      }
+    } catch (error) {
+      console.warn(`  ! ${spec.id} spray failed: ${(error as Error).message}`);
+    }
+  }
+
   for (const palette of pending) {
     const colours = TEMPLATE_PALETTES[palette];
     const jpeg = await renderer.render(image, {

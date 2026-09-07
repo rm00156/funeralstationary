@@ -29,7 +29,12 @@ import {
   type ShapeElement,
   type TextElement,
 } from "@/lib/designEditor";
-import { backgroundElement, getBackgroundSpec, type TextZone } from "@/lib/backgroundArtwork";
+import {
+  backgroundElement,
+  getBackgroundSpec,
+  sprayElement,
+  type TextZone,
+} from "@/lib/backgroundArtwork";
 
 /**
  * Element coordinates are percentages of a page that is taller than it is
@@ -372,6 +377,185 @@ export type ArchetypeId = keyof typeof COVERS;
 export const ARCHETYPE_IDS = Object.keys(COVERS) as ArchetypeId[];
 
 /**
+ * Photo-led compositions built around a cutout spray.
+ *
+ * This is how funeral stationery actually works: the photograph of the person
+ * is the subject and the florals frame it — a corner spray, a bottom spray, a
+ * diagonal pair. Artwork that fills the page and pushes the photo out reads as
+ * a botanical print, not a memorial. Everything sits on plain paper; there is
+ * no background image in these.
+ */
+const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => CanvasElement[]> = {
+  /** Large portrait photo, formal type block, one spray along the bottom edge. */
+  keepsake: (s, src) => [
+    text({
+      text: "In loving memory of",
+      fontFamily: s.body,
+      fontSize: 11,
+      align: "center",
+      color: s.muted,
+      uppercase: true,
+      letterSpacing: 4,
+      x: 15,
+      y: 7,
+      w: 70,
+      h: 0,
+    }),
+    photo({ x: 24, y: 12, w: 52, h: 44 }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 31,
+      align: "center",
+      color: s.ink,
+      x: 8,
+      y: 59,
+      w: 84,
+      h: 0,
+    }),
+    rule({ color: s.accent, strokeWidth: 1, x: 37, y: 68, w: 26, h: 0.4 }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 14,
+      align: "center",
+      color: s.muted,
+      x: 20,
+      y: 71,
+      w: 60,
+      h: 0,
+    }),
+    sprayElement(src, { x: 26, y: 78, w: 48, h: 20 }),
+  ],
+
+  /** Oval portrait held between a diagonal pair of sprays. */
+  "portrait-corners": (s, src) => [
+    // The second copy is turned 180 degrees rather than mirrored — an image
+    // element can rotate but not flip, and a rotated spray reads as a
+    // deliberate pair rather than a repeat.
+    sprayElement(src, { x: -7, y: -4, w: 38, h: 23 }),
+    sprayElement(src, { x: 69, y: 81, w: 38, h: 23 }, 180),
+    text({
+      text: "In loving memory of",
+      fontFamily: s.body,
+      fontSize: 11,
+      align: "center",
+      color: s.muted,
+      uppercase: true,
+      letterSpacing: 4,
+      x: 15,
+      y: 20,
+      w: 70,
+      h: 0,
+    }),
+    photo({ shape: "oval", x: 28, y: 25, w: 44, h: squareH(44) }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 28,
+      align: "center",
+      color: s.ink,
+      x: 8,
+      y: 59,
+      w: 84,
+      h: 0,
+    }),
+    rule({ color: s.accent, strokeWidth: 1, x: 39, y: 67.5, w: 22, h: 0.4 }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 13,
+      align: "center",
+      color: s.muted,
+      x: 20,
+      y: 70.5,
+      w: 60,
+      h: 0,
+    }),
+  ],
+
+  /** Arch photo window with the spray tucked into the bottom-left corner. */
+  "arch-spray": (s, src) => [
+    border({ variant: "single", color: s.accent, x: 5, y: 4, w: 90, h: 92 }),
+    photo({ shape: "arch", x: 28, y: 10, w: 44, h: 42 }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 29,
+      align: "center",
+      color: s.ink,
+      uppercase: true,
+      letterSpacing: 1.5,
+      x: 8,
+      y: 56,
+      w: 84,
+      h: 0,
+    }),
+    rule({ color: s.accent, strokeWidth: 1, x: 38, y: 64.5, w: 24, h: 0.4 }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 13,
+      align: "center",
+      color: s.muted,
+      x: 20,
+      y: 67.5,
+      w: 60,
+      h: 0,
+    }),
+    text({
+      text: FAREWELL,
+      fontFamily: s.script,
+      fontSize: 24,
+      align: "center",
+      color: s.accent,
+      x: 15,
+      y: 73,
+      w: 70,
+      h: 0,
+    }),
+    sprayElement(src, { x: 6, y: 79, w: 34, h: 17 }),
+  ],
+};
+
+export type SprayArchetypeId = keyof typeof SPRAY_COVERS;
+
+export const SPRAY_ARCHETYPE_IDS = Object.keys(SPRAY_COVERS) as SprayArchetypeId[];
+
+export function isSprayArchetype(id: string): id is SprayArchetypeId {
+  return id in SPRAY_COVERS;
+}
+
+/** The back page of a spray template: a small spray over the farewell. */
+function sprayBackPage(style: TemplateStyle, src: string): CanvasElement[] {
+  return [
+    sprayElement(src, { x: 33, y: 14, w: 34, h: 17 }),
+    text({
+      text: FAREWELL,
+      fontFamily: style.script,
+      fontSize: 28,
+      align: "center",
+      color: style.ink,
+      x: 10,
+      y: 36,
+      w: 80,
+      h: 0,
+    }),
+    text({
+      text: THANKS,
+      fontFamily: style.body,
+      fontSize: 12,
+      align: "center",
+      color: style.muted,
+      x: 15,
+      y: 49,
+      w: 70,
+      h: 0,
+    }),
+  ];
+}
+
+/**
  * Compositions for templates with background artwork. The picture is the
  * artwork itself, so these put the name and dates in whichever zone the
  * background leaves clear (see BackgroundSpec.textZone) and otherwise stay
@@ -572,8 +756,11 @@ function artworkBackPage(style: TemplateStyle, zone: TextZone): CanvasElement[] 
 export interface TemplateSpec {
   slug: string;
   name: string;
-  /** A paper composition, or an artwork one — the latter requires `background`. */
-  archetype: ArchetypeId | ArtworkArchetypeId;
+  /**
+   * A paper composition, a full-bleed artwork one (requires a `background`
+   * asset), or a photo-led spray one (requires that background's cutout).
+   */
+  archetype: ArchetypeId | ArtworkArchetypeId | SprayArchetypeId;
   palette: PaletteId;
   typeSet: TypeSetId;
   /** Clipart id — see CLIPARTS in DesignEditor. */
@@ -590,6 +777,8 @@ export interface TemplateSpec {
 export interface BuildLayoutOptions {
   /** URL of the rendered background for `spec.background` + `spec.palette`. */
   backgroundUrl?: string;
+  /** URL of the rendered cutout spray for `spec.background`. */
+  sprayUrl?: string;
 }
 
 export function styleFor(spec: TemplateSpec): TemplateStyle {
@@ -610,7 +799,9 @@ export function buildTemplateLayout(
   options: BuildLayoutOptions = {},
 ): DesignPage[] {
   const style = styleFor(spec);
-  const pages: DesignPage[] = isArtworkArchetype(spec.archetype)
+  const pages: DesignPage[] = isSprayArchetype(spec.archetype)
+    ? sprayPages(spec, spec.archetype, style, options)
+    : isArtworkArchetype(spec.archetype)
     ? artworkPages(spec, spec.archetype, style, options)
     : [
         { id: uid("page"), background: style.paper, elements: COVERS[spec.archetype](style) },
@@ -621,6 +812,42 @@ export function buildTemplateLayout(
     throw new Error(`Expected ${TEMPLATE_PAGE_COUNT} pages, built ${pages.length}`);
   }
   return pages;
+}
+
+/**
+ * Photo-led pages on plain paper, with the cutout spray as an accent. Refuses
+ * to build without the cutout, or for a background that has no spray at all.
+ */
+function sprayPages(
+  spec: TemplateSpec,
+  archetype: SprayArchetypeId,
+  style: TemplateStyle,
+  options: BuildLayoutOptions,
+): DesignPage[] {
+  if (!spec.background) {
+    throw new Error(`Spec "${spec.slug}" uses spray archetype "${archetype}" but has no background`);
+  }
+  const background = getBackgroundSpec(spec.background);
+  if (!background) throw new Error(`Spec "${spec.slug}": unknown background "${spec.background}"`);
+  if (!background.spray) {
+    throw new Error(`Spec "${spec.slug}": background "${spec.background}" has no spray cutout`);
+  }
+  if (!options.sprayUrl) {
+    throw new Error(`Spec "${spec.slug}" needs sprayUrl — run npm run backgrounds:fetch first`);
+  }
+  return [
+    {
+      id: uid("page"),
+      background: style.paper,
+      elements: SPRAY_COVERS[archetype](style, options.sprayUrl),
+    },
+    { id: uid("page"), background: style.paper, elements: middlePage(style, "minimal") },
+    {
+      id: uid("page"),
+      background: style.paper,
+      elements: sprayBackPage(style, options.sprayUrl),
+    },
+  ];
 }
 
 /**
@@ -716,7 +943,7 @@ const CURATED: Array<
 const CURATED_ARTWORK: Array<
   [
     name: string,
-    archetype: ArtworkArchetypeId,
+    archetype: ArtworkArchetypeId | SprayArchetypeId,
     background: string,
     palette: PaletteId,
     typeSet: TypeSetId,
@@ -724,22 +951,26 @@ const CURATED_ARTWORK: Array<
     categories: string[],
   ]
 > = [
-  ["Rose of Josephine", "artwork", "redoute-frankfort-rose", "plum", "cormorant", "flower", ["floral", "classic"]],
-  ["Empress Rose", "artwork-portrait", "redoute-frankfort-rose", "bronze", "garamond", "flower", ["floral", "classic"]],
-  ["Crown Imperial", "artwork", "redoute-crown-imperial", "forest", "playfair", "leaf", ["floral", "nature"]],
-  ["Golden Crown", "artwork-portrait", "redoute-crown-imperial", "bronze", "classic", "flower", ["floral", "religious"]],
-  ["Climbing Lily", "artwork", "redoute-climbing-lily", "plum", "prata", "flower", ["floral", "colourful"]],
-  ["Flame Lily", "artwork-portrait", "redoute-climbing-lily", "forest", "baskerville", "leaf", ["floral", "nature"]],
-  ["Heather Moor", "artwork", "redoute-erica", "stone", "garamond", "leaf", ["nature", "calm"]],
-  ["Heath Light", "artwork-portrait", "redoute-erica", "plum", "cormorant", "flower", ["floral", "calm"]],
-  ["Burgundy Rose", "artwork", "redoute-burgundy-rose", "plum", "playfair", "flower", ["floral", "classic"]],
-  ["Velvet Rose", "artwork-portrait", "redoute-burgundy-rose", "stone", "prata", "heart", ["floral", "modern"]],
-  ["Cabbage Rose", "artwork", "redoute-cabbage-rose", "bronze", "baskerville", "flower", ["floral", "classic"]],
-  ["Old Rose", "artwork-portrait", "redoute-cabbage-rose", "plum", "classic", "flower", ["floral", "classic"]],
+  // Photo-led, spray-framed — the main register. The photograph is the
+  // subject; the cutout frames it.
+  ["Rose of Josephine", "keepsake", "redoute-frankfort-rose", "plum", "cormorant", "flower", ["floral", "classic"]],
+  ["Empress Rose", "portrait-corners", "redoute-frankfort-rose", "bronze", "garamond", "flower", ["floral", "classic"]],
+  ["Crown Imperial", "arch-spray", "redoute-crown-imperial", "forest", "playfair", "leaf", ["floral", "nature"]],
+  ["Golden Crown", "keepsake", "redoute-crown-imperial", "bronze", "classic", "flower", ["floral", "religious"]],
+  ["Climbing Lily", "portrait-corners", "redoute-climbing-lily", "plum", "prata", "flower", ["floral", "colourful"]],
+  ["Flame Lily", "keepsake", "redoute-climbing-lily", "forest", "baskerville", "leaf", ["floral", "nature"]],
+  ["Heather Moor", "arch-spray", "redoute-erica", "stone", "garamond", "leaf", ["nature", "calm"]],
+  ["Heath Light", "keepsake", "redoute-erica", "plum", "cormorant", "flower", ["floral", "calm"]],
+  ["Burgundy Rose", "keepsake", "redoute-burgundy-rose", "plum", "playfair", "flower", ["floral", "classic"]],
+  ["Velvet Rose", "portrait-corners", "redoute-burgundy-rose", "stone", "prata", "heart", ["floral", "modern"]],
+  ["Cabbage Rose", "arch-spray", "redoute-cabbage-rose", "bronze", "baskerville", "flower", ["floral", "classic"]],
+  ["Old Rose", "keepsake", "redoute-cabbage-rose", "plum", "classic", "flower", ["floral", "classic"]],
+  ["Martagon Lily", "portrait-corners", "redoute-martagon-lily", "plum", "cormorant", "flower", ["floral", "colourful"]],
+  ["Turban Lily", "keepsake", "redoute-martagon-lily", "slate", "garamond", "flower", ["floral", "modern"]],
+  // Full-bleed wash — only for the Madonna lily, whose white-on-cream plate
+  // can't be cut out (see its spec).
   ["Madonna Lily", "artwork", "redoute-madonna-lily", "stone", "cormorant", "flower", ["floral", "religious"]],
   ["White Lily", "artwork-portrait", "redoute-madonna-lily", "bronze", "playfair", "flower", ["floral", "classic"]],
-  ["Martagon Lily", "artwork", "redoute-martagon-lily", "plum", "prata", "flower", ["floral", "colourful"]],
-  ["Turban Lily", "artwork-portrait", "redoute-martagon-lily", "slate", "garamond", "flower", ["floral", "modern"]],
 ];
 
 export const TEMPLATE_SPECS: TemplateSpec[] = [

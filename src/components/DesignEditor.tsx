@@ -2684,7 +2684,9 @@ function ImageContent({ element }: { element: ImageElement }) {
           src={element.src}
           alt=""
           draggable={false}
-          className="h-full w-full object-cover"
+          className={`h-full w-full ${
+            element.fit === "contain" ? "object-contain" : "object-cover"
+          }`}
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[#81737d]">

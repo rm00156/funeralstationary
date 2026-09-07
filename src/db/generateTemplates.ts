@@ -36,10 +36,19 @@ import {
   adminSaveTemplateDraftLayout,
   adminUpdateTemplate,
 } from "@/lib/adminCatalogue.server";
-import { backgroundAssetExists, backgroundAssetUrl } from "@/lib/backgroundAssets.server";
+import {
+  backgroundAssetExists,
+  backgroundAssetUrl,
+  sprayAssetUrl,
+} from "@/lib/backgroundAssets.server";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";
 import { renderTemplateThumbnail } from "@/lib/templateThumbnail.server";
-import { TEMPLATE_SPECS, buildTemplateLayout, type TemplateSpec } from "@/lib/templateGenerator";
+import {
+  TEMPLATE_SPECS,
+  buildTemplateLayout,
+  isSprayArchetype,
+  type TemplateSpec,
+} from "@/lib/templateGenerator";
 
 /** Shipped asset, used until a real thumbnail lands so preview_image_url is never a 404. */
 const PLACEHOLDER_PREVIEW = "/fs-monogram.webp";
@@ -77,13 +86,18 @@ async function generate(spec: TemplateSpec, sortOrder: number) {
   if (existing && !force) return { slug: spec.slug, outcome: "skipped" as const };
 
   let backgroundUrl: string | undefined;
+  let sprayUrl: string | undefined;
   if (spec.background) {
-    if (!isStorageConfigured() && !(await backgroundAssetExists(spec.background, spec.palette))) {
-      return { slug: spec.slug, outcome: "no-background" as const };
+    if (isSprayArchetype(spec.archetype)) {
+      sprayUrl = sprayAssetUrl(spec.background);
+    } else {
+      if (!isStorageConfigured() && !(await backgroundAssetExists(spec.background, spec.palette))) {
+        return { slug: spec.slug, outcome: "no-background" as const };
+      }
+      backgroundUrl = backgroundAssetUrl(spec.background, spec.palette);
     }
-    backgroundUrl = backgroundAssetUrl(spec.background, spec.palette);
   }
-  const pages = buildTemplateLayout(spec, { backgroundUrl });
+  const pages = buildTemplateLayout(spec, { backgroundUrl, sprayUrl });
 
   if (existing) {
     await adminUpdateTemplate(spec.slug, {

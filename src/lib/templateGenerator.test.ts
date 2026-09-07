@@ -3,11 +3,13 @@ import { TEMPLATE_PAGE_COUNT } from "@/lib/designEditor";
 import {
   ARCHETYPE_IDS,
   ARTWORK_ARCHETYPE_IDS,
+  SPRAY_ARCHETYPE_IDS,
   TEMPLATE_PALETTES,
   TEMPLATE_SPECS,
   TEMPLATE_TYPE_SETS,
   buildTemplateLayout,
   isArtworkArchetype,
+  isSprayArchetype,
   slugForName,
   styleFor,
   type TemplateSpec,
@@ -163,7 +165,10 @@ describe("TEMPLATE_SPECS", () => {
 
   it("builds a valid layout for every curated spec", () => {
     for (const entry of TEMPLATE_SPECS) {
-      const pages = buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg" });
+      const pages = buildTemplateLayout(entry, {
+        backgroundUrl: "/bg.jpg",
+        sprayUrl: "/spray.png",
+      });
       expect(parseLayoutPages(pages).ok, entry.slug).toBe(true);
     }
   });
@@ -178,6 +183,33 @@ describe("TEMPLATE_SPECS", () => {
     }
   });
 
+  it("only builds spray templates on backgrounds that have a cutout", () => {
+    const sprays = TEMPLATE_SPECS.filter((entry) => isSprayArchetype(entry.archetype));
+    expect(new Set(sprays.map((entry) => entry.archetype)).size).toBe(SPRAY_ARCHETYPE_IDS.length);
+    for (const entry of sprays) {
+      const background = getBackgroundSpec(entry.background ?? "");
+      expect(background, entry.slug).toBeDefined();
+      expect(background!.spray, entry.slug).toBeDefined();
+    }
+  });
+
+  it("makes the photograph the subject of every spray cover", () => {
+    for (const entry of TEMPLATE_SPECS.filter((e) => isSprayArchetype(e.archetype))) {
+      const [cover] = buildTemplateLayout(entry, { sprayUrl: "/spray.png" });
+      const photo = cover.elements.find((el) => el.type === "image" && el.src === null);
+      expect(photo, entry.slug).toBeDefined();
+      const sprays = cover.elements.filter((el) => el.type === "image" && el.src !== null);
+      expect(sprays.length, entry.slug).toBeGreaterThan(0);
+      // Every spray is locked artwork that fits rather than crops, and the
+      // photo outweighs any single one of them.
+      for (const spray of sprays) {
+        expect(spray.locked, entry.slug).toBe(true);
+        expect(spray.type === "image" && spray.fit, entry.slug).toBe("contain");
+        expect(photo!.w * photo!.h, entry.slug).toBeGreaterThan(spray.w * spray.h);
+      }
+    }
+  });
+
   it("never puts two templates on the same picture in the same palette", () => {
     const keys = TEMPLATE_SPECS.filter((entry) => entry.background).map(
       (entry) => `${entry.background}/${entry.palette}`,
@@ -187,7 +219,9 @@ describe("TEMPLATE_SPECS", () => {
 
   it("covers every archetype, so the catalogue is not one design recoloured", () => {
     const used = new Set(TEMPLATE_SPECS.map((entry) => entry.archetype));
-    expect(used.size).toBe(ARCHETYPE_IDS.length + ARTWORK_ARCHETYPE_IDS.length);
+    expect(used.size).toBe(
+      ARCHETYPE_IDS.length + ARTWORK_ARCHETYPE_IDS.length + SPRAY_ARCHETYPE_IDS.length,
+    );
   });
 
   it("gives every spec at least one category", () => {

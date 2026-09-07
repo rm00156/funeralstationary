@@ -221,6 +221,13 @@ export interface ImageElement extends ElementBase {
   /** @deprecated superseded by `shape`; kept so old saved docs still render. */
   round?: boolean;
   shape?: PhotoShape;
+  /**
+   * How the image fills its box. "cover" (the default) crops to fill, which
+   * is what a customer's photo in a fixed window wants. "contain" fits the
+   * whole image inside without cropping or distortion — required for a
+   * transparent cutout, whose own edges are the artwork.
+   */
+  fit?: "cover" | "contain";
 }
 
 /** The effective window shape, honouring the legacy `round` flag. */

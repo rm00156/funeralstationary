@@ -9,7 +9,12 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isStorageConfigured, publicUrlFor, uploadObject } from "@/lib/storage";
-import { backgroundAssetKey, mergeCredits, type BackgroundCredit } from "@/lib/backgroundArtwork";
+import {
+  backgroundAssetKey,
+  mergeCredits,
+  sprayAssetKey,
+  type BackgroundCredit,
+} from "@/lib/backgroundArtwork";
 import type { PaletteId } from "@/lib/templateGenerator";
 
 function localPath(key: string): string {
@@ -27,6 +32,31 @@ export async function backgroundAssetExists(id: string, palette: PaletteId): Pro
   if (isStorageConfigured()) return false;
   try {
     await access(localPath(backgroundAssetKey(id, palette)));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The URL a page element should use for a rendered cutout spray. */
+export function sprayAssetUrl(id: string): string {
+  const key = sprayAssetKey(id);
+  return isStorageConfigured() ? publicUrlFor(key) : `/${key}`;
+}
+
+export async function saveSprayAsset(id: string, png: Buffer): Promise<string> {
+  const key = sprayAssetKey(id);
+  if (isStorageConfigured()) return uploadObject(key, png, "image/png");
+  const file = localPath(key);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, png);
+  return `/${key}`;
+}
+
+export async function sprayAssetExists(id: string): Promise<boolean> {
+  if (isStorageConfigured()) return false;
+  try {
+    await access(localPath(sprayAssetKey(id)));
     return true;
   } catch {
     return false;
