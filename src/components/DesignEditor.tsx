@@ -2339,7 +2339,9 @@ export default function DesignEditor({
           onClick={() => setPreview(false)}
         >
           <div
-            className="mx-auto flex max-h-full w-full max-w-5xl flex-col rounded-xl bg-surface p-6"
+            className={`mx-auto flex max-h-full w-full flex-col rounded-xl bg-surface p-6 ${
+              previewMode === "booklet" ? "h-full max-w-6xl" : "max-w-5xl"
+            }`}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between gap-4">
