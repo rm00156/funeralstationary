@@ -15,6 +15,10 @@ import {
   sprayAssetKey,
   type BackgroundCredit,
 } from "@/lib/backgroundArtwork";
+import {
+  placeholderPortraitKey,
+  type PlaceholderPortraitId,
+} from "@/lib/placeholderPortraits";
 import type { PaletteId } from "@/lib/templateGenerator";
 
 function localPath(key: string): string {
@@ -36,6 +40,12 @@ export async function backgroundAssetExists(id: string, palette: PaletteId): Pro
   } catch {
     return false;
   }
+}
+
+/** The URL of a stand-in portrait, used in template previews only. */
+export function placeholderPortraitUrl(id: PlaceholderPortraitId): string {
+  const key = placeholderPortraitKey(id);
+  return isStorageConfigured() ? publicUrlFor(key) : `/${key}`;
 }
 
 /** The URL a page element should use for a rendered cutout spray. */

@@ -131,7 +131,7 @@ async function generate(spec: TemplateSpec, sortOrder: number) {
   // Best-effort, matching the admin publish route: a thumbnail failure leaves
   // a usable template rather than aborting the whole run.
   try {
-    const png = await renderTemplateThumbnail(origin, pages[0]);
+    const png = await renderTemplateThumbnail(origin, pages[0], spec.slug);
     const url = await saveThumbnail(spec.slug, png);
     await adminUpdateTemplate(spec.slug, { previewImageUrl: url });
     return { slug: spec.slug, outcome: "created" as const, thumbnail: true };
