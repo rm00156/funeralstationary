@@ -519,19 +519,42 @@ function coverElements(template: Template): CanvasElement[] {
   ];
 }
 
-function orderPageElements(): CanvasElement[] {
+/**
+ * The interior page of a starter document, repeated to fill whichever page
+ * count the customer picks.
+ *
+ * It has to stay **generic**. Whatever is here lands on every interior page —
+ * twice even at the smallest 4-page option, twenty-two times at 24 — so it
+ * carries decoration and an invitation to type, never specific content. An
+ * order of service is singular (one service, one order), so putting a running
+ * order here would produce a booklet asserting the service happens six times.
+ * This matches the seeded catalogue and the bulk generator's middlePage.
+ */
+function interiorPageElements(): CanvasElement[] {
   return [
+    {
+      id: uid("shape"),
+      type: "shape",
+      shape: "line",
+      color: "#81737d",
+      strokeWidth: 1,
+      x: 35,
+      y: 41,
+      w: 30,
+      h: 0.3,
+    },
     {
       id: uid("text"),
       type: "text",
-      text: "Order of Service",
+      text: "YOUR TEXT HERE",
       fontFamily: "display",
-      fontSize: 24,
+      fontSize: 26,
       align: "center",
-      color: "#1f1a1e",
-      x: 10,
-      y: 8,
-      w: 80,
+      color: "#4f434c",
+      letterSpacing: 2,
+      x: 12,
+      y: 46,
+      w: 76,
       h: 0,
     },
     {
@@ -541,22 +564,9 @@ function orderPageElements(): CanvasElement[] {
       color: "#81737d",
       strokeWidth: 1,
       x: 35,
-      y: 14.5,
+      y: 57,
       w: 30,
       h: 0.3,
-    },
-    {
-      id: uid("text"),
-      type: "text",
-      text: "Opening Music\n\nWelcome & Introduction\n\nHymn — Abide With Me\n\nEulogy\n\nReading\n\nPrayers\n\nClosing Words",
-      fontFamily: "body",
-      fontSize: 14,
-      align: "center",
-      color: "#4f434c",
-      x: 12,
-      y: 20,
-      w: 76,
-      h: 0,
     },
   ];
 }
@@ -606,7 +616,7 @@ export function makeBlankPage(): DesignPage {
   return { id: uid("page"), elements: [] };
 }
 
-/** Starter document for a template: cover, the order page repeated to fill, back page. */
+/** Starter document for a template: cover, a generic interior page repeated to fill, back page. */
 export function makeStarterDoc(template: Template, pageCount: number): DesignDoc {
   const pages: DesignPage[] = [];
   for (let index = 0; index < pageCount; index += 1) {
@@ -615,7 +625,7 @@ export function makeStarterDoc(template: Template, pageCount: number): DesignDoc
     } else if (index === pageCount - 1) {
       pages.push({ id: uid("page"), elements: backPageElements() });
     } else {
-      pages.push({ id: uid("page"), elements: orderPageElements() });
+      pages.push({ id: uid("page"), elements: interiorPageElements() });
     }
   }
   return { templateId: template.id, pages };

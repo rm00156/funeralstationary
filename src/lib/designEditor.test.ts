@@ -80,7 +80,7 @@ describe("photoBorderRadius", () => {
 });
 
 describe("makeStarterDoc", () => {
-  it("builds a cover, order-of-service, and back page for a 3-page document", () => {
+  it("builds a cover, generic interior, and back page for a 3-page document", () => {
     const doc = makeStarterDoc(makeTemplate(["classic"]), 3);
     expect(doc.pages).toHaveLength(3);
     expect(doc.pages[0].elements.some((el) => el.type === "image")).toBe(true);
@@ -88,18 +88,26 @@ describe("makeStarterDoc", () => {
     expect(cover!.shape).toBe("oval");
     expect(
       doc.pages[1].elements.some(
-        (el) => el.type === "text" && el.text === "Order of Service",
+        (el) => el.type === "text" && el.text === "YOUR TEXT HERE",
       ),
     ).toBe(true);
     expect(doc.pages[2].elements.some((el) => el.type === "clipart")).toBe(true);
   });
 
-  it("repeats the order-of-service page for every interior page", () => {
+  it("repeats the generic interior page for every interior page", () => {
     const doc = makeStarterDoc(makeTemplate(["classic"]), 5);
     for (const page of doc.pages.slice(1, -1)) {
-      expect(page.elements.some((el) => el.type === "text" && el.text === "Order of Service")).toBe(
+      expect(page.elements.some((el) => el.type === "text" && el.text === "YOUR TEXT HERE")).toBe(
         true,
       );
+      // Nothing service-specific may live on the page that repeats: an order
+      // of service is singular, so it would assert the service happens once
+      // per interior page.
+      expect(
+        page.elements.some(
+          (el) => el.type === "text" && /Order of Service|Hymn|Eulogy|Prayers/.test(el.text),
+        ),
+      ).toBe(false);
     }
   });
 });
@@ -132,7 +140,7 @@ describe("instantiateLayout", () => {
     expect(grown.pages).toHaveLength(5);
     expect(grown.pages[4].elements.some((el) => el.type === "clipart")).toBe(true);
     for (const page of grown.pages.slice(1, -1)) {
-      expect(page.elements.some((el) => el.type === "text" && el.text === "Order of Service")).toBe(
+      expect(page.elements.some((el) => el.type === "text" && el.text === "YOUR TEXT HERE")).toBe(
         true,
       );
     }
@@ -145,7 +153,7 @@ describe("makeTemplateLayout", () => {
     expect(layout).toHaveLength(TEMPLATE_PAGE_COUNT);
     expect(layout[0].elements.some((el) => el.type === "image")).toBe(true);
     expect(
-      layout[1].elements.some((el) => el.type === "text" && el.text === "Order of Service"),
+      layout[1].elements.some((el) => el.type === "text" && el.text === "YOUR TEXT HERE"),
     ).toBe(true);
     expect(layout[2].elements.some((el) => el.type === "clipart")).toBe(true);
   });
@@ -212,7 +220,7 @@ describe("withPageCount", () => {
     expect(grown.pages[0]).toBe(doc.pages[0]);
     expect(grown.pages[5].elements.some((el) => el.type === "clipart")).toBe(true);
     for (const page of grown.pages.slice(1, -1)) {
-      expect(page.elements.some((el) => el.type === "text" && el.text === "Order of Service")).toBe(
+      expect(page.elements.some((el) => el.type === "text" && el.text === "YOUR TEXT HERE")).toBe(
         true,
       );
     }
