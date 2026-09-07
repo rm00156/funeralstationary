@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, ChevronRight, FileDown } from "lucide-react";
+import { CheckCircle2, ChevronRight } from "lucide-react";
 
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
@@ -29,8 +29,8 @@ const formatDate = (date: Date | null) =>
     : "—";
 
 const STATUS_NOTES: Partial<Record<string, string>> = {
-  awaiting_proof: "We are preparing your digital proof and will email it to you shortly.",
-  proof_sent: "Your proof has been sent — please check your email and let us know if it is ready to print.",
+  awaiting_proof: "We are preparing your digital proof and will email you as soon as it is ready to review.",
+  proof_sent: "Your proof is ready — we will confirm it with you before anything is printed.",
   approved: "Your proof is approved and your order is queued for printing.",
   in_production: "Your stationery is being printed.",
   shipped: "Your order is on its way.",
@@ -105,11 +105,6 @@ export default async function OrderPage({
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="flex flex-col gap-4">
                 {order.items.map((item) => {
-                  // Only proofs that have actually been sent (or approved) are
-                  // shown — an unreviewed "generated" PDF isn't the customer's yet.
-                  const visibleProofs = item.proofs.filter(
-                    (proof) => proof.status === "sent" || proof.status === "approved",
-                  );
                   return (
                     <article
                       key={item.id}
@@ -132,23 +127,6 @@ export default async function OrderPage({
                           {formatPence(item.lineTotalPence)}
                         </p>
                       </div>
-                      {visibleProofs.length > 0 && (
-                        <ul className="mt-4 flex flex-wrap gap-2">
-                          {visibleProofs.map((proof) => (
-                            <li key={proof.id}>
-                              <a
-                                href={proof.pdfUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-2 rounded-lg border-2 border-primary-container px-4 py-2 font-body text-sm font-medium text-primary-container transition-colors hover:bg-surface-container"
-                              >
-                                <FileDown size={16} aria-hidden />
-                                Proof v{proof.version}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
                     </article>
                   );
                 })}
