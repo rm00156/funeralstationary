@@ -29,6 +29,18 @@ export const ARTBOARD_H_MM = PAGE_H_MM + BLEED_MM * 2;
 export const ARTBOARD_W = PAGE_W + BLEED_PX * 2;
 export const ARTBOARD_H = PAGE_H + BLEED_PX * 2;
 
+/**
+ * Element box (percent of the trim page) that covers the whole artboard,
+ * bleed included. Element coordinates are measured against the trim box, so
+ * a full-bleed background has to start slightly negative and overshoot 100%
+ * — otherwise a hairline of bare paper shows at the cut line.
+ */
+export const FULL_BLEED_BOX = (() => {
+  const bx = (BLEED_MM / PAGE_W_MM) * 100;
+  const by = (BLEED_MM / PAGE_H_MM) * 100;
+  return { x: -bx, y: -by, w: 100 + bx * 2, h: 100 + by * 2 } as const;
+})();
+
 export type FontFamilyId =
   | "display"
   | "body"
@@ -177,6 +189,14 @@ interface ElementBase {
   h: number;
   /** Rotation in degrees, clockwise, around the element's center. Undefined means 0. */
   rotation?: number;
+  /**
+   * A locked element is part of the template's artwork, not the customer's
+   * content: on the customer path it can't be selected, moved, resized,
+   * edited or deleted, and it never shows an outline. Only the template
+   * authoring editor can toggle it. Used for full-bleed background artwork
+   * so a customer can't drag the picture off the page.
+   */
+  locked?: boolean;
 }
 
 export interface TextElement extends ElementBase {

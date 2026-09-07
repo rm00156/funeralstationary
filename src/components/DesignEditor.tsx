@@ -40,6 +40,8 @@ import {
   LayoutTemplate,
   Leaf,
   Lightbulb,
+  Lock,
+  LockOpen,
   Maximize2,
   Minus,
   Music,
@@ -1296,7 +1298,20 @@ export default function DesignEditor({
             </>
           )}
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1">
+            {authoring && (
+              <ToolbarButton
+                label={selected.locked ? "Unlock element" : "Lock element"}
+                active={!!selected.locked}
+                onClick={() => updateSelected({ locked: !selected.locked })}
+              >
+                {selected.locked ? (
+                  <Lock size={16} aria-hidden />
+                ) : (
+                  <LockOpen size={16} aria-hidden />
+                )}
+              </ToolbarButton>
+            )}
             <ToolbarButton label="Delete element" onClick={deleteSelected}>
               <Trash2 size={16} aria-hidden />
             </ToolbarButton>
@@ -2015,25 +2030,37 @@ export default function DesignEditor({
                   {[...page.elements]
                     .map((element, index) => ({ element, index }))
                     .reverse()
-                    .map(({ element, index }) => (
+                    .map(({ element, index }) => {
+                      const inert = !!element.locked && !authoring;
+                      return (
                       <li
                         key={element.id}
                         className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${
                           element.id === selectedId
                             ? "border-primary-container bg-surface-container"
                             : "border-outline-variant/40 bg-surface-container-lowest"
-                        }`}
+                        } ${inert ? "opacity-70" : ""}`}
                       >
                         <button
                           type="button"
+                          disabled={inert}
                           onClick={() => setSelectedId(element.id)}
-                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
                         >
                           <LayerIcon element={element} />
                           <span className="truncate font-body text-xs text-on-surface">
                             {layerLabel(element)}
                           </span>
+                          {element.locked && (
+                            <Lock
+                              size={12}
+                              aria-label="Locked"
+                              className="shrink-0 text-on-surface-variant"
+                            />
+                          )}
                         </button>
+                        {inert ? null : (
+                        <>
                         <button
                           type="button"
                           aria-label="Bring forward"
@@ -2067,8 +2094,11 @@ export default function DesignEditor({
                         >
                           <Trash2 size={14} aria-hidden />
                         </button>
+                        </>
+                        )}
                       </li>
-                    ))}
+                      );
+                    })}
                 </ul>
               )}
             </div>
@@ -2097,6 +2127,7 @@ export default function DesignEditor({
               guides={guides}
               selectedId={selectedId}
               editingId={editingId}
+              editLocked={authoring}
               onSelect={setSelectedId}
               onStartDrag={startDrag}
               onStartEdit={(element) => {
@@ -2336,11 +2367,17 @@ export function PageCanvas({
   onEditText,
   onEndEdit,
   onBackgroundClick,
+  editLocked = false,
 }: {
   page: DesignPage;
   zoom: number;
   showCut: boolean;
   showSafe: boolean;
+  /**
+   * Treat `locked` elements as editable. Only the template authoring editor
+   * sets this — on the customer path locked artwork is inert.
+   */
+  editLocked?: boolean;
   /** Center guide lines to draw while an element is being dragged. */
   guides?: CanvasGuides;
   selectedId: string | null;
@@ -2390,6 +2427,7 @@ export function PageCanvas({
             <ElementView
               key={element.id}
               element={element}
+              locked={!!element.locked && !editLocked}
               selected={element.id === selectedId}
               editing={element.id === editingId}
               onSelect={() => onSelect(element.id)}
@@ -2467,6 +2505,7 @@ const RESIZE_HANDLE_LABELS: Record<ResizeHandle, string> = {
 
 function ElementView({
   element,
+  locked,
   selected,
   editing,
   onSelect,
@@ -2476,6 +2515,7 @@ function ElementView({
   onEndEdit,
 }: {
   element: CanvasElement;
+  locked: boolean;
   selected: boolean;
   editing: boolean;
   onSelect: () => void;
@@ -2497,6 +2537,21 @@ function ElementView({
     height: isText ? "auto" : `${element.h}%`,
     transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
   };
+
+  if (locked) {
+    // Inert artwork: no outline, no handles, and pointer events fall through
+    // to the page so a click on it deselects rather than grabs.
+    return (
+      <div className="pointer-events-none absolute select-none" style={baseStyle}>
+        <ElementContent
+          element={element}
+          editing={false}
+          onEditText={onEditText}
+          onEndEdit={onEndEdit}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
