@@ -2360,15 +2360,20 @@ export default function DesignEditor({
               ))}
             </div>
             <div className="mt-4 flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={downloadProof}
-                disabled={proofState === "generating"}
-                className="flex items-center gap-2 rounded-lg border-2 border-primary-container px-5 py-3 font-body text-sm font-medium text-primary-container transition-colors hover:bg-surface-container disabled:opacity-60"
-              >
-                <FileDown size={16} aria-hidden />
-                {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
-              </button>
+              {/* Admin-only. Customers review their proof on the order page
+                  after payment — the print-ready PDF is a press artefact,
+                  never something the customer downloads. */}
+              {authoring && (
+                <button
+                  type="button"
+                  onClick={downloadProof}
+                  disabled={proofState === "generating"}
+                  className="flex items-center gap-2 rounded-lg border-2 border-primary-container px-5 py-3 font-body text-sm font-medium text-primary-container transition-colors hover:bg-surface-container disabled:opacity-60"
+                >
+                  <FileDown size={16} aria-hidden />
+                  {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
+                </button>
+              )}
               {!authoring && (
                 <button
                   type="button"
