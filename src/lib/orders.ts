@@ -58,6 +58,64 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   refunded: "Refunded",
 };
 
+/* --------------------------- proof review --------------------------- */
+
+export const ORDER_PROOF_STATUSES = [
+  "generated",
+  "sent",
+  "changes_requested",
+  "approved",
+] as const;
+
+export type OrderProofStatus = (typeof ORDER_PROOF_STATUSES)[number];
+
+/** The two answers a customer can give when looking at their proof. */
+export type ProofDecision = "approved" | "changes_requested";
+
+export function parseProofDecision(value: unknown): ProofDecision | null {
+  return value === "approved" || value === "changes_requested" ? value : null;
+}
+
+interface ProofLike {
+  version: number;
+  status: OrderProofStatus;
+}
+
+/**
+ * The proof version the customer is currently looking at: the highest one
+ * that has actually been sent to them.
+ *
+ * A `generated` proof is the admin's working copy — it exists the moment
+ * the render finishes, before anyone has decided it is fit to show — so it
+ * must never reach the customer. Anything from `sent` onwards has been,
+ * including versions they have already responded to.
+ */
+export function latestVisibleProof<T extends ProofLike>(proofs: readonly T[]): T | null {
+  let best: T | null = null;
+  for (const proof of proofs) {
+    if (proof.status === "generated") continue;
+    if (!best || proof.version > best.version) best = proof;
+  }
+  return best;
+}
+
+/** Only a proof still awaiting an answer can be answered. */
+export function canReviewProof(status: OrderProofStatus): boolean {
+  return status === "sent";
+}
+
+/**
+ * Whether the order as a whole is approved: every line's current proof
+ * approved, and every line actually has one. A two-item order is not
+ * approved because the customer signed off one of them.
+ */
+export function allProofsApproved(
+  items: readonly { proofs: readonly ProofLike[] }[],
+): boolean {
+  if (items.length === 0) return false;
+  return items.every((item) => latestVisibleProof(item.proofs)?.status === "approved");
+}
+
 /* ------------------------------------------------------------------ */
 /* Money                                                               */
 /* ------------------------------------------------------------------ */

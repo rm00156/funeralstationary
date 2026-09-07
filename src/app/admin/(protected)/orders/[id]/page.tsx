@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronRight, FileDown } from "lucide-react";
 
 import AdminOrderProofActions from "@/components/AdminOrderProofActions";
+import AdminPrintPdfButton from "@/components/AdminPrintPdfButton";
 import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { adminGetOrder } from "@/lib/adminOrders.server";
@@ -102,26 +103,30 @@ export default async function AdminOrderPage({
                     ) : (
                       <ul className="flex flex-wrap gap-2">
                         {item.proofs.map((proof) => {
-                          const label = `v${proof.version} \u00b7 ${PROOF_STATUS_LABELS[proof.status] ?? proof.status}`;
-                          // The print PDF is generated on demand, so a
-                          // version the customer has already reviewed may
-                          // not have one yet.
+                          const label = `v${proof.version} · ${PROOF_STATUS_LABELS[proof.status] ?? proof.status}`;
                           return (
-                            <li key={proof.id}>
+                            <li
+                              key={proof.id}
+                              className="flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5"
+                            >
+                              <span className="font-body text-xs font-medium text-on-surface">
+                                {label} · {proof.pages.length}pp
+                              </span>
+                              {/* The press file is rendered on demand, so a
+                                  version the customer has already approved
+                                  may not have one yet. */}
                               {proof.pdfUrl ? (
                                 <a
                                   href={proof.pdfUrl}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5 font-body text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high"
+                                  className="inline-flex items-center gap-1 font-body text-xs font-medium text-primary-container underline-offset-2 hover:underline"
                                 >
-                                  <FileDown size={14} aria-hidden />
-                                  {label}
+                                  <FileDown size={12} aria-hidden />
+                                  print PDF
                                 </a>
                               ) : (
-                                <span className="inline-flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5 font-body text-xs font-medium text-on-surface-variant">
-                                  {label}
-                                </span>
+                                <AdminPrintPdfButton orderId={order.id} proofId={proof.id} />
                               )}
                             </li>
                           );

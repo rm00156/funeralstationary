@@ -5,8 +5,12 @@ import {
   ORDER_STATUSES,
   ORDER_STATUS_TRANSITIONS,
   buildStripeLineItems,
+  allProofsApproved,
+  canReviewProof,
   canTransition,
   computeOrderTotals,
+  latestVisibleProof,
+  parseProofDecision,
   makeOrderNumber,
   parseOrderStatus,
   resolveSelectionStrict,
@@ -137,5 +141,56 @@ describe("buildStripeLineItems", () => {
     const lines = buildStripeLineItems(items, { label: "Standard", pricePence: 0 });
     expect(lines).toHaveLength(2);
     expect(sumLineItems(lines)).toBe(12750);
+  });
+});
+
+describe("proof review", () => {
+  const proof = (version: number, status: string) =>
+    ({ version, status }) as { version: number; status: never };
+
+  it("shows the highest version the customer has been sent", () => {
+    const proofs = [proof(2, "sent"), proof(1, "approved")];
+    expect(latestVisibleProof(proofs)?.version).toBe(2);
+  });
+
+  it("never shows a version that is still the admin's working copy", () => {
+    // v3 has been rendered but not sent — the customer still sees v2.
+    const proofs = [proof(3, "generated"), proof(2, "sent"), proof(1, "changes_requested")];
+    expect(latestVisibleProof(proofs)?.version).toBe(2);
+  });
+
+  it("shows nothing when every version is unsent", () => {
+    expect(latestVisibleProof([proof(1, "generated")])).toBeNull();
+    expect(latestVisibleProof([])).toBeNull();
+  });
+
+  it("only lets a customer answer a proof that is awaiting them", () => {
+    expect(canReviewProof("sent")).toBe(true);
+    expect(canReviewProof("generated")).toBe(false);
+    expect(canReviewProof("approved")).toBe(false);
+    expect(canReviewProof("changes_requested")).toBe(false);
+  });
+
+  it("approves the order only when every line is approved", () => {
+    const approved = { proofs: [proof(1, "approved")] };
+    const outstanding = { proofs: [proof(1, "sent")] };
+    expect(allProofsApproved([approved, approved])).toBe(true);
+    expect(allProofsApproved([approved, outstanding])).toBe(false);
+  });
+
+  it("does not approve a line whose newest sent version is still outstanding", () => {
+    // v1 was approved, then a change was made and v2 sent — not approved.
+    expect(allProofsApproved([{ proofs: [proof(2, "sent"), proof(1, "approved")] }])).toBe(false);
+  });
+
+  it("does not approve an order with no lines", () => {
+    expect(allProofsApproved([])).toBe(false);
+  });
+
+  it("rejects a decision that is not one of the two answers", () => {
+    expect(parseProofDecision("approved")).toBe("approved");
+    expect(parseProofDecision("changes_requested")).toBe("changes_requested");
+    expect(parseProofDecision("sent")).toBeNull();
+    expect(parseProofDecision(undefined)).toBeNull();
   });
 });

@@ -5,8 +5,10 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import OrderProofReview from "@/components/OrderProofReview";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { formatPence } from "@/lib/orderOfServicePricing";
+import { latestVisibleProof } from "@/lib/orders";
 import { getOrder } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
 
@@ -30,7 +32,7 @@ const formatDate = (date: Date | null) =>
 
 const STATUS_NOTES: Partial<Record<string, string>> = {
   awaiting_proof: "We are preparing your digital proof and will email you as soon as it is ready to review.",
-  proof_sent: "Your proof is ready — we will confirm it with you before anything is printed.",
+  proof_sent: "Your proof is ready to review below. Nothing is printed until you approve it.",
   approved: "Your proof is approved and your order is queued for printing.",
   in_production: "Your stationery is being printed.",
   shipped: "Your order is on its way.",
@@ -105,6 +107,9 @@ export default async function OrderPage({
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="flex flex-col gap-4">
                 {order.items.map((item) => {
+                  // Versions still "generated" are the admin's working copy;
+                  // only what has actually been sent reaches the customer.
+                  const proof = latestVisibleProof(item.proofs);
                   return (
                     <article
                       key={item.id}
@@ -127,6 +132,7 @@ export default async function OrderPage({
                           {formatPence(item.lineTotalPence)}
                         </p>
                       </div>
+                      {proof && <OrderProofReview orderId={order.id} proof={proof} />}
                     </article>
                   );
                 })}

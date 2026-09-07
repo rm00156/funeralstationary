@@ -1,8 +1,9 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 
 import { adminUpdateOrderStatus, OrderTransitionError } from "@/lib/adminOrders.server";
 import { isAdmin, unauthorised } from "@/lib/adminSession";
 import { parseNote } from "@/lib/adminValidation";
+import { sendProofReadyEmail } from "@/lib/orderFulfilment.server";
 import { parseOrderStatus } from "@/lib/orders";
 
 export const runtime = "nodejs";
@@ -30,6 +31,12 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
   try {
     const order = await adminUpdateOrderStatus(id, nextStatus, parsedNote ?? null);
     if (!order) return Response.json({ error: "Order not found" }, { status: 404 });
+    // Releasing the proof is the moment the customer needs telling; the
+    // send is best-effort and must not hold up the admin's response.
+    if (nextStatus === "proof_sent") {
+      const origin = new URL(request.url).origin;
+      after(() => sendProofReadyEmail(id, origin));
+    }
     return Response.json({ order });
   } catch (error) {
     if (error instanceof OrderTransitionError) {

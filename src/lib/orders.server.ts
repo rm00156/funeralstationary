@@ -27,12 +27,16 @@ import { getDesign } from "@/lib/designs.server";
 import type { OrderEmailSummary } from "@/lib/orderEmails";
 import {
   DEFAULT_VAT_RATE,
+  allProofsApproved,
+  canReviewProof,
   computeOrderTotals,
   makeOrderNumber,
   resolveSelectionStrict,
   vatRateToDecimalString,
+  type OrderProofStatus,
   type OrderStatus,
   type OrderTotals,
+  type ProofDecision,
   type SelectionAxis,
 } from "@/lib/orders";
 import {
@@ -115,7 +119,7 @@ export interface Cart {
   ready: boolean;
 }
 
-export type OrderProofStatus = "generated" | "sent" | "changes_requested" | "approved";
+export type { OrderProofStatus };
 
 export interface OrderProofPageImage {
   pageIndex: number;
@@ -1007,4 +1011,74 @@ export async function getOrderEmailSummary(orderId: string): Promise<OrderEmailS
       order.address.postcode,
     ].filter((line): line is string => !!line),
   };
+}
+
+/**
+ * Record the customer's answer to a proof.
+ *
+ * Owner-scoped like every customer read: an order that isn't theirs 404s
+ * rather than 403s, so the route can't be used to probe for order ids. A
+ * version they were never sent, or one they have already answered, is not
+ * reviewable — `canReviewProof` is the single rule.
+ *
+ * Approving the last outstanding line moves the whole order to `approved`,
+ * conditionally on it still being `proof_sent`, so this can race the admin
+ * doing the same thing without either of them double-writing the event.
+ */
+export async function recordProofReview(
+  owner: Owner,
+  orderId: string,
+  proofId: string,
+  decision: ProofDecision,
+  note: string | null,
+): Promise<OrderDetail | null> {
+  const order = await getOrder(owner, orderId);
+  if (!order) return null;
+
+  const item = order.items.find((candidate) =>
+    candidate.proofs.some((proof) => proof.id === proofId),
+  );
+  const proof = item?.proofs.find((candidate) => candidate.id === proofId);
+  if (!proof) return null;
+  if (!canReviewProof(proof.status)) {
+    throw new CartError(409, "This proof is not awaiting your approval");
+  }
+
+  const [result] = await db
+    .update(orderProofs)
+    .set({ status: decision, respondedAt: new Date(), customerNote: note })
+    .where(and(eq(orderProofs.id, proofId), eq(orderProofs.status, "sent")));
+  if (result.affectedRows === 0) {
+    throw new CartError(409, "This proof was already answered — reload and try again");
+  }
+
+  await addOrderEvent(orderId, {
+    type: decision === "approved" ? "proof_approved" : "proof_changes_requested",
+    actor: "customer",
+    note:
+      decision === "approved"
+        ? `Proof v${proof.version} approved`
+        : `Changes requested on proof v${proof.version}${note ? `: ${note}` : ""}`,
+  });
+
+  // Re-read: this line's status has changed, and the whole-order rule
+  // depends on every other line too.
+  const updated = await loadOrderDetail(orderId, owner);
+  if (updated && updated.status === "proof_sent" && allProofsApproved(updated.items)) {
+    const [moved] = await db
+      .update(orders)
+      .set({ status: "approved" })
+      .where(and(eq(orders.id, orderId), eq(orders.status, "proof_sent")));
+    if (moved.affectedRows > 0) {
+      await addOrderEvent(orderId, {
+        type: "status_changed",
+        fromStatus: "proof_sent",
+        toStatus: "approved",
+        actor: "customer",
+        note: "All proofs approved by the customer",
+      });
+    }
+    return loadOrderDetail(orderId, owner);
+  }
+  return updated;
 }

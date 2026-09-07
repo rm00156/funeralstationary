@@ -81,7 +81,7 @@ export function orderConfirmationEmail(
     `Dear ${summary.contactName},`,
     "",
     `Thank you — we have received your order ${summary.orderNumber} and payment.`,
-    "We will prepare a digital proof and send it to this address for your approval before anything is printed.",
+    "We will prepare a digital proof and email you as soon as it is ready to review. Nothing is printed until you approve it.",
     "",
     itemsText(summary),
     "",
@@ -97,10 +97,44 @@ export function orderConfirmationEmail(
   ].join("\n");
   const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
 <p>Dear ${escapeHtml(summary.contactName)},</p>
-<p>Thank you — we have received your order <strong>${escapeHtml(summary.orderNumber)}</strong> and payment. We will prepare a digital proof and send it to this address for your approval before anything is printed.</p>
+<p>Thank you — we have received your order <strong>${escapeHtml(summary.orderNumber)}</strong> and payment. We will prepare a digital proof and email you as soon as it is ready to review. Nothing is printed until you approve it.</p>
 ${itemsHtml(summary)}
 <p style="margin-top:24px"><strong>Delivering to</strong><br>${summary.addressLines.map(escapeHtml).join("<br>")}</p>
 <p><a href="${escapeHtml(orderUrl)}">View your order</a></p>
+<p>With our sincere condolences,<br>The Funeral Stationery</p>
+</div>`;
+  return { subject, text, html };
+}
+
+/**
+ * Sent when an admin releases a proof to the customer. It links rather than
+ * attaches: the proof is reviewed and approved on the order page, so a copy
+ * in an inbox would only ever be a stale second version of it.
+ */
+export function proofReadyEmail(
+  summary: OrderEmailSummary,
+  orderUrl: string,
+): EmailContent {
+  const subject = `Your proof is ready — order ${summary.orderNumber}`;
+  const text = [
+    `Dear ${summary.contactName},`,
+    "",
+    `The proof for your order ${summary.orderNumber} is ready to review.`,
+    "Please check every page carefully — names, dates and spellings especially.",
+    "Nothing is printed until you approve it.",
+    "",
+    `Review and approve your proof at ${orderUrl}`,
+    "",
+    "If anything needs changing, tell us there and we will send a new proof.",
+    "",
+    "With our sincere condolences,",
+    "The Funeral Stationery",
+  ].join("\n");
+  const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
+<p>Dear ${escapeHtml(summary.contactName)},</p>
+<p>The proof for your order <strong>${escapeHtml(summary.orderNumber)}</strong> is ready to review. Please check every page carefully — names, dates and spellings especially. Nothing is printed until you approve it.</p>
+<p><a href="${escapeHtml(orderUrl)}">Review and approve your proof</a></p>
+<p>If anything needs changing, tell us there and we will send a new proof.</p>
 <p>With our sincere condolences,<br>The Funeral Stationery</p>
 </div>`;
   return { subject, text, html };

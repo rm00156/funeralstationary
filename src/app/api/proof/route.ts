@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { isAdmin, unauthorised } from "@/lib/adminSession";
 import type { ProofRequest } from "@/lib/designEditor";
-import { MAX_PROOF_PAGES, renderProofPdf } from "@/lib/proofPdf.server";
+import { renderProofPdf } from "@/lib/proofPdf.server";
+import { MAX_PROOF_PAGES } from "@/lib/proofRender.server";
 
 export const runtime = "nodejs";
 // Vercel Pro (or higher) is required in production — a single-digit page
