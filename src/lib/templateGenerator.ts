@@ -419,9 +419,9 @@ const SOLID_COVERS: Record<string, (style: TemplateStyle) => CanvasElement[]> = 
       x: FULL_BLEED_BOX.x,
       y: FULL_BLEED_BOX.y,
       w: FULL_BLEED_BOX.w,
-      h: 58 - FULL_BLEED_BOX.y,
+      h: 62 - FULL_BLEED_BOX.y,
     } as CanvasElement,
-    rule({ color: s.paper, strokeWidth: 1, x: 10, y: 63, w: 80, h: 0.3 }),
+    rule({ color: s.paper, strokeWidth: 1, x: 10, y: 67, w: 80, h: 0.3 }),
     text({
       text: "In loving memory of",
       fontFamily: s.body,
@@ -431,20 +431,20 @@ const SOLID_COVERS: Record<string, (style: TemplateStyle) => CanvasElement[]> = 
       uppercase: true,
       letterSpacing: 4,
       x: 15,
-      y: 66,
+      y: 70,
       w: 70,
       h: 0,
     }),
     text({
       text: PLACEHOLDER_NAME,
       fontFamily: s.heading,
-      fontSize: 30,
+      fontSize: 28,
       align: "center",
       color: s.paper,
       uppercase: true,
       letterSpacing: 1.5,
       x: 8,
-      y: 70,
+      y: 74,
       w: 84,
       h: 0,
     }),
@@ -455,17 +455,17 @@ const SOLID_COVERS: Record<string, (style: TemplateStyle) => CanvasElement[]> = 
       align: "center",
       color: s.paper,
       x: 20,
-      y: 79,
+      y: 82,
       w: 60,
       h: 0,
     }),
-    serviceDetails(s, 84, s.paper),
+    serviceDetails(s, 86, s.paper),
   ],
 
   /** Colour ground throughout, portrait held in a thin light rule, script name. */
   "solid-frame": (s) => [
     border({ variant: "single", color: s.paper, x: 8, y: 6, w: 84, h: 88 }),
-    photo({ x: 22, y: 13, w: 56, h: 44 }),
+    photo({ x: 16, y: 12, w: 68, h: 47 }),
     text({
       text: "In loving memory of",
       fontFamily: s.body,
@@ -475,7 +475,7 @@ const SOLID_COVERS: Record<string, (style: TemplateStyle) => CanvasElement[]> = 
       uppercase: true,
       letterSpacing: 4,
       x: 15,
-      y: 61,
+      y: 62,
       w: 70,
       h: 0,
     }),
@@ -538,7 +538,7 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       w: 70,
       h: 0,
     }),
-    photo({ x: 24, y: 12, w: 52, h: 44 }),
+    photo({ x: 14, y: 10, w: 72, h: 50 }),
     text({
       text: PLACEHOLDER_NAME,
       fontFamily: s.heading,
@@ -546,11 +546,11 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.ink,
       x: 8,
-      y: 58,
+      y: 62,
       w: 84,
       h: 0,
     }),
-    rule({ color: s.accent, strokeWidth: 1, x: 37, y: 66, w: 26, h: 0.4 }),
+    rule({ color: s.accent, strokeWidth: 1, x: 37, y: 70, w: 26, h: 0.4 }),
     text({
       text: PLACEHOLDER_DATES,
       fontFamily: s.body,
@@ -558,16 +558,16 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.muted,
       x: 20,
-      y: 69,
+      y: 73,
       w: 60,
       h: 0,
     }),
     // Narrowed so it clears the corner spray's column entirely.
-    { ...serviceDetails(s, 73), x: 30, w: 40 } as CanvasElement,
+    { ...serviceDetails(s, 77), x: 32, w: 36 } as CanvasElement,
     // Anchored into the corner and given real size — a small spray floating
     // centrally under the type reads as an afterthought — but strictly below
     // the type block, never across it.
-    sprayElement(src, { x: 0, y: 78, w: 32, h: 22 }),
+    sprayElement(src, { x: 0, y: 79, w: 30, h: 21 }),
   ],
 
   /** Oval portrait held between a diagonal pair of sprays. */
@@ -586,11 +586,11 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       uppercase: true,
       letterSpacing: 4,
       x: 15,
-      y: 20,
+      y: 19,
       w: 70,
       h: 0,
     }),
-    photo({ shape: "oval", x: 28, y: 25, w: 44, h: squareH(44) }),
+    photo({ shape: "oval", x: 24, y: 23, w: 52, h: squareH(52) }),
     text({
       text: PLACEHOLDER_NAME,
       fontFamily: s.heading,
@@ -598,11 +598,11 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.ink,
       x: 8,
-      y: 59,
+      y: 61,
       w: 84,
       h: 0,
     }),
-    rule({ color: s.accent, strokeWidth: 1, x: 39, y: 67.5, w: 22, h: 0.4 }),
+    rule({ color: s.accent, strokeWidth: 1, x: 39, y: 69.5, w: 22, h: 0.4 }),
     text({
       text: PLACEHOLDER_DATES,
       fontFamily: s.body,
@@ -610,11 +610,11 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.muted,
       x: 20,
-      y: 70.5,
+      y: 72.5,
       w: 60,
       h: 0,
     }),
-    serviceDetails(s, 75.5),
+    serviceDetails(s, 76.5),
   ],
 
   /**
@@ -625,7 +625,7 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
    */
   "side-stem": (s, src) => [
     sprayElement(src, { x: 58, y: 3, w: 42, h: 94 }),
-    photo({ shape: "oval", x: 6, y: 10, w: 44, h: squareH(44) }),
+    photo({ shape: "oval", x: 3, y: 8, w: 50, h: squareH(50) }),
     text({
       text: "In loving memory of",
       fontFamily: s.body,
@@ -679,7 +679,7 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
   /** Arch photo window with the spray tucked into the bottom-left corner. */
   "arch-spray": (s, src) => [
     border({ variant: "single", color: s.accent, x: 5, y: 4, w: 90, h: 92 }),
-    photo({ shape: "arch", x: 28, y: 10, w: 44, h: 42 }),
+    photo({ shape: "arch", x: 22, y: 9, w: 56, h: 47 }),
     text({
       text: PLACEHOLDER_NAME,
       fontFamily: s.heading,
@@ -689,11 +689,11 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       uppercase: true,
       letterSpacing: 1.5,
       x: 8,
-      y: 56,
+      y: 59,
       w: 84,
       h: 0,
     }),
-    rule({ color: s.accent, strokeWidth: 1, x: 38, y: 64.5, w: 24, h: 0.4 }),
+    rule({ color: s.accent, strokeWidth: 1, x: 38, y: 67.5, w: 24, h: 0.4 }),
     text({
       text: PLACEHOLDER_DATES,
       fontFamily: s.body,
@@ -701,14 +701,14 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.muted,
       x: 20,
-      y: 67.5,
+      y: 70.5,
       w: 60,
       h: 0,
     }),
-    serviceDetails(s, 71),
+    serviceDetails(s, 74),
     // Inside the frame on every side — a spray crossing the border line reads
     // as a mistake rather than an overlap.
-    sprayElement(src, { x: 8, y: 76, w: 32, h: 18 }),
+    sprayElement(src, { x: 8, y: 79, w: 30, h: 16 }),
   ],
 };
 
@@ -764,7 +764,7 @@ const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => C
     const top = zone === "bottom" ? 10 : 34;
     const textTop = zone === "bottom" ? 58 : 8;
     return [
-      photo({ shape: "oval", x: 28, y: top, w: 44, h: squareH(44) }),
+      photo({ shape: "oval", x: 24, y: top, w: 52, h: squareH(52) }),
       text({
         text: "In loving memory of",
         fontFamily: s.body,
@@ -810,7 +810,7 @@ const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => C
     const top = zone === "bottom" ? 9 : 36;
     const textTop = zone === "bottom" ? 56 : 8;
     return [
-      photo({ shape: "arch", x: 29, y: top, w: 42, h: 40 }),
+      photo({ shape: "arch", x: 23, y: top, w: 54, h: 45 }),
       text({
         text: PLACEHOLDER_NAME,
         fontFamily: s.heading,
