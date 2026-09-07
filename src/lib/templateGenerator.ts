@@ -29,6 +29,7 @@ import {
   type ShapeElement,
   type TextElement,
 } from "@/lib/designEditor";
+import { backgroundElement, getBackgroundSpec, type TextZone } from "@/lib/backgroundArtwork";
 
 /**
  * Element coordinates are percentages of a page that is taller than it is
@@ -370,6 +371,107 @@ export type ArchetypeId = keyof typeof COVERS;
 
 export const ARCHETYPE_IDS = Object.keys(COVERS) as ArchetypeId[];
 
+/**
+ * Compositions for templates with background artwork. The picture is the
+ * artwork itself, so these put the name and dates in whichever zone the
+ * background leaves clear (see BackgroundSpec.textZone) and otherwise stay
+ * out of its way — no borders, no motifs competing with a Redouté rose.
+ */
+const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => CanvasElement[]> = {
+  /** Typographic: overline, name, rule and dates in the clear zone. No photo. */
+  artwork: (s, zone) => {
+    const top = zone === "bottom" ? 66 : 8;
+    return [
+      text({
+        text: "in loving memory of",
+        fontFamily: s.body,
+        fontSize: 11,
+        align: "center",
+        color: s.muted,
+        uppercase: true,
+        letterSpacing: 4,
+        x: 15,
+        y: top,
+        w: 70,
+        h: 0,
+      }),
+      text({
+        text: PLACEHOLDER_NAME,
+        fontFamily: s.heading,
+        fontSize: 34,
+        align: "center",
+        color: s.ink,
+        x: 8,
+        y: top + 4.5,
+        w: 84,
+        h: 0,
+      }),
+      rule({ color: s.accent, strokeWidth: 1, x: 36, y: top + 14.5, w: 28, h: 0.4 }),
+      text({
+        text: PLACEHOLDER_DATES,
+        fontFamily: s.body,
+        fontSize: 14,
+        align: "center",
+        color: s.muted,
+        x: 20,
+        y: top + 18,
+        w: 60,
+        h: 0,
+      }),
+      text({
+        text: FAREWELL,
+        fontFamily: s.script,
+        fontSize: 26,
+        align: "center",
+        color: s.accent,
+        x: 15,
+        y: top + 23.5,
+        w: 70,
+        h: 0,
+      }),
+    ];
+  },
+
+  /** As above with a small oval portrait beside the artwork's clear zone. */
+  "artwork-portrait": (s, zone) => {
+    const top = zone === "bottom" ? 58 : 6;
+    return [
+      photo({ shape: "oval", x: 38, y: top, w: 24, h: squareH(24) }),
+      text({
+        text: PLACEHOLDER_NAME,
+        fontFamily: s.heading,
+        fontSize: 30,
+        align: "center",
+        color: s.ink,
+        x: 8,
+        y: top + 19,
+        w: 84,
+        h: 0,
+      }),
+      rule({ color: s.accent, strokeWidth: 1, x: 38, y: top + 27.5, w: 24, h: 0.4 }),
+      text({
+        text: PLACEHOLDER_DATES,
+        fontFamily: s.body,
+        fontSize: 14,
+        align: "center",
+        color: s.muted,
+        x: 20,
+        y: top + 30.5,
+        w: 60,
+        h: 0,
+      }),
+    ];
+  },
+};
+
+export type ArtworkArchetypeId = keyof typeof ARTWORK_COVERS;
+
+export const ARTWORK_ARCHETYPE_IDS = Object.keys(ARTWORK_COVERS) as ArtworkArchetypeId[];
+
+export function isArtworkArchetype(id: string): id is ArtworkArchetypeId {
+  return id in ARTWORK_COVERS;
+}
+
 /** Archetypes whose interior pages carry a matching border. */
 const BORDERED_INTERIORS: ReadonlySet<ArchetypeId> = new Set<ArchetypeId>(["framed", "arch"]);
 
@@ -437,16 +539,57 @@ function backPage(style: TemplateStyle): CanvasElement[] {
   ];
 }
 
+/** The back page of an artwork template wraps the same picture, farewell in the clear zone. */
+function artworkBackPage(style: TemplateStyle, zone: TextZone): CanvasElement[] {
+  const top = zone === "bottom" ? 68 : 10;
+  return [
+    text({
+      text: FAREWELL,
+      fontFamily: style.script,
+      fontSize: 28,
+      align: "center",
+      color: style.ink,
+      x: 10,
+      y: top,
+      w: 80,
+      h: 0,
+    }),
+    text({
+      text: THANKS,
+      fontFamily: style.body,
+      fontSize: 12,
+      align: "center",
+      color: style.muted,
+      x: 15,
+      y: top + 12,
+      w: 70,
+      h: 0,
+    }),
+  ];
+}
+
 /** One generated template: what to build, and the catalogue metadata for it. */
 export interface TemplateSpec {
   slug: string;
   name: string;
-  archetype: ArchetypeId;
+  /** A paper composition, or an artwork one — the latter requires `background`. */
+  archetype: ArchetypeId | ArtworkArchetypeId;
   palette: PaletteId;
   typeSet: TypeSetId;
   /** Clipart id — see CLIPARTS in DesignEditor. */
   icon: string;
   categories: string[];
+  /**
+   * BackgroundSpec id (src/lib/backgroundArtwork.ts). The rendered asset for
+   * this spec's palette sits behind the cover and back page as a locked,
+   * full-bleed image; `palette` must be one the background was rendered for.
+   */
+  background?: string;
+}
+
+export interface BuildLayoutOptions {
+  /** URL of the rendered background for `spec.background` + `spec.palette`. */
+  backgroundUrl?: string;
 }
 
 export function styleFor(spec: TemplateSpec): TemplateStyle {
@@ -462,17 +605,66 @@ export function styleFor(spec: TemplateSpec): TemplateStyle {
  * TEMPLATE_PAGE_COUNT pages, so the result satisfies parseLayoutPages and can
  * be written straight to templates.layout.
  */
-export function buildTemplateLayout(spec: TemplateSpec): DesignPage[] {
+export function buildTemplateLayout(
+  spec: TemplateSpec,
+  options: BuildLayoutOptions = {},
+): DesignPage[] {
   const style = styleFor(spec);
-  const pages: DesignPage[] = [
-    { id: uid("page"), background: style.paper, elements: COVERS[spec.archetype](style) },
-    { id: uid("page"), background: style.paper, elements: middlePage(style, spec.archetype) },
-    { id: uid("page"), background: style.paper, elements: backPage(style) },
-  ];
+  const pages: DesignPage[] = isArtworkArchetype(spec.archetype)
+    ? artworkPages(spec, spec.archetype, style, options)
+    : [
+        { id: uid("page"), background: style.paper, elements: COVERS[spec.archetype](style) },
+        { id: uid("page"), background: style.paper, elements: middlePage(style, spec.archetype) },
+        { id: uid("page"), background: style.paper, elements: backPage(style) },
+      ];
   if (pages.length !== TEMPLATE_PAGE_COUNT) {
     throw new Error(`Expected ${TEMPLATE_PAGE_COUNT} pages, built ${pages.length}`);
   }
   return pages;
+}
+
+/**
+ * Cover and back page over the artwork, a plain paper middle page. The
+ * background image is always element 0 so everything else draws above it.
+ * Refuses to build without the asset URL rather than quietly producing a
+ * paper template with an artwork composition on it.
+ */
+function artworkPages(
+  spec: TemplateSpec,
+  archetype: ArtworkArchetypeId,
+  style: TemplateStyle,
+  options: BuildLayoutOptions,
+): DesignPage[] {
+  if (!spec.background) {
+    throw new Error(`Spec "${spec.slug}" uses artwork archetype "${archetype}" but has no background`);
+  }
+  const background = getBackgroundSpec(spec.background);
+  if (!background) throw new Error(`Spec "${spec.slug}": unknown background "${spec.background}"`);
+  if (!background.palettes.includes(spec.palette)) {
+    throw new Error(
+      `Spec "${spec.slug}": background "${spec.background}" is not rendered for palette "${spec.palette}"`,
+    );
+  }
+  if (!options.backgroundUrl) {
+    throw new Error(`Spec "${spec.slug}" needs backgroundUrl — run npm run backgrounds:fetch first`);
+  }
+  const zone = background.textZone;
+  return [
+    {
+      id: uid("page"),
+      background: style.paper,
+      elements: [
+        backgroundElement(options.backgroundUrl),
+        ...ARTWORK_COVERS[archetype](style, zone),
+      ],
+    },
+    { id: uid("page"), background: style.paper, elements: middlePage(style, "minimal") },
+    {
+      id: uid("page"),
+      background: style.paper,
+      elements: [backgroundElement(options.backgroundUrl), ...artworkBackPage(style, zone)],
+    },
+  ];
 }
 
 /** Kebab-cased slug for a display name. Slugs are immutable once created. */
@@ -515,14 +707,63 @@ const CURATED: Array<
   ["Heartfelt Tribute", "corners", "plum", "baskerville", "heart", ["floral", "colourful"]],
 ];
 
-export const TEMPLATE_SPECS: TemplateSpec[] = CURATED.map(
-  ([name, archetype, palette, typeSet, icon, categories]) => ({
-    slug: slugForName(name),
-    name,
-    archetype,
-    palette,
-    typeSet,
-    icon,
-    categories,
-  }),
-);
+/**
+ * Templates built over background artwork (see BACKGROUND_SPECS). Each
+ * background appears twice — once typographic, once with a portrait — in a
+ * palette it was rendered for. The artwork is what makes these distinct, so
+ * two templates on one picture in one palette would be a duplicate.
+ */
+const CURATED_ARTWORK: Array<
+  [
+    name: string,
+    archetype: ArtworkArchetypeId,
+    background: string,
+    palette: PaletteId,
+    typeSet: TypeSetId,
+    icon: string,
+    categories: string[],
+  ]
+> = [
+  ["Rose of Josephine", "artwork", "redoute-frankfort-rose", "plum", "cormorant", "flower", ["floral", "classic"]],
+  ["Empress Rose", "artwork-portrait", "redoute-frankfort-rose", "bronze", "garamond", "flower", ["floral", "classic"]],
+  ["Crown Imperial", "artwork", "redoute-crown-imperial", "forest", "playfair", "leaf", ["floral", "nature"]],
+  ["Golden Crown", "artwork-portrait", "redoute-crown-imperial", "bronze", "classic", "flower", ["floral", "religious"]],
+  ["Climbing Lily", "artwork", "redoute-climbing-lily", "plum", "prata", "flower", ["floral", "colourful"]],
+  ["Flame Lily", "artwork-portrait", "redoute-climbing-lily", "forest", "baskerville", "leaf", ["floral", "nature"]],
+  ["Heather Moor", "artwork", "redoute-erica", "stone", "garamond", "leaf", ["nature", "calm"]],
+  ["Heath Light", "artwork-portrait", "redoute-erica", "plum", "cormorant", "flower", ["floral", "calm"]],
+  ["Burgundy Rose", "artwork", "redoute-burgundy-rose", "plum", "playfair", "flower", ["floral", "classic"]],
+  ["Velvet Rose", "artwork-portrait", "redoute-burgundy-rose", "stone", "prata", "heart", ["floral", "modern"]],
+  ["Cabbage Rose", "artwork", "redoute-cabbage-rose", "bronze", "baskerville", "flower", ["floral", "classic"]],
+  ["Old Rose", "artwork-portrait", "redoute-cabbage-rose", "plum", "classic", "flower", ["floral", "classic"]],
+  ["Morning Glory", "artwork", "sori-morning-glories", "slate", "cormorant", "leaf", ["nature", "calm"]],
+  ["Blue Dawn", "artwork-portrait", "sori-morning-glories", "forest", "playfair", "sun", ["nature", "colourful"]],
+  ["Swallows and Peonies", "artwork", "hokuba-swallows-peonies", "slate", "prata", "bird", ["birds", "floral"]],
+  ["Spring Rain", "artwork-portrait", "hokuba-swallows-peonies", "plum", "garamond", "bird", ["birds", "classic"]],
+];
+
+export const TEMPLATE_SPECS: TemplateSpec[] = [
+  ...CURATED.map(
+    ([name, archetype, palette, typeSet, icon, categories]): TemplateSpec => ({
+      slug: slugForName(name),
+      name,
+      archetype,
+      palette,
+      typeSet,
+      icon,
+      categories,
+    }),
+  ),
+  ...CURATED_ARTWORK.map(
+    ([name, archetype, background, palette, typeSet, icon, categories]): TemplateSpec => ({
+      slug: slugForName(name),
+      name,
+      archetype,
+      background,
+      palette,
+      typeSet,
+      icon,
+      categories,
+    }),
+  ),
+];

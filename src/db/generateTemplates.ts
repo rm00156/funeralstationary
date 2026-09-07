@@ -15,6 +15,10 @@
  * publish flow, so they need a running server: start `npm run dev` first, or
  * pass --origin, or skip them with --no-thumbnails.
  *
+ * Specs with a `background` need their rendered artwork to exist first
+ * (`npm run backgrounds:fetch`); without S3 that's checked on disk and the
+ * spec is skipped with a warning rather than generated over a broken image.
+ *
  * Usage:
  *   npm run templates:generate -- [--origin=http://localhost:3000]
  *                                 [--product=order-of-service]
@@ -32,6 +36,7 @@ import {
   adminSaveTemplateDraftLayout,
   adminUpdateTemplate,
 } from "@/lib/adminCatalogue.server";
+import { backgroundAssetExists, backgroundAssetUrl } from "@/lib/backgroundAssets.server";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";
 import { renderTemplateThumbnail } from "@/lib/templateThumbnail.server";
 import { TEMPLATE_SPECS, buildTemplateLayout, type TemplateSpec } from "@/lib/templateGenerator";
@@ -71,7 +76,14 @@ async function generate(spec: TemplateSpec, sortOrder: number) {
   const existing = await adminGetTemplate(spec.slug);
   if (existing && !force) return { slug: spec.slug, outcome: "skipped" as const };
 
-  const pages = buildTemplateLayout(spec);
+  let backgroundUrl: string | undefined;
+  if (spec.background) {
+    if (!isStorageConfigured() && !(await backgroundAssetExists(spec.background, spec.palette))) {
+      return { slug: spec.slug, outcome: "no-background" as const };
+    }
+    backgroundUrl = backgroundAssetUrl(spec.background, spec.palette);
+  }
+  const pages = buildTemplateLayout(spec, { backgroundUrl });
 
   if (existing) {
     await adminUpdateTemplate(spec.slug, {
@@ -144,7 +156,9 @@ async function main() {
     console.log(
       result.outcome === "skipped"
         ? `  - ${spec.slug} (already exists — pass --force to rebuild)`
-        : `  ✓ ${spec.slug}${result.thumbnail ? "" : " (no thumbnail)"}`,
+        : result.outcome === "no-background"
+          ? `  ! ${spec.slug} skipped — background "${spec.background}/${spec.palette}" not rendered (run npm run backgrounds:fetch)`
+          : `  ✓ ${spec.slug}${result.thumbnail ? "" : " (no thumbnail)"}`,
     );
     results.push(result);
   }

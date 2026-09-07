@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 import { TEMPLATE_PAGE_COUNT } from "@/lib/designEditor";
 import {
   ARCHETYPE_IDS,
+  ARTWORK_ARCHETYPE_IDS,
   TEMPLATE_PALETTES,
   TEMPLATE_SPECS,
   TEMPLATE_TYPE_SETS,
   buildTemplateLayout,
+  isArtworkArchetype,
   slugForName,
   styleFor,
   type TemplateSpec,
 } from "@/lib/templateGenerator";
+import { getBackgroundSpec } from "@/lib/backgroundArtwork";
 import { parseLayoutPages } from "@/lib/adminValidation";
 
 const spec = (patch: Partial<TemplateSpec> = {}): TemplateSpec => ({
@@ -101,6 +104,51 @@ describe("buildTemplateLayout", () => {
   });
 });
 
+describe("artwork templates", () => {
+  const artworkSpec = (overrides: Partial<TemplateSpec> = {}): TemplateSpec => ({
+    ...spec(),
+    archetype: "artwork",
+    background: "redoute-frankfort-rose",
+    palette: "plum",
+    ...overrides,
+  });
+
+  it("puts a locked full-bleed background first on the cover and back page, not the middle", () => {
+    const pages = buildTemplateLayout(artworkSpec(), { backgroundUrl: "/bg.jpg" });
+    for (const index of [0, 2]) {
+      const first = pages[index].elements[0];
+      expect(first.type).toBe("image");
+      expect(first.locked).toBe(true);
+      expect(first.type === "image" && first.src).toBe("/bg.jpg");
+      expect(first.x).toBeLessThan(0);
+    }
+    expect(pages[1].elements.some((el) => el.locked)).toBe(false);
+    expect(parseLayoutPages(pages).ok).toBe(true);
+  });
+
+  it("gives the portrait variant an empty photo placeholder above the background", () => {
+    const [cover] = buildTemplateLayout(artworkSpec({ archetype: "artwork-portrait" }), {
+      backgroundUrl: "/bg.jpg",
+    });
+    const placeholder = cover.elements.find((el) => el.type === "image" && el.src === null);
+    expect(placeholder).toBeDefined();
+    expect(cover.elements.indexOf(placeholder!)).toBeGreaterThan(0);
+  });
+
+  it("refuses to build without the rendered asset, an unknown background, or an unrendered palette", () => {
+    expect(() => buildTemplateLayout(artworkSpec())).toThrow(/backgroundUrl/);
+    expect(() =>
+      buildTemplateLayout(artworkSpec({ background: "nope" }), { backgroundUrl: "/bg.jpg" }),
+    ).toThrow(/unknown background/);
+    expect(() =>
+      buildTemplateLayout(artworkSpec({ palette: "ink" }), { backgroundUrl: "/bg.jpg" }),
+    ).toThrow(/not rendered for palette/);
+    expect(() =>
+      buildTemplateLayout(artworkSpec({ background: undefined }), { backgroundUrl: "/bg.jpg" }),
+    ).toThrow(/no background/);
+  });
+});
+
 describe("TEMPLATE_SPECS", () => {
   it("has unique slugs", () => {
     const slugs = TEMPLATE_SPECS.map((entry) => entry.slug);
@@ -115,13 +163,31 @@ describe("TEMPLATE_SPECS", () => {
 
   it("builds a valid layout for every curated spec", () => {
     for (const entry of TEMPLATE_SPECS) {
-      expect(parseLayoutPages(buildTemplateLayout(entry)).ok, entry.slug).toBe(true);
+      const pages = buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg" });
+      expect(parseLayoutPages(pages).ok, entry.slug).toBe(true);
     }
+  });
+
+  it("uses every artwork archetype and only backgrounds rendered for the spec's palette", () => {
+    const artwork = TEMPLATE_SPECS.filter((entry) => isArtworkArchetype(entry.archetype));
+    expect(new Set(artwork.map((entry) => entry.archetype)).size).toBe(ARTWORK_ARCHETYPE_IDS.length);
+    for (const entry of artwork) {
+      const background = getBackgroundSpec(entry.background ?? "");
+      expect(background, entry.slug).toBeDefined();
+      expect(background!.palettes, entry.slug).toContain(entry.palette);
+    }
+  });
+
+  it("never puts two templates on the same picture in the same palette", () => {
+    const keys = TEMPLATE_SPECS.filter((entry) => entry.background).map(
+      (entry) => `${entry.background}/${entry.palette}`,
+    );
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("covers every archetype, so the catalogue is not one design recoloured", () => {
     const used = new Set(TEMPLATE_SPECS.map((entry) => entry.archetype));
-    expect(used.size).toBe(ARCHETYPE_IDS.length);
+    expect(used.size).toBe(ARCHETYPE_IDS.length + ARTWORK_ARCHETYPE_IDS.length);
   });
 
   it("gives every spec at least one category", () => {
