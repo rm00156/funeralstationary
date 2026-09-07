@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, ChevronRight } from "lucide-react";
@@ -6,6 +7,7 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import OrderProofReview from "@/components/OrderProofReview";
+import OrderProofShare from "@/components/OrderProofShare";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { formatPence } from "@/lib/orderOfServicePricing";
 import { latestVisibleProof } from "@/lib/orders";
@@ -52,6 +54,14 @@ export default async function OrderPage({
   const owner = await readOwner();
   const order = owner ? await getOrder(owner, id) : null;
   if (!order) notFound();
+
+  // Nothing to share until a proof has actually been released.
+  const hasProof = order.items.some((item) => latestVisibleProof(item.proofs));
+  // Build the share URL server-side so it renders whole rather than
+  // appearing as a bare path until hydration supplies window.location.
+  const headerList = await headers();
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
+  const origin = `${headerList.get("x-forwarded-proto") ?? "http"}://${host}`;
 
   return (
     <>
@@ -139,6 +149,13 @@ export default async function OrderPage({
               </div>
 
               <aside className="flex h-fit flex-col gap-6">
+                {hasProof && (
+                  <OrderProofShare
+                    orderId={order.id}
+                    origin={origin}
+                    initialToken={order.shareToken}
+                  />
+                )}
                 <section className="rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow">
                   <h2 className="mb-4 font-display text-2xl text-primary">Total</h2>
                   <dl className="space-y-2 font-body text-sm text-on-surface-variant">
