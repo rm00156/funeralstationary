@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -313,6 +314,8 @@ export default function DesignEditor({
   const [preview, setPreview] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(true);
   const [proofState, setProofState] = useState<"idle" | "generating">("idle");
+  const [addingToCart, setAddingToCart] = useState(false);
+  const router = useRouter();
   /** Whether the active panel is open as a bottom sheet (mobile only). */
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   /** Center guide lines shown while dragging an element (see startDrag). */
@@ -345,7 +348,7 @@ export default function DesignEditor({
    * shared link) reopens the same design.
    */
   const persist = useCallback(
-    async (options: { silent?: boolean } = {}) => {
+    async (options: { silent?: boolean } = {}): Promise<string | null> => {
       setSaveState("saving");
       try {
         // Authoring mode: the document IS the template layout — save it to
@@ -364,7 +367,7 @@ export default function DesignEditor({
           setSaveState("saved");
           setDraftPending(true);
           if (!options.silent) flash("Draft saved — not visible to customers yet");
-          return;
+          return null;
         }
 
         const payload = {
@@ -392,9 +395,11 @@ export default function DesignEditor({
         if (!designId) setDesignId(saved.id);
         setSaveState("saved");
         if (!options.silent) flash("Design saved to your account");
+        return designId ?? saved.id;
       } catch {
         setSaveState("error");
         if (!options.silent) flash("Could not save — please try again");
+        return null;
       }
     },
     [doc, pagesOptionId, paperId, designName, designId, activeTemplate.id, productId, templateAuthoring, flash],
@@ -403,6 +408,38 @@ export default function DesignEditor({
   const saveDesign = () => {
     void persist();
   };
+
+  /**
+   * Save first (the row may not exist yet — see persist), then put the
+   * design in the basket and go there. Quantity, size and colour are chosen
+   * on the basket page; pages and paper come from the design itself.
+   */
+  const addToCart = useCallback(async () => {
+    if (authoring) return;
+    setAddingToCart(true);
+    const id = await persist({ silent: true });
+    if (!id) {
+      setAddingToCart(false);
+      flash("Could not save your design — please try again");
+      return;
+    }
+    try {
+      const response = await fetch("/api/cart/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ designId: id }),
+      });
+      if (!response.ok) {
+        const { error } = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(error || "Could not add to your basket — please try again");
+      }
+      window.dispatchEvent(new Event("tfs:cart-changed"));
+      router.push("/cart");
+    } catch (error) {
+      setAddingToCart(false);
+      flash(error instanceof Error ? error.message : "Could not add to your basket — please try again");
+    }
+  }, [authoring, persist, flash, router]);
 
   /**
    * Authoring only: promote the draft to the live layout. Saves first, so
@@ -1121,14 +1158,17 @@ export default function DesignEditor({
             <span className="hidden md:inline">Preview</span>
           </button>
           {!authoring && (
-            <Link
-              href="/order-of-service"
-              className="flex items-center gap-2 rounded-lg bg-primary-container p-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-primary sm:px-4"
+            <button
+              type="button"
+              onClick={() => void addToCart()}
+              disabled={addingToCart}
+              aria-label="Add to basket"
+              className="flex items-center gap-2 rounded-lg bg-primary-container p-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-primary disabled:opacity-60 sm:px-4"
             >
               <ShoppingCart size={16} aria-hidden className="md:hidden" />
-              <span className="hidden md:inline">Add To Cart</span>
+              <span className="hidden md:inline">{addingToCart ? "Adding…" : "Add to basket"}</span>
               <ArrowRight size={16} aria-hidden className="hidden md:block" />
-            </Link>
+            </button>
           )}
         </div>
       </header>
@@ -2255,13 +2295,15 @@ export default function DesignEditor({
                 {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
               </button>
               {!authoring && (
-                <Link
-                  href="/order-of-service"
-                  className="flex items-center gap-2 rounded-lg bg-primary-container px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-primary"
+                <button
+                  type="button"
+                  onClick={() => void addToCart()}
+                  disabled={addingToCart}
+                  className="flex items-center gap-2 rounded-lg bg-primary-container px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-primary disabled:opacity-60"
                 >
                   <ShoppingCart size={16} aria-hidden />
-                  Continue to order
-                </Link>
+                  {addingToCart ? "Adding…" : "Add to basket"}
+                </button>
               )}
             </div>
           </div>

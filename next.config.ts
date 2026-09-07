@@ -35,8 +35,12 @@ const nextConfig: NextConfig = {
   // `puppeteer` (full, with a bundled Chromium download) is dev-only — the
   // deployed /api/proof function uses puppeteer-core + @sparticuz/chromium
   // instead. Keep it out of the traced serverless bundle.
+  // Keys are route globs. The dev-only puppeteer package (with its bundled
+  // Chromium) must stay out of every deployed function that launches a
+  // browser — /api/proof, the admin template publish + order proof routes,
+  // and the Stripe webhook / checkout return routes that render proofs.
   outputFileTracingExcludes: {
-    "/api/proof": ["./node_modules/puppeteer/**"],
+    "/**": ["./node_modules/puppeteer/**"],
   },
 };
 

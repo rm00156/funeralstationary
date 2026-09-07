@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { CircleUserRound, Menu, X } from "lucide-react";
 
+import CartLink from "@/components/CartLink";
+
 const NAV_LINKS = [
   { label: "Order of Service", href: "/order-of-service" },
   { label: "Themes", href: "/#templates" },
@@ -49,6 +51,7 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-4">
+          <CartLink className="hidden md:flex" />
           <Link
             href="/designs"
             className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors duration-300 text-sm font-medium tracking-wide"
@@ -83,6 +86,7 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
+          <CartLink className="flex" onClick={() => setMenuOpen(false)} />
           <Link
             href="/designs"
             onClick={() => setMenuOpen(false)}

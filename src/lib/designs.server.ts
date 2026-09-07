@@ -10,9 +10,17 @@
  * every write resolves an incoming slug to its surrogate id, and every read
  * joins back out to slugs, so nothing outside src/db ever sees a surrogate id.
  */
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { designs, pageCountOptions, paperOptions, products, templates } from "@/db/schema";
+import {
+  designs,
+  orderItems,
+  orders,
+  pageCountOptions,
+  paperOptions,
+  products,
+  templates,
+} from "@/db/schema";
 import type { DesignDoc } from "@/lib/designEditor";
 import type { Owner } from "@/lib/session";
 
@@ -29,6 +37,8 @@ export interface SavedDesign {
   name: string;
   templateId: string;
   templateName: string;
+  /** The template's preview artwork — the closest thing to a design thumbnail. */
+  templateImage: string;
   productId: string;
   productLabel: string;
   doc: DesignDoc;
@@ -100,6 +110,7 @@ function savedDesignSelection() {
     updatedAt: designs.updatedAt,
     templateSlug: templates.slug,
     templateName: templates.name,
+    templateImage: templates.previewImageUrl,
     productSlug: products.slug,
     productLabel: products.label,
     pageCountSlug: pageCountOptions.slug,
@@ -115,6 +126,7 @@ type SelectedRow = {
   updatedAt: Date;
   templateSlug: string;
   templateName: string;
+  templateImage: string;
   productSlug: string;
   productLabel: string;
   pageCountSlug: string;
@@ -127,6 +139,7 @@ function toSavedDesign(row: SelectedRow): SavedDesign {
     name: row.name,
     templateId: row.templateSlug,
     templateName: row.templateName,
+    templateImage: row.templateImage,
     productId: row.productSlug,
     productLabel: row.productLabel,
     doc: row.doc,
@@ -286,7 +299,12 @@ export async function updateDesign(
   return getDesign(owner, id);
 }
 
-/** Soft delete — the row survives so any order that referenced it still reads. */
+/**
+ * Soft delete — the row survives so any *placed* order that referenced it
+ * still reads. Lines in a still-draft order (the basket) are dropped instead:
+ * a basket line for a design the customer just removed can never be paid
+ * for. (Done here rather than in orders.server.ts, which imports this module.)
+ */
 export async function deleteDesign(owner: Owner, id: string): Promise<boolean> {
   const existing = await getDesign(owner, id);
   if (!existing) return false;
@@ -294,5 +312,14 @@ export async function deleteDesign(owner: Owner, id: string): Promise<boolean> {
     .update(designs)
     .set({ deletedAt: new Date() })
     .where(and(eq(designs.id, id), ownedBy(owner), isLiveDesign()));
+  await db.delete(orderItems).where(
+    and(
+      eq(orderItems.designId, id),
+      inArray(
+        orderItems.orderId,
+        db.select({ id: orders.id }).from(orders).where(eq(orders.status, "draft")),
+      ),
+    ),
+  );
   return true;
 }

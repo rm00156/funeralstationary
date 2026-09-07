@@ -73,12 +73,21 @@ export const orders = mysqlTable(
     totalPence: int("total_pence").notNull().default(0),
     currency: char("currency", { length: 3 }).notNull().default("GBP"),
     placedAt: timestamp("placed_at"),
+    /**
+     * Stripe Checkout. The session id is set when the customer is sent to
+     * pay (a draft with a session is "payment pending"); the intent id and
+     * paidAt land when the payment completes and the order is finalised.
+     */
+    stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }).unique(),
+    stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+    paidAt: timestamp("paid_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },
   (t) => [
     index("orders_user_idx").on(t.userId, t.createdAt),
     index("orders_guest_token_idx").on(t.guestToken),
+    index("orders_status_placed_idx").on(t.status, t.placedAt),
   ],
 );
 
@@ -103,7 +112,13 @@ export const orderItems = mysqlTable(
     pageCountOptionId: varchar("page_count_option_id", { length: 64 }),
     paperOptionId: varchar("paper_option_id", { length: 64 }),
     deliveryOptionId: varchar("delivery_option_id", { length: 64 }),
-    /** The fully resolved Quote (labels, multipliers, rates) as the customer saw it. */
+    /**
+     * The fully resolved Quote (labels, multipliers, rates) as the customer
+     * saw it. Its `delivery` is the order-level option and its `totalPence`
+     * therefore includes delivery — `lineTotalPence` below (print cost only)
+     * is the authoritative per-line figure. While the order is still a draft
+     * this is a placeholder; it is rewritten at the pay click.
+     */
     quoteSnapshot: json("quote_snapshot").$type<Quote>().notNull(),
     quantityCopies: int("quantity_copies").notNull(),
     unitPricePence: int("unit_price_pence").notNull(),
