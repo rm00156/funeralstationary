@@ -3,9 +3,13 @@
  *
  * Shared by POST /api/proof (the editor's "Download proof") and the order
  * fulfilment path (proofs generated after payment, and admin regeneration).
- * It screenshots the real PageCanvas via the hidden /proof-render route so
- * the PDF is pixel-identical to the editor — never reimplement the layout
- * as a second renderer. proofRender.server.ts is the only Chromium entry.
+ * The pages come out of Chromium's own printer, driving the real
+ * PageCanvas on the hidden /proof-render route — so the file matches what
+ * the customer saw, with live text and embedded fonts rather than a raster
+ * of the screen. Never reimplement the layout as a second renderer (drawing
+ * text or shapes directly with pdf-lib); pdf-lib's job here is limited to
+ * marks and metadata on pages Chromium produced. proofRender.server.ts is
+ * the only Chromium entry.
  *
  * This is the press artefact. Customers never receive it; they review the
  * page images rendered by renderProofPageImages.
@@ -18,7 +22,7 @@ import {
   BLEED_MM,
   type DesignDoc,
 } from "@/lib/designEditor";
-import { renderProofPagePngs } from "@/lib/proofRender.server";
+import { renderProofPrintPdf } from "@/lib/proofRender.server";
 
 const MM_TO_PT = 72 / 25.4;
 const mmToPt = (mm: number) => mm * MM_TO_PT;
@@ -59,13 +63,26 @@ function drawCropMarks(page: PDFPage) {
  * incoming request, as every caller does).
  */
 export async function renderProofPdf(origin: string, doc: DesignDoc): Promise<Buffer> {
-  const shots = await renderProofPagePngs(origin, doc);
+  const printed = await renderProofPrintPdf(origin, doc);
+  const pdfDoc = await PDFDocument.load(printed);
 
-  const pdfDoc = await PDFDocument.create();
-  for (const shot of shots) {
-    const image = await pdfDoc.embedPng(shot);
-    const pdfPage = pdfDoc.addPage([PAGE_W_PT, PAGE_H_PT]);
-    pdfPage.drawImage(image, { x: 0, y: 0, width: PAGE_W_PT, height: PAGE_H_PT });
+  const pages = pdfDoc.getPages();
+  // One artboard per sheet. A mismatch means the print layout has broken
+  // (a page overflowing onto a second sheet, say) and the file would go to
+  // press wrong — fail loudly rather than ship it.
+  if (pages.length !== doc.pages.length) {
+    throw new Error(
+      `Print layout produced ${pages.length} sheets for ${doc.pages.length} pages`,
+    );
+  }
+  for (const pdfPage of pages) {
+    const { width, height } = pdfPage.getSize();
+    if (Math.abs(width - PAGE_W_PT) > 1 || Math.abs(height - PAGE_H_PT) > 1) {
+      throw new Error(
+        `Print layout produced a ${width.toFixed(1)}x${height.toFixed(1)}pt sheet, ` +
+          `expected ${PAGE_W_PT.toFixed(1)}x${PAGE_H_PT.toFixed(1)}pt`,
+      );
+    }
     drawCropMarks(pdfPage);
   }
 
