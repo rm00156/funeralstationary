@@ -3,12 +3,14 @@ import { TEMPLATE_PAGE_COUNT } from "@/lib/designEditor";
 import {
   ARCHETYPE_IDS,
   ARTWORK_ARCHETYPE_IDS,
+  SOLID_ARCHETYPE_IDS,
   SPRAY_ARCHETYPE_IDS,
   TEMPLATE_PALETTES,
   TEMPLATE_SPECS,
   TEMPLATE_TYPE_SETS,
   buildTemplateLayout,
   isArtworkArchetype,
+  isSolidArchetype,
   isSprayArchetype,
   slugForName,
   styleFor,
@@ -193,20 +195,53 @@ describe("TEMPLATE_SPECS", () => {
     }
   });
 
-  it("makes the photograph the subject of every spray cover", () => {
+  it("gives the photograph a substantial window on every spray cover", () => {
     for (const entry of TEMPLATE_SPECS.filter((e) => isSprayArchetype(e.archetype))) {
       const [cover] = buildTemplateLayout(entry, { sprayUrl: "/spray.png" });
       const photo = cover.elements.find((el) => el.type === "image" && el.src === null);
       expect(photo, entry.slug).toBeDefined();
+      // At least ~40% of the page wide: the person is the subject, not a stamp.
+      expect(photo!.w, entry.slug).toBeGreaterThanOrEqual(40);
       const sprays = cover.elements.filter((el) => el.type === "image" && el.src !== null);
       expect(sprays.length, entry.slug).toBeGreaterThan(0);
-      // Every spray is locked artwork that fits rather than crops, and the
-      // photo outweighs any single one of them.
       for (const spray of sprays) {
         expect(spray.locked, entry.slug).toBe(true);
         expect(spray.type === "image" && spray.fit, entry.slug).toBe("contain");
-        expect(photo!.w * photo!.h, entry.slug).toBeGreaterThan(spray.w * spray.h);
       }
+    }
+  });
+
+  it("puts the service details on every generated cover", () => {
+    for (const entry of TEMPLATE_SPECS) {
+      const [cover] = buildTemplateLayout(entry, {
+        backgroundUrl: "/bg.jpg",
+        sprayUrl: "/spray.png",
+      });
+      const hasService = cover.elements.some(
+        (el) => el.type === "text" && el.text.includes("Crematorium"),
+      );
+      // The paper archetypes predate this and are left alone; everything the
+      // artwork work introduced must carry venue and time.
+      if (!ARCHETYPE_IDS.includes(entry.archetype as never)) {
+        expect(hasService, entry.slug).toBe(true);
+      }
+    }
+  });
+
+  it("builds solid covers on a deep ground with light type and no artwork", () => {
+    for (const entry of TEMPLATE_SPECS.filter((e) => isSolidArchetype(e.archetype))) {
+      expect(entry.background, entry.slug).toBeUndefined();
+      const pages = buildTemplateLayout(entry);
+      expect(parseLayoutPages(pages).ok, entry.slug).toBe(true);
+      const style = styleFor(entry);
+      expect(pages[0].background, entry.slug).toBe(style.accent);
+      // The middle page stays paper — light type repeated a dozen times is
+      // not readable as a running order.
+      expect(pages[1].background, entry.slug).toBe(style.paper);
+      expect(
+        pages[0].elements.some((el) => el.type === "image" && el.src === null),
+        entry.slug,
+      ).toBe(true);
     }
   });
 
@@ -220,7 +255,10 @@ describe("TEMPLATE_SPECS", () => {
   it("covers every archetype, so the catalogue is not one design recoloured", () => {
     const used = new Set(TEMPLATE_SPECS.map((entry) => entry.archetype));
     expect(used.size).toBe(
-      ARCHETYPE_IDS.length + ARTWORK_ARCHETYPE_IDS.length + SPRAY_ARCHETYPE_IDS.length,
+      ARCHETYPE_IDS.length +
+        ARTWORK_ARCHETYPE_IDS.length +
+        SPRAY_ARCHETYPE_IDS.length +
+        SOLID_ARCHETYPE_IDS.length,
     );
   });
 

@@ -35,6 +35,7 @@ import {
   sprayElement,
   type TextZone,
 } from "@/lib/backgroundArtwork";
+import { FULL_BLEED_BOX } from "@/lib/designEditor";
 
 /**
  * Element coordinates are percentages of a page that is taller than it is
@@ -43,6 +44,24 @@ import {
  * as ovals.
  */
 const squareH = (w: number) => (w * PAGE_W_MM) / PAGE_H_MM;
+
+/** The venue and time block, in whichever ink the ground calls for. */
+const serviceDetails = (
+  style: TemplateStyle,
+  y: number,
+  color = style.muted,
+): CanvasElement =>
+  text({
+    text: PLACEHOLDER_SERVICE,
+    fontFamily: style.body,
+    fontSize: 11,
+    align: "center",
+    color,
+    x: 18,
+    y,
+    w: 64,
+    h: 0,
+  });
 
 const text = (props: Omit<TextElement, "id" | "type">): CanvasElement => ({
   id: uid("text"),
@@ -131,6 +150,12 @@ const PLACEHOLDER_DATES = "1971 – 2024";
 const RUNNING_ORDER =
   "Opening Music\n\nWelcome & Introduction\n\nHymn — Abide With Me\n\nEulogy\n\nReading\n\nPrayers\n\nClosing Words";
 const FAREWELL = "Forever in our hearts";
+/**
+ * Where and when the service is. Every competitor cover carries this under
+ * the dates — it's the practical reason a mourner keeps the card in a pocket
+ * — so no cover should ship without a slot for it.
+ */
+const PLACEHOLDER_SERVICE = "Reading Crematorium\nTuesday 16th June 2026, 11am";
 const THANKS =
   "The family would like to thank you\nfor your kindness, support and\npresence here today.";
 
@@ -377,6 +402,118 @@ export type ArchetypeId = keyof typeof COVERS;
 export const ARCHETYPE_IDS = Object.keys(COVERS) as ArchetypeId[];
 
 /**
+ * Solid-ground compositions. No sourced artwork at all: a deep field of the
+ * palette's accent, the photograph, and light type over it. A large part of
+ * what the market actually sells is exactly this — a colour block and a
+ * portrait — and it costs nothing to generate, so it isn't gated on a plate
+ * being cuttable.
+ *
+ * Text is set in `paper` because the ground is `accent`; only palettes whose
+ * accent is genuinely deep should be curated onto these.
+ */
+const SOLID_COVERS: Record<string, (style: TemplateStyle) => CanvasElement[]> = {
+  /** Photograph bleeding off the top edge, colour block beneath carrying the type. */
+  "solid-block": (s) => [
+    {
+      ...photo({ x: 0, y: 0, w: 0, h: 0 }),
+      x: FULL_BLEED_BOX.x,
+      y: FULL_BLEED_BOX.y,
+      w: FULL_BLEED_BOX.w,
+      h: 58 - FULL_BLEED_BOX.y,
+    } as CanvasElement,
+    rule({ color: s.paper, strokeWidth: 1, x: 10, y: 63, w: 80, h: 0.3 }),
+    text({
+      text: "In loving memory of",
+      fontFamily: s.body,
+      fontSize: 10,
+      align: "center",
+      color: s.paper,
+      uppercase: true,
+      letterSpacing: 4,
+      x: 15,
+      y: 66,
+      w: 70,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 30,
+      align: "center",
+      color: s.paper,
+      uppercase: true,
+      letterSpacing: 1.5,
+      x: 8,
+      y: 70,
+      w: 84,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 12,
+      align: "center",
+      color: s.paper,
+      x: 20,
+      y: 79,
+      w: 60,
+      h: 0,
+    }),
+    serviceDetails(s, 84, s.paper),
+  ],
+
+  /** Colour ground throughout, portrait held in a thin light rule, script name. */
+  "solid-frame": (s) => [
+    border({ variant: "single", color: s.paper, x: 8, y: 6, w: 84, h: 88 }),
+    photo({ x: 22, y: 13, w: 56, h: 44 }),
+    text({
+      text: "In loving memory of",
+      fontFamily: s.body,
+      fontSize: 10,
+      align: "center",
+      color: s.paper,
+      uppercase: true,
+      letterSpacing: 4,
+      x: 15,
+      y: 61,
+      w: 70,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.script,
+      fontSize: 40,
+      align: "center",
+      color: s.paper,
+      x: 8,
+      y: 64,
+      w: 84,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 12,
+      align: "center",
+      color: s.paper,
+      x: 20,
+      y: 76,
+      w: 60,
+      h: 0,
+    }),
+    serviceDetails(s, 81, s.paper),
+  ],
+};
+
+export type SolidArchetypeId = keyof typeof SOLID_COVERS;
+
+export const SOLID_ARCHETYPE_IDS = Object.keys(SOLID_COVERS) as SolidArchetypeId[];
+
+export function isSolidArchetype(id: string): id is SolidArchetypeId {
+  return id in SOLID_COVERS;
+}
+
+/**
  * Photo-led compositions built around a cutout spray.
  *
  * This is how funeral stationery actually works: the photograph of the person
@@ -405,7 +542,7 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
     text({
       text: PLACEHOLDER_NAME,
       fontFamily: s.heading,
-      fontSize: 31,
+      fontSize: 29,
       align: "center",
       color: s.ink,
       x: 8,
@@ -413,19 +550,22 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       w: 84,
       h: 0,
     }),
-    rule({ color: s.accent, strokeWidth: 1, x: 37, y: 68, w: 26, h: 0.4 }),
+    rule({ color: s.accent, strokeWidth: 1, x: 37, y: 67, w: 26, h: 0.4 }),
     text({
       text: PLACEHOLDER_DATES,
       fontFamily: s.body,
-      fontSize: 14,
+      fontSize: 13,
       align: "center",
       color: s.muted,
       x: 20,
-      y: 71,
+      y: 70,
       w: 60,
       h: 0,
     }),
-    sprayElement(src, { x: 26, y: 78, w: 48, h: 20 }),
+    serviceDetails(s, 75),
+    // Anchored into the corner and given real size — a small spray floating
+    // centrally under the type reads as an afterthought.
+    sprayElement(src, { x: 2, y: 70, w: 34, h: 30 }),
   ],
 
   /** Oval portrait held between a diagonal pair of sprays. */
@@ -472,6 +612,64 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       w: 60,
       h: 0,
     }),
+    serviceDetails(s, 75.5),
+  ],
+
+  /**
+   * Spray running the full height of one edge, everything else in the column
+   * beside it. The best fit for these plates: they are tall single specimens,
+   * so a tall box shows them at full size where a wide "bottom band" box
+   * would letterbox them down to nothing.
+   */
+  "side-stem": (s, src) => [
+    sprayElement(src, { x: 58, y: 3, w: 42, h: 94 }),
+    photo({ shape: "oval", x: 6, y: 10, w: 44, h: squareH(44) }),
+    text({
+      text: "In loving memory of",
+      fontFamily: s.body,
+      fontSize: 10,
+      align: "center",
+      color: s.muted,
+      uppercase: true,
+      letterSpacing: 3,
+      x: 4,
+      y: 45,
+      w: 48,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.script,
+      fontSize: 36,
+      align: "center",
+      color: s.accent,
+      x: 2,
+      y: 48,
+      w: 52,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 11,
+      align: "center",
+      color: s.muted,
+      x: 4,
+      y: 60,
+      w: 48,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_SERVICE,
+      fontFamily: s.body,
+      fontSize: 10,
+      align: "center",
+      color: s.muted,
+      x: 4,
+      y: 66,
+      w: 48,
+      h: 0,
+    }),
   ],
 
   /** Arch photo window with the spray tucked into the bottom-left corner. */
@@ -503,20 +701,10 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       w: 60,
       h: 0,
     }),
-    text({
-      text: FAREWELL,
-      fontFamily: s.script,
-      fontSize: 24,
-      align: "center",
-      color: s.accent,
-      x: 15,
-      y: 73,
-      w: 70,
-      h: 0,
-    }),
+    serviceDetails(s, 71),
     // Inside the frame on every side — a spray crossing the border line reads
     // as a mistake rather than an overlap.
-    sprayElement(src, { x: 9, y: 74, w: 30, h: 16 }),
+    sprayElement(src, { x: 8, y: 76, w: 32, h: 18 }),
   ],
 };
 
@@ -609,6 +797,7 @@ const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => C
         w: 60,
         h: 0,
       }),
+      serviceDetails(s, textTop + 21),
     ];
   },
 
@@ -643,17 +832,7 @@ const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => C
         w: 60,
         h: 0,
       }),
-      text({
-        text: FAREWELL,
-        fontFamily: s.script,
-        fontSize: 24,
-        align: "center",
-        color: s.accent,
-        x: 15,
-        y: textTop + 17,
-        w: 70,
-        h: 0,
-      }),
+      serviceDetails(s, textTop + 16),
     ];
   },
 };
@@ -770,7 +949,7 @@ export interface TemplateSpec {
    * A paper composition, a full-bleed artwork one (requires a `background`
    * asset), or a photo-led spray one (requires that background's cutout).
    */
-  archetype: ArchetypeId | ArtworkArchetypeId | SprayArchetypeId;
+  archetype: ArchetypeId | ArtworkArchetypeId | SprayArchetypeId | SolidArchetypeId;
   palette: PaletteId;
   typeSet: TypeSetId;
   /** Clipart id — see CLIPARTS in DesignEditor. */
@@ -809,7 +988,9 @@ export function buildTemplateLayout(
   options: BuildLayoutOptions = {},
 ): DesignPage[] {
   const style = styleFor(spec);
-  const pages: DesignPage[] = isSprayArchetype(spec.archetype)
+  const pages: DesignPage[] = isSolidArchetype(spec.archetype)
+    ? solidPages(spec.archetype, style)
+    : isSprayArchetype(spec.archetype)
     ? sprayPages(spec, spec.archetype, style, options)
     : isArtworkArchetype(spec.archetype)
     ? artworkPages(spec, spec.archetype, style, options)
@@ -822,6 +1003,46 @@ export function buildTemplateLayout(
     throw new Error(`Expected ${TEMPLATE_PAGE_COUNT} pages, built ${pages.length}`);
   }
   return pages;
+}
+
+/**
+ * Cover and back page on a deep field of the palette accent, with a plain
+ * paper middle page — the running order has to stay readable, and light type
+ * on a colour field repeated a dozen times does not.
+ */
+function solidPages(archetype: SolidArchetypeId, style: TemplateStyle): DesignPage[] {
+  return [
+    { id: uid("page"), background: style.accent, elements: SOLID_COVERS[archetype](style) },
+    { id: uid("page"), background: style.paper, elements: middlePage(style, "minimal") },
+    {
+      id: uid("page"),
+      background: style.accent,
+      elements: [
+        text({
+          text: FAREWELL,
+          fontFamily: style.script,
+          fontSize: 30,
+          align: "center",
+          color: style.paper,
+          x: 10,
+          y: 34,
+          w: 80,
+          h: 0,
+        }),
+        text({
+          text: THANKS,
+          fontFamily: style.body,
+          fontSize: 12,
+          align: "center",
+          color: style.paper,
+          x: 15,
+          y: 48,
+          w: 70,
+          h: 0,
+        }),
+      ],
+    },
+  ];
 }
 
 /**
@@ -970,17 +1191,40 @@ const CURATED_ARTWORK: Array<
   ["Climbing Lily", "portrait-corners", "redoute-climbing-lily", "plum", "prata", "flower", ["floral", "colourful"]],
   ["Flame Lily", "keepsake", "redoute-climbing-lily", "forest", "baskerville", "leaf", ["floral", "nature"]],
   ["Heather Moor", "arch-spray", "redoute-erica", "stone", "garamond", "leaf", ["nature", "calm"]],
-  ["Heath Light", "keepsake", "redoute-erica", "plum", "cormorant", "flower", ["floral", "calm"]],
+  ["Heath Light", "side-stem", "redoute-erica", "plum", "cormorant", "flower", ["floral", "calm"]],
   ["Burgundy Rose", "keepsake", "redoute-burgundy-rose", "plum", "playfair", "flower", ["floral", "classic"]],
   ["Velvet Rose", "portrait-corners", "redoute-burgundy-rose", "stone", "prata", "heart", ["floral", "modern"]],
   ["Cabbage Rose", "arch-spray", "redoute-cabbage-rose", "bronze", "baskerville", "flower", ["floral", "classic"]],
-  ["Old Rose", "keepsake", "redoute-cabbage-rose", "plum", "classic", "flower", ["floral", "classic"]],
+  ["Old Rose", "side-stem", "redoute-cabbage-rose", "plum", "classic", "flower", ["floral", "classic"]],
   ["Martagon Lily", "portrait-corners", "redoute-martagon-lily", "plum", "cormorant", "flower", ["floral", "colourful"]],
   ["Turban Lily", "keepsake", "redoute-martagon-lily", "slate", "garamond", "flower", ["floral", "modern"]],
   // Full-bleed wash — only for the Madonna lily, whose white-on-cream plate
   // can't be cut out (see its spec).
   ["Madonna Lily", "wash-portrait", "redoute-madonna-lily", "stone", "cormorant", "flower", ["floral", "religious"]],
   ["White Lily", "wash-arch", "redoute-madonna-lily", "bronze", "playfair", "flower", ["floral", "classic"]],
+];
+
+/**
+ * Solid-ground templates. These reference no background at all, so they never
+ * wait on artwork being sourced or cut. Only palettes with a genuinely deep
+ * accent are used — light type has to hold against the ground.
+ */
+const CURATED_SOLID: Array<
+  [
+    name: string,
+    archetype: SolidArchetypeId,
+    palette: PaletteId,
+    typeSet: TypeSetId,
+    icon: string,
+    categories: string[],
+  ]
+> = [
+  ["Midnight Portrait", "solid-block", "slate", "playfair", "star", ["modern", "simple"]],
+  ["Deep Green", "solid-frame", "forest", "cormorant", "leaf", ["nature", "classic"]],
+  ["Charcoal Tribute", "solid-block", "ink", "prata", "sparkles", ["minimalistic", "modern"]],
+  ["Bronze Keepsake", "solid-frame", "bronze", "garamond", "candle", ["classic", "religious"]],
+  ["Amethyst Memory", "solid-frame", "plum", "baskerville", "heart", ["colourful", "classic"]],
+  ["Harbour Blue", "solid-block", "slate", "classic", "bird", ["calm", "modern"]],
 ];
 
 export const TEMPLATE_SPECS: TemplateSpec[] = [
@@ -1001,6 +1245,17 @@ export const TEMPLATE_SPECS: TemplateSpec[] = [
       name,
       archetype,
       background,
+      palette,
+      typeSet,
+      icon,
+      categories,
+    }),
+  ),
+  ...CURATED_SOLID.map(
+    ([name, archetype, palette, typeSet, icon, categories]): TemplateSpec => ({
+      slug: slugForName(name),
+      name,
+      archetype,
       palette,
       typeSet,
       icon,
