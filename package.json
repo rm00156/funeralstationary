@@ -13,6 +13,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
     "templates:generate": "tsx src/db/generateTemplates.ts",
+    "backgrounds:fetch": "tsx src/db/fetchBackgrounds.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
