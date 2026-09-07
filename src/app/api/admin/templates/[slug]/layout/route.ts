@@ -113,7 +113,7 @@ export async function POST(
     if (isStorageConfigured() && coverPage) {
       try {
         const origin = new URL(request.url).origin;
-        const png = await renderTemplateThumbnail(origin, coverPage);
+        const png = await renderTemplateThumbnail(origin, coverPage, slug);
         const url = await uploadObject(
           `template-previews/${slug}-${Date.now()}.png`,
           png,

@@ -1,0 +1,58 @@
+[
+  {
+    "id": "redoute-frankfort-rose",
+    "name": "Frankfort Rose",
+    "licence": "Public domain (Met Open Access, CC0)",
+    "credit": "Pierre-Joseph Redouté, ‘Empress Josephine’ or Frankfort Rose, from Les Roses. The Metropolitan Museum of Art.",
+    "sourceUrl": "https://www.metmuseum.org/art/collection/search/762055"
+  },
+  {
+    "id": "redoute-crown-imperial",
+    "name": "Crown Imperial",
+    "licence": "Public domain (Met Open Access, CC0)",
+    "credit": "Pierre-Joseph Redouté, Crown Imperial (Fritillaria imperialis), from Les Liliacées. The Metropolitan Museum of Art.",
+    "sourceUrl": "https://www.metmuseum.org/art/collection/search/762064"
+  },
+  {
+    "id": "redoute-climbing-lily",
+    "name": "Climbing Lily",
+    "licence": "Public domain (Met Open Access, CC0)",
+    "credit": "Pierre-Joseph Redouté, Gloriosa Superba (Climbing Lily). The Metropolitan Museum of Art.",
+    "sourceUrl": "https://www.metmuseum.org/art/collection/search/697703"
+  },
+  {
+    "id": "redoute-erica",
+    "name": "Heath in Flower",
+    "licence": "Public domain (Met Open Access, CC0)",
+    "credit": "Pierre-Joseph Redouté, Erica Fulgida. The Metropolitan Museum of Art.",
+    "sourceUrl": "https://www.metmuseum.org/art/collection/search/697702"
+  },
+  {
+    "id": "redoute-burgundy-rose",
+    "name": "Burgundy Rose",
+    "licence": "Public domain",
+    "credit": "Pierre-Joseph Redouté, Rosa centifolia Burgundiaca, from Les Roses. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Rosa_centifolia_Burgundiaca.jpg"
+  },
+  {
+    "id": "redoute-cabbage-rose",
+    "name": "Cabbage Rose",
+    "licence": "Public domain",
+    "credit": "Pierre-Joseph Redouté, Rosa centifolia foliacea, from Les Roses. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Redoute_-_Rosa_centifolia_foliacea.jpg"
+  },
+  {
+    "id": "redoute-madonna-lily",
+    "name": "Madonna Lily",
+    "licence": "Public domain",
+    "credit": "Pierre-Joseph Redouté, Lilium candidum (Lis Blanc), from Les Liliacées. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lilium_candidum_in_Les_liliacees.jpg"
+  },
+  {
+    "id": "redoute-martagon-lily",
+    "name": "Martagon Lily",
+    "licence": "Public domain",
+    "credit": "Pierre-Joseph Redouté, Lilium martagon (Lis Martagon), from Les Liliacées. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lilium_martagon_-_Les_liliac%C3%A9es,_vol._3_-_t._146.jpg"
+  }
+]

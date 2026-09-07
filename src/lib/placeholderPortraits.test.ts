@@ -1,0 +1,100 @@
+import { describe, expect, it } from "vitest";
+import {
+  PLACEHOLDER_PORTRAIT_IDS,
+  placeholderPortraitKey,
+  portraitIdForSeed,
+  portraitRotationForSeed,
+  withPlaceholderPhotos,
+} from "./placeholderPortraits";
+import { TEMPLATE_SPECS, buildTemplateLayout } from "./templateGenerator";
+import type { DesignPage } from "./designEditor";
+
+const page = (elements: DesignPage["elements"]): DesignPage => ({ id: "p", elements });
+
+describe("portraitIdForSeed", () => {
+  it("is stable for a given seed", () => {
+    expect(portraitIdForSeed("cabbage-rose")).toBe(portraitIdForSeed("cabbage-rose"));
+  });
+
+  it("only ever returns a known portrait", () => {
+    for (const spec of TEMPLATE_SPECS) {
+      expect(PLACEHOLDER_PORTRAIT_IDS).toContain(portraitIdForSeed(spec.slug));
+    }
+  });
+
+  it("spreads the catalogue across all three, not one face everywhere", () => {
+    const used = new Set(TEMPLATE_SPECS.map((s) => portraitIdForSeed(s.slug)));
+    expect(used.size).toBe(PLACEHOLDER_PORTRAIT_IDS.length);
+  });
+});
+
+describe("placeholderPortraitKey", () => {
+  it("keys by id", () => {
+    expect(placeholderPortraitKey("portrait-2")).toBe("templates/placeholders/portrait-2.jpg");
+  });
+});
+
+describe("portraitRotationForSeed", () => {
+  it("lists every portrait once, starting with this seed's pick", () => {
+    const rotation = portraitRotationForSeed("quiet-modern");
+    expect(rotation).toHaveLength(PLACEHOLDER_PORTRAIT_IDS.length);
+    expect(new Set(rotation).size).toBe(PLACEHOLDER_PORTRAIT_IDS.length);
+    expect(rotation[0]).toBe(portraitIdForSeed("quiet-modern"));
+  });
+});
+
+describe("withPlaceholderPhotos", () => {
+  it("fills empty photo windows and leaves artwork alone", () => {
+    const original = page([
+      { id: "a", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 },
+      { id: "b", type: "image", src: "/spray.png", locked: true, x: 0, y: 0, w: 10, h: 10 },
+      { id: "c", type: "text", text: "x", fontFamily: "lato", fontSize: 10, align: "center", color: "#000", x: 0, y: 0, w: 10, h: 0 },
+    ]);
+    const filled = withPlaceholderPhotos(original, "/portrait.jpg");
+    expect(filled.elements[0].type === "image" && filled.elements[0].src).toBe("/portrait.jpg");
+    expect(filled.elements[1].type === "image" && filled.elements[1].src).toBe("/spray.png");
+    expect(filled.elements[2].type).toBe("text");
+  });
+
+  it("never mutates the page it was given — the stored layout keeps its nulls", () => {
+    const original = page([{ id: "a", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 }]);
+    withPlaceholderPhotos(original, "/portrait.jpg");
+    expect(original.elements[0].type === "image" && original.elements[0].src).toBeNull();
+  });
+
+  it("cycles portraits across a collage rather than repeating one face", () => {
+    const collage = page(
+      Array.from({ length: 4 }, (_, i) => ({
+        id: `i${i}`,
+        type: "image" as const,
+        src: null,
+        x: 0,
+        y: 0,
+        w: 10,
+        h: 10,
+      })),
+    );
+    const filled = withPlaceholderPhotos(collage, ["/a.jpg", "/b.jpg", "/c.jpg"]);
+    const srcs = filled.elements.map((el) => (el.type === "image" ? el.src : null));
+    expect(srcs).toEqual(["/a.jpg", "/b.jpg", "/c.jpg", "/a.jpg"]);
+  });
+
+  it("does not consume a portrait on a window that already has artwork", () => {
+    const mixed = page([
+      { id: "bg", type: "image", src: "/bg.jpg", x: 0, y: 0, w: 10, h: 10 },
+      { id: "p1", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 },
+      { id: "p2", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 },
+    ]);
+    const filled = withPlaceholderPhotos(mixed, ["/a.jpg", "/b.jpg"]);
+    const srcs = filled.elements.map((el) => (el.type === "image" ? el.src : null));
+    expect(srcs).toEqual(["/bg.jpg", "/a.jpg", "/b.jpg"]);
+  });
+
+  it("fills the photo window on a real generated cover", () => {
+    const spec = TEMPLATE_SPECS.find((s) => s.archetype === "keepsake")!;
+    const [cover] = buildTemplateLayout(spec, { sprayUrl: "/spray.png" });
+    const filled = withPlaceholderPhotos(cover, "/portrait.jpg");
+    expect(filled.elements.some((el) => el.type === "image" && el.src === "/portrait.jpg")).toBe(true);
+    expect(filled.elements.some((el) => el.type === "image" && el.src === null)).toBe(false);
+  });
+});

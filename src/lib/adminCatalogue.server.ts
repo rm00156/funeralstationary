@@ -7,14 +7,16 @@
  * immutable after create (they're snapshot keys in order history), so no
  * update below ever touches a slug column.
  *
- * There are deliberately no hard deletes: designs FK into every one of these
- * tables with ON DELETE RESTRICT, so rows are retired with is_active = false
- * (or status = "archived" for templates) instead.
+ * Rows are retired, not deleted: designs FK into every one of these tables
+ * with ON DELETE RESTRICT, so is_active = false (or status = "archived" for
+ * templates) is how a catalogue row leaves the shop. The single exception is
+ * adminDeleteTemplate below, for a template nothing has ever referenced.
  */
 import { asc, eq, and, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   colourOptions,
+  designs,
   deliveryOptions,
   pageCountOptions,
   paperOptions,
@@ -28,8 +30,11 @@ import {
 import type { TemplateStatus } from "@/lib/adminValidation";
 import type { DesignPage } from "@/lib/designEditor";
 
-// Re-exported for the admin routes; the helper itself lives in src/db/errors.ts
-// so the orders seam can share it without importing the admin module.
+// Re-exported for the admin routes; the helpers themselves live in
+// src/db/errors.ts so the orders seam can share them without importing the
+// admin module.
+import { isRowReferencedError } from "@/db/errors";
+
 export { isDuplicateKeyError } from "@/db/errors";
 
 async function resolveProductId(slug: string): Promise<number | null> {
@@ -591,6 +596,59 @@ export async function adminUpdateTemplate(
     await setTemplateCategories(templateId, patch.categories);
   }
   return adminGetTemplate(slug);
+}
+
+/**
+ * Hard-delete a template — the one exception to this module's retire-don't-
+ * delete rule, for a template nothing has ever used. A bulk-generated draft
+ * that didn't make the cut would otherwise sit in /admin/templates forever:
+ * archiving is the right answer for a template with history, but there is no
+ * history here to protect.
+ *
+ * The guard is the FK that would refuse the delete anyway, checked up front so
+ * the UI can explain itself rather than surface a MySQL error: any `designs`
+ * row pointing here blocks it — soft-deleted ones included, since deleted_at
+ * leaves the row, and so the constraint, in place. That transitively covers
+ * order history too, because a template can only reach an order through a
+ * design. Anything with designs gets archived instead.
+ *
+ * The preview image is deliberately left in object storage: an orphaned
+ * thumbnail costs nothing, and blindly deleting one risks pulling the rug from
+ * under another row pointed at the same URL.
+ */
+export async function adminDeleteTemplate(
+  slug: string,
+): Promise<
+  | { status: "deleted" }
+  | { status: "not-found" }
+  | { status: "in-use"; designCount: number }
+> {
+  const templateId = await resolveTemplateId(slug);
+  if (!templateId) return { status: "not-found" };
+
+  const [used] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(designs)
+    .where(eq(designs.templateId, templateId));
+  const designCount = Number(used?.count ?? 0);
+  if (designCount > 0) return { status: "in-use", designCount };
+
+  try {
+    await db.transaction(async (tx) => {
+      // Links cascade, but the delete is explicit so this doesn't depend on
+      // the FK's ON DELETE surviving a future migration.
+      await tx
+        .delete(templateCategoryLinks)
+        .where(eq(templateCategoryLinks.templateId, templateId));
+      await tx.delete(templates).where(eq(templates.id, templateId));
+    });
+  } catch (error) {
+    // A design created between the count above and the delete: the FK is the
+    // real gate, so report it the same way rather than 500ing.
+    if (isRowReferencedError(error)) return { status: "in-use", designCount: 1 };
+    throw error;
+  }
+  return { status: "deleted" };
 }
 
 /**

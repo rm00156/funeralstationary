@@ -15,6 +15,10 @@
  * publish flow, so they need a running server: start `npm run dev` first, or
  * pass --origin, or skip them with --no-thumbnails.
  *
+ * Specs with a `background` need their rendered artwork to exist first
+ * (`npm run backgrounds:fetch`); without S3 that's checked on disk and the
+ * spec is skipped with a warning rather than generated over a broken image.
+ *
  * Usage:
  *   npm run templates:generate -- [--origin=http://localhost:3000]
  *                                 [--product=order-of-service]
@@ -22,8 +26,6 @@
  */
 
 import "dotenv/config";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import {
   adminCreateTemplate,
   adminGetTemplate,
@@ -32,9 +34,19 @@ import {
   adminSaveTemplateDraftLayout,
   adminUpdateTemplate,
 } from "@/lib/adminCatalogue.server";
-import { isStorageConfigured, uploadObject } from "@/lib/storage";
-import { renderTemplateThumbnail } from "@/lib/templateThumbnail.server";
-import { TEMPLATE_SPECS, buildTemplateLayout, type TemplateSpec } from "@/lib/templateGenerator";
+import {
+  backgroundAssetExists,
+  backgroundAssetUrl,
+  sprayAssetUrl,
+} from "@/lib/backgroundAssets.server";
+import { isStorageConfigured } from "@/lib/storage";
+import { renderTemplateThumbnail, saveTemplateThumbnail } from "@/lib/templateThumbnail.server";
+import {
+  TEMPLATE_SPECS,
+  buildTemplateLayout,
+  isSprayArchetype,
+  type TemplateSpec,
+} from "@/lib/templateGenerator";
 
 /** Shipped asset, used until a real thumbnail lands so preview_image_url is never a 404. */
 const PLACEHOLDER_PREVIEW = "/fs-monogram.webp";
@@ -52,26 +64,23 @@ const only = flag("only")?.split(",").map((entry) => entry.trim()).filter(Boolea
 const force = has("force");
 const thumbnails = !has("no-thumbnails");
 
-/**
- * Persist a rendered thumbnail. Object storage when it's configured (the same
- * place the admin publish flow puts them), otherwise a file under public/ so
- * the script is still usable in development without S3.
- */
-async function saveThumbnail(slug: string, png: Buffer): Promise<string> {
-  if (isStorageConfigured()) {
-    return uploadObject(`template-previews/${slug}-${Date.now()}.png`, png, "image/png");
-  }
-  const dir = path.join(process.cwd(), "public", "templates", slug);
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, "cover.png"), png);
-  return `/templates/${slug}/cover.png`;
-}
-
 async function generate(spec: TemplateSpec, sortOrder: number) {
   const existing = await adminGetTemplate(spec.slug);
   if (existing && !force) return { slug: spec.slug, outcome: "skipped" as const };
 
-  const pages = buildTemplateLayout(spec);
+  let backgroundUrl: string | undefined;
+  let sprayUrl: string | undefined;
+  if (spec.background) {
+    if (isSprayArchetype(spec.archetype)) {
+      sprayUrl = sprayAssetUrl(spec.background);
+    } else {
+      if (!isStorageConfigured() && !(await backgroundAssetExists(spec.background, spec.palette))) {
+        return { slug: spec.slug, outcome: "no-background" as const };
+      }
+      backgroundUrl = backgroundAssetUrl(spec.background, spec.palette);
+    }
+  }
+  const pages = buildTemplateLayout(spec, { backgroundUrl, sprayUrl });
 
   if (existing) {
     await adminUpdateTemplate(spec.slug, {
@@ -105,8 +114,8 @@ async function generate(spec: TemplateSpec, sortOrder: number) {
   // Best-effort, matching the admin publish route: a thumbnail failure leaves
   // a usable template rather than aborting the whole run.
   try {
-    const png = await renderTemplateThumbnail(origin, pages[0]);
-    const url = await saveThumbnail(spec.slug, png);
+    const png = await renderTemplateThumbnail(origin, pages[0], spec.slug);
+    const url = await saveTemplateThumbnail(spec.slug, png);
     await adminUpdateTemplate(spec.slug, { previewImageUrl: url });
     return { slug: spec.slug, outcome: "created" as const, thumbnail: true };
   } catch (error) {
@@ -144,7 +153,9 @@ async function main() {
     console.log(
       result.outcome === "skipped"
         ? `  - ${spec.slug} (already exists — pass --force to rebuild)`
-        : `  ✓ ${spec.slug}${result.thumbnail ? "" : " (no thumbnail)"}`,
+        : result.outcome === "no-background"
+          ? `  ! ${spec.slug} skipped — background "${spec.background}/${spec.palette}" not rendered (run npm run backgrounds:fetch)`
+          : `  ✓ ${spec.slug}${result.thumbnail ? "" : " (no thumbnail)"}`,
     );
     results.push(result);
   }

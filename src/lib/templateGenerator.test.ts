@@ -2,14 +2,21 @@ import { describe, expect, it } from "vitest";
 import { TEMPLATE_PAGE_COUNT } from "@/lib/designEditor";
 import {
   ARCHETYPE_IDS,
+  ARTWORK_ARCHETYPE_IDS,
+  SOLID_ARCHETYPE_IDS,
+  SPRAY_ARCHETYPE_IDS,
   TEMPLATE_PALETTES,
   TEMPLATE_SPECS,
   TEMPLATE_TYPE_SETS,
   buildTemplateLayout,
+  isArtworkArchetype,
+  isSolidArchetype,
+  isSprayArchetype,
   slugForName,
   styleFor,
   type TemplateSpec,
 } from "@/lib/templateGenerator";
+import { getBackgroundSpec } from "@/lib/backgroundArtwork";
 import { parseLayoutPages } from "@/lib/adminValidation";
 
 const spec = (patch: Partial<TemplateSpec> = {}): TemplateSpec => ({
@@ -39,11 +46,17 @@ describe("buildTemplateLayout", () => {
     for (const archetype of ARCHETYPE_IDS) {
       const pages = buildTemplateLayout(spec({ archetype }));
       expect(pages, archetype).toHaveLength(TEMPLATE_PAGE_COUNT);
-      // The middle page is what repeats, so it must carry the running order.
+      // The middle page is what repeats, so it must stay generic — see
+      // middlePage. Anything service-specific here lands on every interior
+      // page, twice over even at the smallest page count.
       expect(
-        pages[1].elements.some((el) => el.type === "text" && el.text === "Order of Service"),
+        pages[1].elements.some((el) => el.type === "text" && el.text === "YOUR TEXT HERE"),
         archetype,
       ).toBe(true);
+      expect(
+        pages[1].elements.some((el) => el.type === "text" && /Order of Service|Hymn|Eulogy/.test(el.text)),
+        archetype,
+      ).toBe(false);
     }
   });
 
@@ -101,6 +114,51 @@ describe("buildTemplateLayout", () => {
   });
 });
 
+describe("artwork templates", () => {
+  const artworkSpec = (overrides: Partial<TemplateSpec> = {}): TemplateSpec => ({
+    ...spec(),
+    archetype: "wash-portrait",
+    background: "redoute-frankfort-rose",
+    palette: "plum",
+    ...overrides,
+  });
+
+  it("puts a locked full-bleed background first on the cover and back page, not the middle", () => {
+    const pages = buildTemplateLayout(artworkSpec(), { backgroundUrl: "/bg.jpg" });
+    for (const index of [0, 2]) {
+      const first = pages[index].elements[0];
+      expect(first.type).toBe("image");
+      expect(first.locked).toBe(true);
+      expect(first.type === "image" && first.src).toBe("/bg.jpg");
+      expect(first.x).toBeLessThan(0);
+    }
+    expect(pages[1].elements.some((el) => el.locked)).toBe(false);
+    expect(parseLayoutPages(pages).ok).toBe(true);
+  });
+
+  it("gives the wash variants an empty photo placeholder above the background", () => {
+    const [cover] = buildTemplateLayout(artworkSpec({ archetype: "wash-arch" }), {
+      backgroundUrl: "/bg.jpg",
+    });
+    const placeholder = cover.elements.find((el) => el.type === "image" && el.src === null);
+    expect(placeholder).toBeDefined();
+    expect(cover.elements.indexOf(placeholder!)).toBeGreaterThan(0);
+  });
+
+  it("refuses to build without the rendered asset, an unknown background, or an unrendered palette", () => {
+    expect(() => buildTemplateLayout(artworkSpec())).toThrow(/backgroundUrl/);
+    expect(() =>
+      buildTemplateLayout(artworkSpec({ background: "nope" }), { backgroundUrl: "/bg.jpg" }),
+    ).toThrow(/unknown background/);
+    expect(() =>
+      buildTemplateLayout(artworkSpec({ palette: "ink" }), { backgroundUrl: "/bg.jpg" }),
+    ).toThrow(/not rendered for palette/);
+    expect(() =>
+      buildTemplateLayout(artworkSpec({ background: undefined }), { backgroundUrl: "/bg.jpg" }),
+    ).toThrow(/no background/);
+  });
+});
+
 describe("TEMPLATE_SPECS", () => {
   it("has unique slugs", () => {
     const slugs = TEMPLATE_SPECS.map((entry) => entry.slug);
@@ -115,13 +173,99 @@ describe("TEMPLATE_SPECS", () => {
 
   it("builds a valid layout for every curated spec", () => {
     for (const entry of TEMPLATE_SPECS) {
-      expect(parseLayoutPages(buildTemplateLayout(entry)).ok, entry.slug).toBe(true);
+      const pages = buildTemplateLayout(entry, {
+        backgroundUrl: "/bg.jpg",
+        sprayUrl: "/spray.png",
+      });
+      expect(parseLayoutPages(pages).ok, entry.slug).toBe(true);
     }
+  });
+
+  it("uses every artwork archetype and only backgrounds rendered for the spec's palette", () => {
+    const artwork = TEMPLATE_SPECS.filter((entry) => isArtworkArchetype(entry.archetype));
+    expect(new Set(artwork.map((entry) => entry.archetype)).size).toBe(ARTWORK_ARCHETYPE_IDS.length);
+    for (const entry of artwork) {
+      const background = getBackgroundSpec(entry.background ?? "");
+      expect(background, entry.slug).toBeDefined();
+      expect(background!.palettes, entry.slug).toContain(entry.palette);
+    }
+  });
+
+  it("only builds spray templates on backgrounds that have a cutout", () => {
+    const sprays = TEMPLATE_SPECS.filter((entry) => isSprayArchetype(entry.archetype));
+    expect(new Set(sprays.map((entry) => entry.archetype)).size).toBe(SPRAY_ARCHETYPE_IDS.length);
+    for (const entry of sprays) {
+      const background = getBackgroundSpec(entry.background ?? "");
+      expect(background, entry.slug).toBeDefined();
+      expect(background!.spray, entry.slug).toBeDefined();
+    }
+  });
+
+  it("gives the photograph a substantial window on every spray cover", () => {
+    for (const entry of TEMPLATE_SPECS.filter((e) => isSprayArchetype(e.archetype))) {
+      const [cover] = buildTemplateLayout(entry, { sprayUrl: "/spray.png" });
+      const photo = cover.elements.find((el) => el.type === "image" && el.src === null);
+      expect(photo, entry.slug).toBeDefined();
+      // At least ~40% of the page wide: the person is the subject, not a stamp.
+      expect(photo!.w, entry.slug).toBeGreaterThanOrEqual(40);
+      const sprays = cover.elements.filter((el) => el.type === "image" && el.src !== null);
+      expect(sprays.length, entry.slug).toBeGreaterThan(0);
+      for (const spray of sprays) {
+        expect(spray.locked, entry.slug).toBe(true);
+        expect(spray.type === "image" && spray.fit, entry.slug).toBe("contain");
+      }
+    }
+  });
+
+  it("puts the service details on every generated cover", () => {
+    for (const entry of TEMPLATE_SPECS) {
+      const [cover] = buildTemplateLayout(entry, {
+        backgroundUrl: "/bg.jpg",
+        sprayUrl: "/spray.png",
+      });
+      const hasService = cover.elements.some(
+        (el) => el.type === "text" && el.text.includes("Crematorium"),
+      );
+      // The paper archetypes predate this and are left alone; everything the
+      // artwork work introduced must carry venue and time.
+      if (!ARCHETYPE_IDS.includes(entry.archetype as never)) {
+        expect(hasService, entry.slug).toBe(true);
+      }
+    }
+  });
+
+  it("builds solid covers on a deep ground with light type and no artwork", () => {
+    for (const entry of TEMPLATE_SPECS.filter((e) => isSolidArchetype(e.archetype))) {
+      expect(entry.background, entry.slug).toBeUndefined();
+      const pages = buildTemplateLayout(entry);
+      expect(parseLayoutPages(pages).ok, entry.slug).toBe(true);
+      const style = styleFor(entry);
+      expect(pages[0].background, entry.slug).toBe(style.accent);
+      // The middle page stays paper — light type repeated a dozen times is
+      // not readable as a running order.
+      expect(pages[1].background, entry.slug).toBe(style.paper);
+      expect(
+        pages[0].elements.some((el) => el.type === "image" && el.src === null),
+        entry.slug,
+      ).toBe(true);
+    }
+  });
+
+  it("never puts two templates on the same picture in the same palette", () => {
+    const keys = TEMPLATE_SPECS.filter((entry) => entry.background).map(
+      (entry) => `${entry.background}/${entry.palette}`,
+    );
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it("covers every archetype, so the catalogue is not one design recoloured", () => {
     const used = new Set(TEMPLATE_SPECS.map((entry) => entry.archetype));
-    expect(used.size).toBe(ARCHETYPE_IDS.length);
+    expect(used.size).toBe(
+      ARCHETYPE_IDS.length +
+        ARTWORK_ARCHETYPE_IDS.length +
+        SPRAY_ARCHETYPE_IDS.length +
+        SOLID_ARCHETYPE_IDS.length,
+    );
   });
 
   it("gives every spec at least one category", () => {

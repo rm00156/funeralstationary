@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, PenTool } from "lucide-react";
 
+import AdminTemplateDeleteButton from "@/components/AdminTemplateDeleteButton";
 import AdminTemplateForm from "@/components/AdminTemplateForm";
 import AdminTemplateLayoutActions from "@/components/AdminTemplateLayoutActions";
 import {
@@ -69,6 +70,8 @@ export default async function AdminTemplatePage({
         products={products}
         categories={categories}
       />
+
+      <AdminTemplateDeleteButton slug={template.slug} name={template.name} />
     </>
   );
 }

@@ -1,5 +1,9 @@
 import type { NextRequest } from "next/server";
-import { adminGetTemplate, adminUpdateTemplate } from "@/lib/adminCatalogue.server";
+import {
+  adminDeleteTemplate,
+  adminGetTemplate,
+  adminUpdateTemplate,
+} from "@/lib/adminCatalogue.server";
 import { isAdmin, unauthorised } from "@/lib/adminSession";
 import {
   parseCategorySlugs,
@@ -87,4 +91,34 @@ export async function PATCH(
     }
     throw error;
   }
+}
+
+/**
+ * DELETE /api/admin/templates/:slug — remove a template that nothing has ever
+ * used. The catalogue's rule is retire-don't-delete (see
+ * adminCatalogue.server.ts); this exists only so an unused draft — typically a
+ * templates:generate reject — doesn't have to be archived and lived with
+ * forever. A template with designs behind it 409s and stays put.
+ */
+export async function DELETE(
+  _request: NextRequest,
+  ctx: RouteContext<"/api/admin/templates/[slug]">,
+) {
+  if (!(await isAdmin())) return unauthorised();
+  const { slug } = await ctx.params;
+  const result = await adminDeleteTemplate(slug);
+  if (result.status === "not-found") {
+    return Response.json({ error: "Template not found" }, { status: 404 });
+  }
+  if (result.status === "in-use") {
+    return Response.json(
+      {
+        error: `This template can't be deleted — ${result.designCount} customer ${
+          result.designCount === 1 ? "design uses" : "designs use"
+        } it. Set its status to Archived instead.`,
+      },
+      { status: 409 },
+    );
+  }
+  return Response.json({ ok: true });
 }

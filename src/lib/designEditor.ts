@@ -29,6 +29,18 @@ export const ARTBOARD_H_MM = PAGE_H_MM + BLEED_MM * 2;
 export const ARTBOARD_W = PAGE_W + BLEED_PX * 2;
 export const ARTBOARD_H = PAGE_H + BLEED_PX * 2;
 
+/**
+ * Element box (percent of the trim page) that covers the whole artboard,
+ * bleed included. Element coordinates are measured against the trim box, so
+ * a full-bleed background has to start slightly negative and overshoot 100%
+ * — otherwise a hairline of bare paper shows at the cut line.
+ */
+export const FULL_BLEED_BOX = (() => {
+  const bx = (BLEED_MM / PAGE_W_MM) * 100;
+  const by = (BLEED_MM / PAGE_H_MM) * 100;
+  return { x: -bx, y: -by, w: 100 + bx * 2, h: 100 + by * 2 } as const;
+})();
+
 export type FontFamilyId =
   | "display"
   | "body"
@@ -177,6 +189,14 @@ interface ElementBase {
   h: number;
   /** Rotation in degrees, clockwise, around the element's center. Undefined means 0. */
   rotation?: number;
+  /**
+   * A locked element is part of the template's artwork, not the customer's
+   * content: on the customer path it can't be selected, moved, resized,
+   * edited or deleted, and it never shows an outline. Only the template
+   * authoring editor can toggle it. Used for full-bleed background artwork
+   * so a customer can't drag the picture off the page.
+   */
+  locked?: boolean;
 }
 
 export interface TextElement extends ElementBase {
@@ -201,6 +221,47 @@ export interface ImageElement extends ElementBase {
   /** @deprecated superseded by `shape`; kept so old saved docs still render. */
   round?: boolean;
   shape?: PhotoShape;
+  /**
+   * How the image fills its box. "cover" (the default) crops to fill, which
+   * is what a customer's photo in a fixed window wants. "contain" fits the
+   * whole image inside without cropping or distortion — required for a
+   * transparent cutout, whose own edges are the artwork.
+   */
+  fit?: "cover" | "contain";
+  /**
+   * Optional line border drawn around the photo window, using the same
+   * single/double/triple line pattern as a page `FrameElement`. It follows the
+   * window shape, so an oval photo gets an oval border and an arch an arched
+   * one. Undefined means no border.
+   */
+  border?: FrameVariant;
+  /** Border colour; only meaningful when `border` is set. */
+  borderColor?: string;
+}
+
+export type FrameVariant = "single" | "double" | "triple";
+
+export const FRAME_VARIANTS: readonly FrameVariant[] = ["single", "double", "triple"];
+
+/** Default colour for a photo border the moment one is switched on. */
+export const DEFAULT_PHOTO_BORDER_COLOR = INK_PALETTE[0];
+
+/** Gap between the lines of a frame, in base-page px. */
+export const FRAME_RING_GAP = 4;
+
+/**
+ * Line widths of a frame from the outside in, in base-page px. A page border
+ * and a photo border draw the same lines so the two match on one page.
+ */
+export function frameRings(variant: FrameVariant): number[] {
+  if (variant === "single") return [1];
+  if (variant === "double") return [1, 2.5];
+  return [1, 1, 2.5];
+}
+
+/** Total depth a frame's lines and gaps occupy from the outer edge. */
+export function frameDepth(variant: FrameVariant): number {
+  return frameRings(variant).reduce((sum, width) => sum + width + FRAME_RING_GAP, 0);
 }
 
 /** The effective window shape, honouring the legacy `round` flag. */
@@ -224,6 +285,28 @@ export function photoBorderRadius(el: ImageElement): string | undefined {
   return undefined;
 }
 
+/**
+ * The border-radius of a box sitting `inset` base-page px inside the photo
+ * window, so a border ring (or the photo inside it) keeps the window's shape:
+ * an oval stays 50%, an arch's semicircle shrinks by the inset so the ring
+ * runs parallel to the outer edge, and a rectangle stays square.
+ */
+export function photoInnerBorderRadius(el: ImageElement, inset: number): string | undefined {
+  const shape = imageShape(el);
+  if (shape === "oval") return "50%";
+  if (shape === "arch") {
+    const r = Math.max(0, ((el.w / 100) * PAGE_W) / 2 - inset);
+    return `${r}px ${r}px 0 0`;
+  }
+  return undefined;
+}
+
+export interface FrameElement extends ElementBase {
+  type: "frame";
+  variant: FrameVariant;
+  color: string;
+}
+
 export interface ShapeElement extends ElementBase {
   type: "shape";
   shape: "rect" | "circle" | "line";
@@ -234,12 +317,6 @@ export interface ShapeElement extends ElementBase {
 export interface ClipartElement extends ElementBase {
   type: "clipart";
   icon: string;
-  color: string;
-}
-
-export interface FrameElement extends ElementBase {
-  type: "frame";
-  variant: "single" | "double" | "triple";
   color: string;
 }
 
@@ -492,19 +569,42 @@ function coverElements(template: Template): CanvasElement[] {
   ];
 }
 
-function orderPageElements(): CanvasElement[] {
+/**
+ * The interior page of a starter document, repeated to fill whichever page
+ * count the customer picks.
+ *
+ * It has to stay **generic**. Whatever is here lands on every interior page —
+ * twice even at the smallest 4-page option, twenty-two times at 24 — so it
+ * carries decoration and an invitation to type, never specific content. An
+ * order of service is singular (one service, one order), so putting a running
+ * order here would produce a booklet asserting the service happens six times.
+ * This matches the seeded catalogue and the bulk generator's middlePage.
+ */
+function interiorPageElements(): CanvasElement[] {
   return [
+    {
+      id: uid("shape"),
+      type: "shape",
+      shape: "line",
+      color: "#81737d",
+      strokeWidth: 1,
+      x: 35,
+      y: 41,
+      w: 30,
+      h: 0.3,
+    },
     {
       id: uid("text"),
       type: "text",
-      text: "Order of Service",
+      text: "YOUR TEXT HERE",
       fontFamily: "display",
-      fontSize: 24,
+      fontSize: 26,
       align: "center",
-      color: "#1f1a1e",
-      x: 10,
-      y: 8,
-      w: 80,
+      color: "#4f434c",
+      letterSpacing: 2,
+      x: 12,
+      y: 46,
+      w: 76,
       h: 0,
     },
     {
@@ -514,22 +614,9 @@ function orderPageElements(): CanvasElement[] {
       color: "#81737d",
       strokeWidth: 1,
       x: 35,
-      y: 14.5,
+      y: 57,
       w: 30,
       h: 0.3,
-    },
-    {
-      id: uid("text"),
-      type: "text",
-      text: "Opening Music\n\nWelcome & Introduction\n\nHymn — Abide With Me\n\nEulogy\n\nReading\n\nPrayers\n\nClosing Words",
-      fontFamily: "body",
-      fontSize: 14,
-      align: "center",
-      color: "#4f434c",
-      x: 12,
-      y: 20,
-      w: 76,
-      h: 0,
     },
   ];
 }
@@ -579,7 +666,7 @@ export function makeBlankPage(): DesignPage {
   return { id: uid("page"), elements: [] };
 }
 
-/** Starter document for a template: cover, the order page repeated to fill, back page. */
+/** Starter document for a template: cover, a generic interior page repeated to fill, back page. */
 export function makeStarterDoc(template: Template, pageCount: number): DesignDoc {
   const pages: DesignPage[] = [];
   for (let index = 0; index < pageCount; index += 1) {
@@ -588,7 +675,7 @@ export function makeStarterDoc(template: Template, pageCount: number): DesignDoc
     } else if (index === pageCount - 1) {
       pages.push({ id: uid("page"), elements: backPageElements() });
     } else {
-      pages.push({ id: uid("page"), elements: orderPageElements() });
+      pages.push({ id: uid("page"), elements: interiorPageElements() });
     }
   }
   return { templateId: template.id, pages };
