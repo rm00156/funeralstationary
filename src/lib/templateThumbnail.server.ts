@@ -10,10 +10,13 @@
  * (see placeholderPortraits) — a preview of a dashed empty box tells a
  * browsing customer nothing, but the stored layout must keep its nulls.
  */
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { launchHeadlessBrowser } from "@/lib/headlessBrowser.server";
+import { isStorageConfigured, uploadObject } from "@/lib/storage";
 import { placeholderPortraitUrl } from "@/lib/backgroundAssets.server";
 import {
-  portraitIdForSeed,
+  portraitRotationForSeed,
   withPlaceholderPhotos,
 } from "@/lib/placeholderPortraits";
 import type { DesignDoc, DesignPage } from "@/lib/designEditor";
@@ -26,7 +29,7 @@ export async function renderTemplateThumbnail(
 ): Promise<Buffer> {
   const page0 = withPlaceholderPhotos(
     coverPage,
-    placeholderPortraitUrl(portraitIdForSeed(seed)),
+    portraitRotationForSeed(seed).map(placeholderPortraitUrl),
   );
   const browser = await launchHeadlessBrowser();
   try {
@@ -48,4 +51,19 @@ export async function renderTemplateThumbnail(
   } finally {
     await browser.close();
   }
+}
+
+/**
+ * Persist a rendered thumbnail. Object storage when it's configured — the
+ * same place the admin publish flow puts them — otherwise a file under
+ * public/ so the tooling still works in development without S3.
+ */
+export async function saveTemplateThumbnail(slug: string, png: Buffer): Promise<string> {
+  if (isStorageConfigured()) {
+    return uploadObject(`template-previews/${slug}-${Date.now()}.png`, png, "image/png");
+  }
+  const dir = path.join(process.cwd(), "public", "templates", slug);
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, "cover.png"), png);
+  return `/templates/${slug}/cover.png`;
 }

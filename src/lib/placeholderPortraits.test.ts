@@ -3,6 +3,7 @@ import {
   PLACEHOLDER_PORTRAIT_IDS,
   placeholderPortraitKey,
   portraitIdForSeed,
+  portraitRotationForSeed,
   withPlaceholderPhotos,
 } from "./placeholderPortraits";
 import { TEMPLATE_SPECS, buildTemplateLayout } from "./templateGenerator";
@@ -33,6 +34,15 @@ describe("placeholderPortraitKey", () => {
   });
 });
 
+describe("portraitRotationForSeed", () => {
+  it("lists every portrait once, starting with this seed's pick", () => {
+    const rotation = portraitRotationForSeed("quiet-modern");
+    expect(rotation).toHaveLength(PLACEHOLDER_PORTRAIT_IDS.length);
+    expect(new Set(rotation).size).toBe(PLACEHOLDER_PORTRAIT_IDS.length);
+    expect(rotation[0]).toBe(portraitIdForSeed("quiet-modern"));
+  });
+});
+
 describe("withPlaceholderPhotos", () => {
   it("fills empty photo windows and leaves artwork alone", () => {
     const original = page([
@@ -50,6 +60,34 @@ describe("withPlaceholderPhotos", () => {
     const original = page([{ id: "a", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 }]);
     withPlaceholderPhotos(original, "/portrait.jpg");
     expect(original.elements[0].type === "image" && original.elements[0].src).toBeNull();
+  });
+
+  it("cycles portraits across a collage rather than repeating one face", () => {
+    const collage = page(
+      Array.from({ length: 4 }, (_, i) => ({
+        id: `i${i}`,
+        type: "image" as const,
+        src: null,
+        x: 0,
+        y: 0,
+        w: 10,
+        h: 10,
+      })),
+    );
+    const filled = withPlaceholderPhotos(collage, ["/a.jpg", "/b.jpg", "/c.jpg"]);
+    const srcs = filled.elements.map((el) => (el.type === "image" ? el.src : null));
+    expect(srcs).toEqual(["/a.jpg", "/b.jpg", "/c.jpg", "/a.jpg"]);
+  });
+
+  it("does not consume a portrait on a window that already has artwork", () => {
+    const mixed = page([
+      { id: "bg", type: "image", src: "/bg.jpg", x: 0, y: 0, w: 10, h: 10 },
+      { id: "p1", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 },
+      { id: "p2", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 },
+    ]);
+    const filled = withPlaceholderPhotos(mixed, ["/a.jpg", "/b.jpg"]);
+    const srcs = filled.elements.map((el) => (el.type === "image" ? el.src : null));
+    expect(srcs).toEqual(["/bg.jpg", "/a.jpg", "/b.jpg"]);
   });
 
   it("fills the photo window on a real generated cover", () => {

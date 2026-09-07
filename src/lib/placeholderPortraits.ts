@@ -40,12 +40,31 @@ export function portraitIdForSeed(seed: string): PlaceholderPortraitId {
  * A copy of the page with every empty photo window filled. Elements that
  * already have a src — background washes, cutout sprays — are left alone, as
  * is the original page: this must never mutate what gets stored.
+ *
+ * Given several portraits, successive windows cycle through them, so a photo
+ * collage previews as a family rather than the same face repeated.
  */
-export function withPlaceholderPhotos(page: DesignPage, src: string): DesignPage {
+export function withPlaceholderPhotos(
+  page: DesignPage,
+  src: string | readonly string[],
+): DesignPage {
+  const sources = typeof src === "string" ? [src] : src;
+  if (sources.length === 0) return page;
+  let filled = 0;
   return {
     ...page,
     elements: page.elements.map((element) =>
-      element.type === "image" && element.src === null ? { ...element, src } : element,
+      element.type === "image" && element.src === null
+        ? { ...element, src: sources[filled++ % sources.length] }
+        : element,
     ),
   };
+}
+
+/** The three portraits, ordered so `seed`'s pick comes first. */
+export function portraitRotationForSeed(seed: string): PlaceholderPortraitId[] {
+  const start = PLACEHOLDER_PORTRAIT_IDS.indexOf(portraitIdForSeed(seed));
+  return PLACEHOLDER_PORTRAIT_IDS.map(
+    (_, i) => PLACEHOLDER_PORTRAIT_IDS[(start + i) % PLACEHOLDER_PORTRAIT_IDS.length],
+  );
 }

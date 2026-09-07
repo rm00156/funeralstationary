@@ -26,8 +26,6 @@
  */
 
 import "dotenv/config";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import {
   adminCreateTemplate,
   adminGetTemplate,
@@ -41,8 +39,8 @@ import {
   backgroundAssetUrl,
   sprayAssetUrl,
 } from "@/lib/backgroundAssets.server";
-import { isStorageConfigured, uploadObject } from "@/lib/storage";
-import { renderTemplateThumbnail } from "@/lib/templateThumbnail.server";
+import { isStorageConfigured } from "@/lib/storage";
+import { renderTemplateThumbnail, saveTemplateThumbnail } from "@/lib/templateThumbnail.server";
 import {
   TEMPLATE_SPECS,
   buildTemplateLayout,
@@ -65,21 +63,6 @@ const productSlug = flag("product") ?? "order-of-service";
 const only = flag("only")?.split(",").map((entry) => entry.trim()).filter(Boolean);
 const force = has("force");
 const thumbnails = !has("no-thumbnails");
-
-/**
- * Persist a rendered thumbnail. Object storage when it's configured (the same
- * place the admin publish flow puts them), otherwise a file under public/ so
- * the script is still usable in development without S3.
- */
-async function saveThumbnail(slug: string, png: Buffer): Promise<string> {
-  if (isStorageConfigured()) {
-    return uploadObject(`template-previews/${slug}-${Date.now()}.png`, png, "image/png");
-  }
-  const dir = path.join(process.cwd(), "public", "templates", slug);
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, "cover.png"), png);
-  return `/templates/${slug}/cover.png`;
-}
 
 async function generate(spec: TemplateSpec, sortOrder: number) {
   const existing = await adminGetTemplate(spec.slug);
@@ -132,7 +115,7 @@ async function generate(spec: TemplateSpec, sortOrder: number) {
   // a usable template rather than aborting the whole run.
   try {
     const png = await renderTemplateThumbnail(origin, pages[0], spec.slug);
-    const url = await saveThumbnail(spec.slug, png);
+    const url = await saveTemplateThumbnail(spec.slug, png);
     await adminUpdateTemplate(spec.slug, { previewImageUrl: url });
     return { slug: spec.slug, outcome: "created" as const, thumbnail: true };
   } catch (error) {
