@@ -20,10 +20,16 @@
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
-import { designs, orderEvents, orderItems, orderProofs, orders } from "@/db/schema";
+import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders } from "@/db/schema";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
 import type { DesignDoc } from "@/lib/designEditor";
 import { getDesign } from "@/lib/designs.server";
+import {
+  describeIssue,
+  isDesignOrderable,
+  needsDefaultsConfirmation,
+} from "@/lib/designReadiness";
+import { checkDocReadiness } from "@/lib/designReadiness.server";
 import type { OrderEmailSummary } from "@/lib/orderEmails";
 import {
   DEFAULT_VAT_RATE,
@@ -50,6 +56,12 @@ export class CartError extends Error {
   constructor(
     public readonly status: 400 | 404 | 409,
     message: string,
+    /**
+     * Extra JSON merged into the error response. Used by the pre-order check
+     * so the client gets the actual list of things to fix, not just a
+     * sentence — the customer needs to be shown *which* photo window is empty.
+     */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "CartError";
@@ -59,7 +71,7 @@ export class CartError extends Error {
 /** Route helper: the Response for a CartError / resolver miss, else null. */
 export function cartErrorResponse(error: unknown): Response | null {
   if (error instanceof CartError) {
-    return Response.json({ error: error.message }, { status: error.status });
+    return Response.json({ error: error.message, ...error.details }, { status: error.status });
   }
   if (error instanceof Error && error.message.startsWith("Unknown")) {
     return Response.json({ error: error.message }, { status: 400 });
@@ -115,13 +127,21 @@ export interface Cart {
   ready: boolean;
 }
 
-export type OrderProofStatus = "generated" | "sent" | "changes_requested" | "approved";
+export interface OrderProofPageImage {
+  pageIndex: number;
+  imageUrl: string;
+}
 
+/**
+ * A rendered version of a line's artwork. Admin-only, in full: proofs are a
+ * press artefact, and nothing on the customer path reads them.
+ */
 export interface OrderProofSummary {
   id: string;
   version: number;
-  pdfUrl: string;
-  status: OrderProofStatus;
+  /** The print-ready PDF — null until an admin generates one. */
+  pdfUrl: string | null;
+  pages: OrderProofPageImage[];
   createdAt: Date;
 }
 
@@ -386,6 +406,16 @@ export async function getCartCount(owner: Owner): Promise<number> {
 
 type LineChoice = Partial<Pick<Selection, "quantity" | "size" | "colour">>;
 
+interface AddCartItemOptions extends LineChoice {
+  /**
+   * The customer has been shown the template wording they left unedited and
+   * has confirmed they meant to keep it. Without this an otherwise valid
+   * design is refused, so the confirmation can never be skipped by a client
+   * that simply doesn't implement the dialog.
+   */
+  acknowledgeDefaults?: boolean;
+}
+
 function assertLineChoiceValid(
   pricing: PricingData,
   selection: Selection,
@@ -406,7 +436,7 @@ function assertLineChoiceValid(
 export async function addCartItem(
   owner: Owner,
   designId: string,
-  choice: LineChoice = {},
+  choice: AddCartItemOptions = {},
 ): Promise<Cart> {
   const design = await getDesign(owner, designId);
   if (!design) throw new CartError(404, "Design not found");
@@ -425,6 +455,28 @@ export async function addCartItem(
     const cart = await getCart(owner);
     if (!cart) throw new Error("Basket vanished");
     return cart;
+  }
+
+  /*
+   * The pre-order gate. Everything a proof review would have caught is caught
+   * here instead, while the customer is still in front of the editor and can
+   * fix it themselves: an empty photo window is refused outright (it prints as
+   * the editor's dashed placeholder), and template wording left unedited must
+   * be confirmed. Enforced server-side because the client's copy of this check
+   * is a nicety, not a gate.
+   */
+  const readiness = await checkDocReadiness(design.templateId, design.doc);
+  if (!isDesignOrderable(readiness)) {
+    throw new CartError(409, readiness.blocking.map(describeIssue).join(". "), {
+      reason: "blocked",
+      readiness,
+    });
+  }
+  if (needsDefaultsConfirmation(readiness) && !choice.acknowledgeDefaults) {
+    throw new CartError(409, "Please confirm the wording you have left unchanged", {
+      reason: "confirm",
+      readiness,
+    });
   }
 
   const pricing = await getPricingData(design.productId);
@@ -468,6 +520,10 @@ export async function addCartItem(
     unitPricePence: quote.unitPricePence,
     lineTotalPence: quote.printCostPence,
     docSnapshot: design.doc,
+    // The audit record: what they were warned about, and when they accepted
+    // it. Null when there was nothing to warn about at all.
+    defaultsAck: readiness.warnings.length > 0 ? readiness.warnings : null,
+    defaultsAckAt: readiness.warnings.length > 0 ? new Date() : null,
   });
 
   const cart = await getCart(owner);
@@ -759,7 +815,7 @@ export async function finaliseOrder(
   const [result] = await db
     .update(orders)
     .set({
-      status: "awaiting_proof",
+      status: "awaiting_print",
       placedAt: now,
       paidAt: now,
       stripeCheckoutSessionId: payment.sessionId,
@@ -780,7 +836,7 @@ export async function finaliseOrder(
   await insertEvent(orderId, {
     type: "placed",
     fromStatus: "draft",
-    toStatus: "awaiting_proof",
+    toStatus: "awaiting_print",
     actor: "stripe",
     note: `Paid via Stripe Checkout (${payment.sessionId})`,
   });
@@ -866,6 +922,26 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       .orderBy(desc(orderEvents.createdAt), desc(orderEvents.id)),
   ]);
 
+  // Only worth a round trip once there is something to page through.
+  const pageRows = proofRows.length
+    ? await db
+        .select()
+        .from(orderProofPages)
+        .where(
+          inArray(
+            orderProofPages.proofId,
+            proofRows.map((proof) => proof.id),
+          ),
+        )
+        .orderBy(asc(orderProofPages.pageIndex))
+    : [];
+  const pagesByProof = new Map<string, OrderProofPageImage[]>();
+  for (const row of pageRows) {
+    const list = pagesByProof.get(row.proofId) ?? [];
+    list.push({ pageIndex: row.pageIndex, imageUrl: row.imageUrl });
+    pagesByProof.set(row.proofId, list);
+  }
+
   const proofsByItem = new Map<string, OrderProofSummary[]>();
   for (const proof of proofRows) {
     const list = proofsByItem.get(proof.orderItemId) ?? [];
@@ -873,7 +949,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       id: proof.id,
       version: proof.version,
       pdfUrl: proof.pdfUrl,
-      status: proof.status,
+      pages: pagesByProof.get(proof.id) ?? [],
       createdAt: proof.createdAt,
     });
     proofsByItem.set(proof.orderItemId, list);
@@ -977,3 +1053,4 @@ export async function getOrderEmailSummary(orderId: string): Promise<OrderEmailS
     ].filter((line): line is string => !!line),
   };
 }
+

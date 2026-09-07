@@ -30,17 +30,24 @@ const pricing: PricingData = {
 
 describe("status machine", () => {
   it("allows the documented forward path", () => {
-    expect(canTransition("awaiting_proof", "proof_sent")).toBe(true);
-    expect(canTransition("proof_sent", "approved")).toBe(true);
-    expect(canTransition("approved", "in_production")).toBe(true);
+    expect(canTransition("awaiting_print", "in_production")).toBe(true);
     expect(canTransition("in_production", "shipped")).toBe(true);
     expect(canTransition("shipped", "delivered")).toBe(true);
   });
 
   it("rejects skipping steps and leaving terminal states", () => {
-    expect(canTransition("awaiting_proof", "delivered")).toBe(false);
+    expect(canTransition("awaiting_print", "delivered")).toBe(false);
     expect(canTransition("refunded", "draft")).toBe(false);
-    expect(canTransition("draft", "awaiting_proof")).toBe(false); // only payment does this
+    expect(canTransition("draft", "awaiting_print")).toBe(false); // only payment does this
+  });
+
+  it("has no customer proof-approval detour", () => {
+    // Mistakes are caught before payment by the pre-order check, so a paid
+    // order goes straight to the print queue — see designReadiness.ts.
+    expect(ORDER_STATUSES).not.toContain("awaiting_proof");
+    expect(ORDER_STATUSES).not.toContain("proof_sent");
+    expect(ORDER_STATUSES).not.toContain("approved");
+    expect(ORDER_STATUS_TRANSITIONS.awaiting_print).toEqual(["in_production", "cancelled"]);
   });
 
   it("covers every status exactly once and only points at real statuses", () => {

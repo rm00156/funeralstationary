@@ -29,7 +29,7 @@ const SECTIONS = [
 ];
 
 export default async function AdminDashboardPage() {
-  const awaitingProof = await adminCountOrders("awaiting_proof");
+  const awaitingPrint = await adminCountOrders("awaiting_print");
   return (
     <>
       <h1 className="mb-8 font-display text-3xl font-semibold text-primary">
@@ -45,9 +45,9 @@ export default async function AdminDashboardPage() {
             <h2 className="mb-2 flex items-center justify-between font-display text-xl text-on-surface">
               <span className="flex items-center gap-3">
                 {section.title}
-                {section.href === "/admin/orders" && awaitingProof > 0 && (
+                {section.href === "/admin/orders" && awaitingPrint > 0 && (
                   <span className="rounded-full bg-primary-container px-2.5 py-0.5 font-body text-xs font-medium text-white">
-                    {awaitingProof} awaiting proof
+                    {awaitingPrint} awaiting print
                   </span>
                 )}
               </span>

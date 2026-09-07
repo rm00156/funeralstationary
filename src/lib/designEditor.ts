@@ -30,6 +30,18 @@ export const ARTBOARD_W = PAGE_W + BLEED_PX * 2;
 export const ARTBOARD_H = PAGE_H + BLEED_PX * 2;
 
 /**
+ * The PageCanvas zoom that makes one artboard exactly one physical page.
+ *
+ * The canvas works in its own px/mm (PAGE_W / PAGE_W_MM), while CSS print
+ * sizing is fixed at 96px per inch. Rendering the canvas at this zoom makes
+ * its box measure ARTBOARD_W_MM x ARTBOARD_H_MM in real millimetres, so a
+ * CSS `@page` of the same size holds it exactly — which is what lets the
+ * press PDF come out of Chromium's own printer with live text instead of a
+ * screenshot.
+ */
+export const PRINT_ZOOM = 96 / 25.4 / (PAGE_W / PAGE_W_MM);
+
+/**
  * Element box (percent of the trim page) that covers the whole artboard,
  * bleed included. Element coordinates are measured against the trim box, so
  * a full-bleed background has to start slightly negative and overshoot 100%

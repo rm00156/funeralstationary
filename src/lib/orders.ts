@@ -22,14 +22,16 @@ export const ORDER_STATUSES = orderStatusValues;
 
 /**
  * Which statuses an order may move to from each one. `draft` only ever
- * leaves via payment (finaliseOrder → awaiting_proof) or cancellation — it
+ * leaves via payment (finaliseOrder → awaiting_print) or cancellation — it
  * is never set by hand. Admin status changes go through canTransition().
+ *
+ * There is no proof-approval detour: the design was checked before it could
+ * be paid for (see src/lib/designReadiness.ts), so a paid order is simply
+ * waiting to reach the press.
  */
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
   draft: ["cancelled"],
-  awaiting_proof: ["proof_sent", "cancelled"],
-  proof_sent: ["approved", "awaiting_proof", "cancelled"],
-  approved: ["in_production", "proof_sent", "cancelled"],
+  awaiting_print: ["in_production", "cancelled"],
   in_production: ["shipped", "cancelled"],
   shipped: ["delivered"],
   delivered: ["refunded"],
@@ -48,9 +50,7 @@ export function parseOrderStatus(value: unknown): OrderStatus | null {
 /** Customer-facing wording. */
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   draft: "Draft",
-  awaiting_proof: "Awaiting proof",
-  proof_sent: "Proof sent",
-  approved: "Proof approved",
+  awaiting_print: "Awaiting print",
   in_production: "In production",
   shipped: "Shipped",
   delivered: "Delivered",

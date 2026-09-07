@@ -3,9 +3,7 @@ import { ORDER_STATUS_LABELS, type OrderStatus } from "@/lib/orders";
 /** Surface-toned pills — same vocabulary as the admin template status pills. */
 export const ORDER_STATUS_STYLES: Record<OrderStatus, string> = {
   draft: "bg-surface-container text-on-surface-variant",
-  awaiting_proof: "bg-surface-container-high text-on-surface",
-  proof_sent: "bg-primary-fixed text-on-primary-container",
-  approved: "bg-soft-sage text-secondary",
+  awaiting_print: "bg-surface-container-high text-on-surface",
   in_production: "bg-soft-sage text-secondary",
   shipped: "bg-secondary-container text-on-secondary-container",
   delivered: "bg-secondary-container text-on-secondary-container",

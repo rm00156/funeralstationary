@@ -3,16 +3,47 @@
 import { useEffect, useRef, useState } from "react";
 
 import { PageCanvas } from "@/components/DesignEditor";
-import type { DesignDoc } from "@/lib/designEditor";
+import {
+  ARTBOARD_H_MM,
+  ARTBOARD_W_MM,
+  PRINT_ZOOM,
+  type DesignDoc,
+} from "@/lib/designEditor";
 
 declare global {
   interface Window {
     /** Set by the Puppeteer job via page.evaluate() before it fires "proof-data-ready". */
     __PROOF_DATA__?: DesignDoc;
+    /**
+     * Set only by the press-PDF job, which prints this page rather than
+     * screenshotting it. Left undefined by the review-image and template
+     * thumbnail jobs, which want the on-screen layout.
+     */
+    __PROOF_PRINT__?: boolean;
   }
 }
 
 const noop = () => {};
+
+/**
+ * Print layout: one artboard per physical page, at true size.
+ *
+ * Chromium's own printer emits live text and embedded fonts, so the press
+ * PDF is vector rather than a raster of the screen — but only if the page
+ * is laid out for paper. That means an @page the exact size of the
+ * artboard, no page margins, no container padding, a forced break after
+ * every artboard, and print-color-adjust so the artwork's backgrounds
+ * survive. The drop shadow is screen furniture and must not print.
+ */
+const PRINT_CSS = `
+@page { size: ${ARTBOARD_W_MM}mm ${ARTBOARD_H_MM}mm; margin: 0; }
+html, body { margin: 0; padding: 0; background: #fff; }
+[data-proof-container] { padding: 0 !important; gap: 0 !important; min-height: 0 !important; }
+[data-proof-page] { break-after: page; break-inside: avoid; }
+[data-proof-page]:last-child { break-after: auto; }
+[data-proof-page] * { box-shadow: none !important; }
+* { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+`;
 
 /**
  * Hidden render target for the server-side proof job (see /api/proof).
@@ -25,6 +56,7 @@ const noop = () => {};
  */
 export default function ProofRenderClient() {
   const [doc, setDoc] = useState<DesignDoc | null>(null);
+  const [print, setPrint] = useState(false);
   const [ready, setReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,11 +65,15 @@ export default function ProofRenderClient() {
        One-time read of a global Puppeteer injects before hydration; there
        is no React-owned source of truth to derive this from. */
     if (window.__PROOF_DATA__) {
+      setPrint(!!window.__PROOF_PRINT__);
       setDoc(window.__PROOF_DATA__);
       return;
     }
     const onData = () => {
-      if (window.__PROOF_DATA__) setDoc(window.__PROOF_DATA__);
+      if (window.__PROOF_DATA__) {
+        setPrint(!!window.__PROOF_PRINT__);
+        setDoc(window.__PROOF_DATA__);
+      }
     };
     window.addEventListener("proof-data-ready", onData);
     return () => window.removeEventListener("proof-data-ready", onData);
@@ -103,9 +139,11 @@ export default function ProofRenderClient() {
   return (
     <div
       ref={containerRef}
+      data-proof-container=""
       data-proof-ready={ready ? "true" : undefined}
       className="flex min-h-screen flex-col items-start gap-10 bg-white p-10"
     >
+      {print && <style>{PRINT_CSS}</style>}
       {/* The dev-mode route indicator (nextjs-portal) mounts outside this
           container and is dev-only — hidden here so a local test proof
           doesn't pick it up; it never renders in a production build. */}
@@ -114,7 +152,7 @@ export default function ProofRenderClient() {
         <div key={page.id} data-proof-page={index}>
           <PageCanvas
             page={page}
-            zoom={1}
+            zoom={print ? PRINT_ZOOM : 1}
             showCut={false}
             showSafe={false}
             selectedId={null}

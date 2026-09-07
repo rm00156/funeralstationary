@@ -21,6 +21,7 @@ import {
   Bird,
   Ban,
   Bold,
+  BookOpen,
   ChevronDown,
   ChevronUp,
   Circle,
@@ -38,6 +39,7 @@ import {
   ImagePlus,
   Italic,
   Layers,
+  LayoutGrid,
   LayoutTemplate,
   Leaf,
   Lightbulb,
@@ -108,6 +110,11 @@ import {
   type ShapeElement,
   type TextElement,
 } from "@/lib/designEditor";
+import BookletPreview from "@/components/BookletPreview";
+import PreOrderCheckDialog, {
+  parsePreOrderCheck,
+  type PreOrderCheck,
+} from "@/components/PreOrderCheckDialog";
 import {
   defaultSelection,
   formatPence,
@@ -322,9 +329,16 @@ export default function DesignEditor({
   const [publishing, setPublishing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"pages" | "booklet">("pages");
   const [tipsOpen, setTipsOpen] = useState(true);
   const [proofState, setProofState] = useState<"idle" | "generating">("idle");
   const [addingToCart, setAddingToCart] = useState(false);
+  /**
+   * The pre-order check the server refused the add with — an empty photo
+   * window, or wording still at the template's default. Shown as a dialog so
+   * the customer can fix it here rather than discover it after paying.
+   */
+  const [preOrderCheck, setPreOrderCheck] = useState<PreOrderCheck | null>(null);
   const router = useRouter();
   /** Whether the active panel is open as a bottom sheet (mobile only). */
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
@@ -424,7 +438,7 @@ export default function DesignEditor({
    * design in the basket and go there. Quantity, size and colour are chosen
    * on the basket page; pages and paper come from the design itself.
    */
-  const addToCart = useCallback(async () => {
+  const addToCart = useCallback(async (acknowledgeDefaults = false) => {
     if (authoring) return;
     setAddingToCart(true);
     const id = await persist({ silent: true });
@@ -437,12 +451,21 @@ export default function DesignEditor({
       const response = await fetch("/api/cart/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ designId: id }),
+        body: JSON.stringify({ designId: id, acknowledgeDefaults }),
       });
       if (!response.ok) {
-        const { error } = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(error || "Could not add to your basket — please try again");
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        // A refused pre-order check is not an error to apologise for — it is a
+        // list of things the customer can put right, so show them the list.
+        const check = parsePreOrderCheck(body);
+        if (check) {
+          setAddingToCart(false);
+          setPreOrderCheck(check);
+          return;
+        }
+        throw new Error(body.error || "Could not add to your basket — please try again");
       }
+      setPreOrderCheck(null);
       window.dispatchEvent(new Event("tfs:cart-changed"));
       router.push("/cart");
     } catch (error) {
@@ -2325,6 +2348,16 @@ export default function DesignEditor({
         </div>
       )}
 
+      {/* pre-order check — the last look before a design becomes an order */}
+      {preOrderCheck && (
+        <PreOrderCheckDialog
+          check={preOrderCheck}
+          busy={addingToCart}
+          onConfirm={() => void addToCart(true)}
+          onClose={() => setPreOrderCheck(null)}
+        />
+      )}
+
       {/* preview modal */}
       {preview && (
         <div
@@ -2335,11 +2368,40 @@ export default function DesignEditor({
           onClick={() => setPreview(false)}
         >
           <div
-            className="mx-auto flex max-h-full w-full max-w-5xl flex-col rounded-xl bg-surface p-6"
+            className={`mx-auto flex max-h-full w-full flex-col rounded-xl bg-surface p-6 ${
+              previewMode === "booklet" ? "h-full max-w-6xl" : "max-w-5xl"
+            }`}
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-4">
               <h2 className="font-display text-xl text-primary">Preview</h2>
+              <div
+                role="group"
+                aria-label="Preview as"
+                className="flex rounded-lg border border-outline-variant/60 bg-surface-container-lowest p-0.5"
+              >
+                {(
+                  [
+                    { mode: "pages", label: "Pages", Icon: LayoutGrid },
+                    { mode: "booklet", label: "Booklet", Icon: BookOpen },
+                  ] as const
+                ).map(({ mode, label, Icon }) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={previewMode === mode}
+                    onClick={() => setPreviewMode(mode)}
+                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-body text-sm transition-colors ${
+                      previewMode === mode
+                        ? "bg-primary-container text-white"
+                        : "text-on-surface-variant hover:bg-surface-container hover:text-primary"
+                    }`}
+                  >
+                    <Icon size={15} aria-hidden />
+                    {label}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 aria-label="Close preview"
@@ -2349,26 +2411,48 @@ export default function DesignEditor({
                 <X size={18} aria-hidden />
               </button>
             </div>
-            <div className="flex flex-wrap justify-center gap-6 overflow-auto pb-2">
-              {doc.pages.map((previewPage, index) => (
-                <div key={previewPage.id} className="flex flex-col items-center gap-2">
-                  <StaticPage page={previewPage} scale={0.45} />
-                  <span className="font-body text-xs text-on-surface-variant">
-                    {authoring ? templatePageLabel(index) : `Page ${index + 1}`}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {previewMode === "booklet" ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2">
+                {/* A template is only ever cover / middle / back, so show it
+                    the way a customer would actually get it: expanded to a
+                    real booklet, middle page repeated. */}
+                {authoring && (
+                  <p className="text-center font-body text-xs text-on-surface-variant">
+                    Shown as an 8-page booklet, middle page repeated.
+                  </p>
+                )}
+                <BookletPreview
+                  pages={authoring ? withPageCount(doc, 8).pages : doc.pages}
+                  renderPage={(page, scale) => <StaticPage page={page} scale={scale} plain />}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-6 overflow-auto pb-2">
+                {doc.pages.map((previewPage, index) => (
+                  <div key={previewPage.id} className="flex flex-col items-center gap-2">
+                    <StaticPage page={previewPage} scale={0.45} />
+                    <span className="font-body text-xs text-on-surface-variant">
+                      {authoring ? templatePageLabel(index) : `Page ${index + 1}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mt-4 flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={downloadProof}
-                disabled={proofState === "generating"}
-                className="flex items-center gap-2 rounded-lg border-2 border-primary-container px-5 py-3 font-body text-sm font-medium text-primary-container transition-colors hover:bg-surface-container disabled:opacity-60"
-              >
-                <FileDown size={16} aria-hidden />
-                {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
-              </button>
+              {/* Admin-only. Customers review their proof on the order page
+                  after payment — the print-ready PDF is a press artefact,
+                  never something the customer downloads. */}
+              {authoring && (
+                <button
+                  type="button"
+                  onClick={downloadProof}
+                  disabled={proofState === "generating"}
+                  className="flex items-center gap-2 rounded-lg border-2 border-primary-container px-5 py-3 font-body text-sm font-medium text-primary-container transition-colors hover:bg-surface-container disabled:opacity-60"
+                >
+                  <FileDown size={16} aria-hidden />
+                  {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
+                </button>
+              )}
               {!authoring && (
                 <button
                   type="button"
@@ -2842,11 +2926,23 @@ function FrameRings({
 /* Static page (preview modal)                                         */
 /* ------------------------------------------------------------------ */
 
-function StaticPage({ page, scale }: { page: DesignPage; scale: number }) {
+function StaticPage({
+  page,
+  scale,
+  plain = false,
+}: {
+  page: DesignPage;
+  scale: number;
+  /** No shadow or rounding — for when the page sits inside something that
+      already has depth of its own, like a booklet leaf. */
+  plain?: boolean;
+}) {
   return (
     <div
       style={{ width: PAGE_W * scale, height: PAGE_H * scale }}
-      className="relative shrink-0 overflow-hidden rounded-sm shadow-[0_4px_20px_rgba(31,26,30,0.15)]"
+      className={`relative shrink-0 overflow-hidden ${
+        plain ? "" : "rounded-sm shadow-[0_4px_20px_rgba(31,26,30,0.15)]"
+      }`}
     >
       <div
         style={{

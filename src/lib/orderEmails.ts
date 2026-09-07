@@ -81,7 +81,7 @@ export function orderConfirmationEmail(
     `Dear ${summary.contactName},`,
     "",
     `Thank you — we have received your order ${summary.orderNumber} and payment.`,
-    "We will prepare a digital proof and send it to this address for your approval before anything is printed.",
+    "Your stationery is now queued for printing, exactly as you designed and confirmed it.",
     "",
     itemsText(summary),
     "",
@@ -97,7 +97,7 @@ export function orderConfirmationEmail(
   ].join("\n");
   const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
 <p>Dear ${escapeHtml(summary.contactName)},</p>
-<p>Thank you — we have received your order <strong>${escapeHtml(summary.orderNumber)}</strong> and payment. We will prepare a digital proof and send it to this address for your approval before anything is printed.</p>
+<p>Thank you — we have received your order <strong>${escapeHtml(summary.orderNumber)}</strong> and payment. Your stationery is now queued for printing, exactly as you designed and confirmed it.</p>
 ${itemsHtml(summary)}
 <p style="margin-top:24px"><strong>Delivering to</strong><br>${summary.addressLines.map(escapeHtml).join("<br>")}</p>
 <p><a href="${escapeHtml(orderUrl)}">View your order</a></p>

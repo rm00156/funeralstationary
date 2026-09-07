@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronRight, FileDown } from "lucide-react";
 
 import AdminOrderProofActions from "@/components/AdminOrderProofActions";
+import AdminPrintPdfButton from "@/components/AdminPrintPdfButton";
 import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { adminGetOrder } from "@/lib/adminOrders.server";
@@ -21,13 +22,6 @@ const formatDateTime = (date: Date | null) =>
         minute: "2-digit",
       }).format(date)
     : "—";
-
-const PROOF_STATUS_LABELS: Record<string, string> = {
-  generated: "Generated",
-  sent: "Sent to customer",
-  changes_requested: "Changes requested",
-  approved: "Approved",
-};
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -101,19 +95,34 @@ export default async function AdminOrderPage({
                       <p className="font-body text-sm text-on-surface-variant">No proof yet.</p>
                     ) : (
                       <ul className="flex flex-wrap gap-2">
-                        {item.proofs.map((proof) => (
-                          <li key={proof.id}>
-                            <a
-                              href={proof.pdfUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5 font-body text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-high"
+                        {item.proofs.map((proof) => {
+                          const label = `v${proof.version}`;
+                          return (
+                            <li
+                              key={proof.id}
+                              className="flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5"
                             >
-                              <FileDown size={14} aria-hidden />
-                              v{proof.version} · {PROOF_STATUS_LABELS[proof.status] ?? proof.status}
-                            </a>
-                          </li>
-                        ))}
+                              <span className="font-body text-xs font-medium text-on-surface">
+                                {label} · {proof.pages.length}pp
+                              </span>
+                              {/* The press file is rendered on demand, so a
+                                  version may not have one yet. */}
+                              {proof.pdfUrl ? (
+                                <a
+                                  href={proof.pdfUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 font-body text-xs font-medium text-primary-container underline-offset-2 hover:underline"
+                                >
+                                  <FileDown size={12} aria-hidden />
+                                  print PDF
+                                </a>
+                              ) : (
+                                <AdminPrintPdfButton orderId={order.id} proofId={proof.id} />
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                     <AdminOrderProofActions

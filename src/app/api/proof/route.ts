@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isAdmin, unauthorised } from "@/lib/adminSession";
 import type { ProofRequest } from "@/lib/designEditor";
-import { MAX_PROOF_PAGES, renderProofPdf } from "@/lib/proofPdf.server";
+import { renderProofPdf } from "@/lib/proofPdf.server";
+import { MAX_PROOF_PAGES } from "@/lib/proofRender.server";
 
 export const runtime = "nodejs";
 // Vercel Pro (or higher) is required in production — a single-digit page
@@ -9,7 +11,15 @@ export const runtime = "nodejs";
 // booklets. Hobby's 10s ceiling is not enough for a headless-Chromium job.
 export const maxDuration = 60;
 
+/**
+ * Admin-only, despite living outside /api/admin — the print-ready PDF is a
+ * press artefact, not a customer download, and its only caller is the
+ * template authoring editor. Without this check anyone could POST a crafted
+ * DesignDoc and get back a bleed PDF with crop marks.
+ */
 export async function POST(request: NextRequest) {
+  if (!(await isAdmin())) return unauthorised();
+
   let body: ProofRequest;
   try {
     body = await request.json();
