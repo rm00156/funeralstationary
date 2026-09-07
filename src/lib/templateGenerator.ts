@@ -1150,10 +1150,10 @@ export function slugForName(name: string): string {
 const CURATED: Array<
   [name: string, archetype: ArchetypeId, palette: PaletteId, typeSet: TypeSetId, icon: string, categories: string[]]
 > = [
-  ["Whispering Petals", "framed", "plum", "classic", "flower", ["floral", "classic"]],
+  ["Violet Border", "framed", "plum", "classic", "flower", ["classic", "minimalistic", "simple"]],
   ["Lilac Remembrance", "arch", "plum", "cormorant", "flower", ["floral", "classic"]],
   ["Garden Light", "portrait", "plum", "playfair", "flower", ["floral", "colourful"]],
-  ["Fern Hollow", "framed", "forest", "garamond", "leaf", ["nature", "calm"]],
+  ["Sage Border", "framed", "forest", "garamond", "leaf", ["classic", "minimalistic", "simple"]],
   ["Woodland Rest", "arch", "forest", "classic", "tree", ["nature", "calm"]],
   ["Open Meadow", "portrait", "forest", "baskerville", "leaf", ["nature", "simple"]],
   ["Harbour Calm", "portrait", "slate", "playfair", "bird", ["birds", "calm"]],
@@ -1192,7 +1192,7 @@ const CURATED_ARTWORK: Array<
   // Photo-led, spray-framed — the main register. The photograph is the
   // subject; the cutout frames it.
   ["Rose of Josephine", "keepsake", "redoute-frankfort-rose", "plum", "cormorant", "flower", ["floral", "classic"]],
-  ["Empress Rose", "portrait-corners", "redoute-frankfort-rose", "bronze", "garamond", "flower", ["floral", "classic"]],
+  ["Empress Rose", "portrait-corners", "redoute-frankfort-rose", "bronze", "garamond", "flower", ["floral", "classic", "calm"]],
   ["Crown Imperial", "arch-spray", "redoute-crown-imperial", "forest", "playfair", "leaf", ["floral", "nature"]],
   ["Golden Crown", "keepsake", "redoute-crown-imperial", "bronze", "classic", "flower", ["floral", "religious"]],
   ["Climbing Lily", "portrait-corners", "redoute-climbing-lily", "plum", "prata", "flower", ["floral", "colourful"]],
@@ -1203,7 +1203,7 @@ const CURATED_ARTWORK: Array<
   ["Velvet Rose", "portrait-corners", "redoute-burgundy-rose", "stone", "prata", "heart", ["floral", "modern"]],
   ["Cabbage Rose", "arch-spray", "redoute-cabbage-rose", "bronze", "baskerville", "flower", ["floral", "classic"]],
   ["Old Rose", "side-stem", "redoute-cabbage-rose", "plum", "classic", "flower", ["floral", "classic"]],
-  ["Martagon Lily", "portrait-corners", "redoute-martagon-lily", "plum", "cormorant", "flower", ["floral", "colourful"]],
+  ["Engraved Lily", "portrait-corners", "redoute-martagon-lily", "plum", "cormorant", "flower", ["floral", "classic", "minimalistic"]],
   ["Turban Lily", "keepsake", "redoute-martagon-lily", "slate", "garamond", "flower", ["floral", "modern"]],
   // Full-bleed wash — only for the Madonna lily, whose white-on-cream plate
   // can't be cut out (see its spec).
@@ -1227,9 +1227,9 @@ const CURATED_SOLID: Array<
   ]
 > = [
   ["Midnight Portrait", "solid-block", "slate", "playfair", "star", ["modern", "simple"]],
-  ["Deep Green", "solid-frame", "forest", "cormorant", "leaf", ["nature", "classic"]],
+  ["Deep Green", "solid-frame", "forest", "cormorant", "leaf", ["classic", "colourful"]],
   ["Charcoal Tribute", "solid-block", "ink", "prata", "sparkles", ["minimalistic", "modern"]],
-  ["Bronze Keepsake", "solid-frame", "bronze", "garamond", "candle", ["classic", "religious"]],
+  ["Bronze Keepsake", "solid-frame", "bronze", "garamond", "candle", ["classic", "colourful"]],
   ["Amethyst Memory", "solid-frame", "plum", "baskerville", "heart", ["colourful", "classic"]],
   ["Harbour Blue", "solid-block", "slate", "classic", "bird", ["calm", "modern"]],
 ];
