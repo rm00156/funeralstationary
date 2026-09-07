@@ -546,11 +546,11 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.ink,
       x: 8,
-      y: 59,
+      y: 58,
       w: 84,
       h: 0,
     }),
-    rule({ color: s.accent, strokeWidth: 1, x: 37, y: 67, w: 26, h: 0.4 }),
+    rule({ color: s.accent, strokeWidth: 1, x: 37, y: 66, w: 26, h: 0.4 }),
     text({
       text: PLACEHOLDER_DATES,
       fontFamily: s.body,
@@ -558,14 +558,16 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.muted,
       x: 20,
-      y: 70,
+      y: 69,
       w: 60,
       h: 0,
     }),
-    serviceDetails(s, 75),
+    // Narrowed so it clears the corner spray's column entirely.
+    { ...serviceDetails(s, 73), x: 30, w: 40 } as CanvasElement,
     // Anchored into the corner and given real size — a small spray floating
-    // centrally under the type reads as an afterthought.
-    sprayElement(src, { x: 2, y: 70, w: 34, h: 30 }),
+    // centrally under the type reads as an afterthought — but strictly below
+    // the type block, never across it.
+    sprayElement(src, { x: 0, y: 78, w: 32, h: 22 }),
   ],
 
   /** Oval portrait held between a diagonal pair of sprays. */
@@ -633,18 +635,20 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       uppercase: true,
       letterSpacing: 3,
       x: 4,
-      y: 45,
+      y: 44,
       w: 48,
       h: 0,
     }),
     text({
+      // Sized to sit on one line inside a half-width column — a script face
+      // set as large as a full-width heading wraps and lands on the dates.
       text: PLACEHOLDER_NAME,
       fontFamily: s.script,
-      fontSize: 36,
+      fontSize: 24,
       align: "center",
       color: s.accent,
       x: 2,
-      y: 48,
+      y: 47,
       w: 52,
       h: 0,
     }),
@@ -655,7 +659,7 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.muted,
       x: 4,
-      y: 60,
+      y: 56,
       w: 48,
       h: 0,
     }),
@@ -666,7 +670,7 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       align: "center",
       color: s.muted,
       x: 4,
-      y: 66,
+      y: 61,
       w: 48,
       h: 0,
     }),
