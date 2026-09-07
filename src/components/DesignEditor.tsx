@@ -19,6 +19,7 @@ import {
   ArrowRight,
   ArrowUp,
   Bird,
+  Ban,
   Bold,
   ChevronDown,
   ChevronUp,
@@ -71,8 +72,14 @@ import {
   ARTBOARD_W,
   BLEED_PX,
   FONT_OPTIONS,
+  frameDepth,
+  frameRings,
   imageShape,
   photoBorderRadius,
+  photoInnerBorderRadius,
+  DEFAULT_PHOTO_BORDER_COLOR,
+  FRAME_RING_GAP,
+  FRAME_VARIANTS,
   INK_PALETTE,
   PAGE_BACKGROUND_PALETTE,
   PAGE_H,
@@ -94,6 +101,7 @@ import {
   type FontFamilyId,
   type FrameElement,
   type ImageElement,
+  type FrameVariant,
   type PhotoShape,
   type ProofRequest,
   type ResizeHandle,
@@ -1295,6 +1303,55 @@ export default function DesignEditor({
                   <Icon size={16} aria-hidden />
                 </ToolbarButton>
               ))}
+              <div className="mx-1 h-6 w-px bg-outline-variant/50" aria-hidden />
+              <span className="font-body text-xs text-on-surface-variant">Border</span>
+              <ToolbarButton
+                label="No border"
+                active={!selected.border}
+                onClick={() => updateSelected({ border: undefined })}
+              >
+                <Ban size={16} aria-hidden />
+              </ToolbarButton>
+              {FRAME_VARIANTS.map((variant) => (
+                <ToolbarButton
+                  key={variant}
+                  label={`${FRAME_VARIANT_LABELS[variant]} border`}
+                  active={selected.border === variant}
+                  onClick={() =>
+                    updateSelected({
+                      border: variant,
+                      borderColor: selected.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR,
+                    })
+                  }
+                >
+                  <FrameSwatch variant={variant} />
+                </ToolbarButton>
+              ))}
+              {selected.border && (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {INK_PALETTE.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        aria-label={`Border colour ${color}`}
+                        onClick={() => updateSelected({ borderColor: color })}
+                        className={`h-5 w-5 rounded-full border ${
+                          (selected.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR) === color
+                            ? "border-primary ring-2 ring-primary-container/40"
+                            : "border-outline-variant/60"
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                  <div className="h-5 w-px bg-outline-variant/50" aria-hidden />
+                  <ColorPicker
+                    value={selected.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR}
+                    onChange={(borderColor) => updateSelected({ borderColor })}
+                  />
+                </div>
+              )}
             </>
           )}
 
@@ -1975,7 +2032,7 @@ export default function DesignEditor({
               <div>
                 <PanelHeading>Page borders</PanelHeading>
                 <div className="grid grid-cols-3 gap-2">
-                  {(["single", "double", "triple"] as const).map((variant) => (
+                  {FRAME_VARIANTS.map((variant) => (
                     <ElementSwatch
                       key={variant}
                       label={variant}
@@ -1992,20 +2049,7 @@ export default function DesignEditor({
                         })
                       }
                     >
-                      <span
-                        aria-hidden
-                        className="block h-8 w-6 border border-current"
-                        style={
-                          variant === "single"
-                            ? undefined
-                            : {
-                                boxShadow:
-                                  variant === "double"
-                                    ? "inset 0 0 0 2.5px #fff, inset 0 0 0 3.5px currentcolor"
-                                    : "inset 0 0 0 2px #fff, inset 0 0 0 3px currentcolor, inset 0 0 0 5px #fff, inset 0 0 0 6px currentcolor",
-                              }
-                        }
-                      />
+                      <FrameSwatch variant={variant} className="h-8 w-6" />
                     </ElementSwatch>
                   ))}
                 </div>
@@ -2407,7 +2451,13 @@ export function PageCanvas({
           transformOrigin: "top left",
           backgroundColor: page.background ?? "#ffffff",
         }}
-        className="absolute left-0 top-0 shadow-[0_8px_40px_rgba(31,26,30,0.18)]"
+        /* Nothing selected = the page as it prints, so anything hanging off
+           the sheet is clipped away. While an element is selected (which
+           includes the whole of a drag) the overhang is shown again, so you
+           can see and grab the part that sits outside the artboard. */
+        className={`absolute left-0 top-0 shadow-[0_8px_40px_rgba(31,26,30,0.18)] ${
+          selectedId ? "" : "overflow-hidden"
+        }`}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) onBackgroundClick();
         }}
@@ -2671,29 +2721,46 @@ function TextContent({
 }
 
 function ImageContent({ element }: { element: ImageElement }) {
+  const border = element.border;
+  const inset = border ? frameDepth(border) : 0;
+  const innerRadius = border ? photoInnerBorderRadius(element, inset) : undefined;
   return (
     <div
-      className={`h-full w-full overflow-hidden ${
-        element.src ? "" : "border-2 border-dashed border-[#d3c2cd] bg-[#faf6f8]"
-      }`}
-      style={{ borderRadius: photoBorderRadius(element) }}
+      className={`relative h-full w-full overflow-hidden ${
+        element.src || border ? "" : "border-2 border-dashed border-[#d3c2cd]"
+      } ${element.src ? "" : "bg-[#faf6f8]"}`}
+      style={{ borderRadius: photoBorderRadius(element), padding: inset }}
     >
-      {element.src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={element.src}
-          alt=""
-          draggable={false}
-          className={`h-full w-full ${
-            element.fit === "contain" ? "object-contain" : "object-cover"
-          }`}
-        />
-      ) : (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[#81737d]">
-          <ImagePlus size={22} aria-hidden />
-          <span className="px-3 text-center font-body text-[10px]">
-            Double-click to add a photo
-          </span>
+      <div
+        className="h-full w-full overflow-hidden"
+        style={{ borderRadius: innerRadius ?? photoBorderRadius(element) }}
+      >
+        {element.src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={element.src}
+            alt=""
+            draggable={false}
+            className={`h-full w-full ${
+              element.fit === "contain" ? "object-contain" : "object-cover"
+            }`}
+          />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[#81737d]">
+            <ImagePlus size={22} aria-hidden />
+            <span className="px-3 text-center font-body text-[10px]">
+              Double-click to add a photo
+            </span>
+          </div>
+        )}
+      </div>
+      {border && (
+        <div className="pointer-events-none absolute inset-0">
+          <FrameRings
+            variant={border}
+            color={element.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR}
+            radiusAt={(offset) => photoInnerBorderRadius(element, offset)}
+          />
         </div>
       )}
     </div>
@@ -2732,24 +2799,43 @@ function ClipartContent({ element }: { element: ClipartElement }) {
 }
 
 function FrameContent({ element }: { element: FrameElement }) {
-  const color = element.color;
-  return (
-    <div className="h-full w-full" style={{ border: `1px solid ${color}`, padding: 4 }}>
-      {element.variant !== "single" && (
-        <div
-          className="h-full w-full"
-          style={{
-            border: `${element.variant === "double" ? 2.5 : 1}px solid ${color}`,
-            padding: 4,
-          }}
-        >
-          {element.variant === "triple" && (
-            <div className="h-full w-full" style={{ border: `2.5px solid ${color}` }} />
-          )}
-        </div>
-      )}
-    </div>
-  );
+  return <FrameRings variant={element.variant} color={element.color} />;
+}
+
+/**
+ * The nested lines of a frame, from the outside in — shared by the page
+ * border element and the photo border so the two match. `radiusAt` gives the
+ * border-radius for a ring `offset` base-page px inside the outer edge, so a
+ * shaped photo window's rings stay parallel to its edge.
+ */
+function FrameRings({
+  variant,
+  color,
+  radiusAt,
+}: {
+  variant: FrameVariant;
+  color: string;
+  radiusAt?: (offset: number) => string | undefined;
+}) {
+  const rings = frameRings(variant);
+  let node: React.ReactNode = null;
+  let offset = frameDepth(variant);
+  for (let i = rings.length - 1; i >= 0; i -= 1) {
+    offset -= rings[i] + FRAME_RING_GAP;
+    node = (
+      <div
+        className="h-full w-full"
+        style={{
+          border: `${rings[i]}px solid ${color}`,
+          padding: FRAME_RING_GAP,
+          borderRadius: radiusAt?.(offset),
+        }}
+      >
+        {node}
+      </div>
+    );
+  }
+  return node;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2816,6 +2902,38 @@ function ArchIcon({ size = 16 }: { size?: number | string }) {
     >
       <path d="M5 21v-9a7 7 0 0 1 14 0v9z" />
     </svg>
+  );
+}
+
+const FRAME_VARIANT_LABELS: Record<FrameVariant, string> = {
+  single: "Single",
+  double: "Double",
+  triple: "Triple",
+};
+
+/** A tiny rectangle previewing a frame variant's line pattern. */
+function FrameSwatch({
+  variant,
+  className = "h-4 w-3",
+}: {
+  variant: FrameVariant;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={`block border border-current ${className}`}
+      style={
+        variant === "single"
+          ? undefined
+          : {
+              boxShadow:
+                variant === "double"
+                  ? "inset 0 0 0 2.5px #fff, inset 0 0 0 3.5px currentcolor"
+                  : "inset 0 0 0 2px #fff, inset 0 0 0 3px currentcolor, inset 0 0 0 5px #fff, inset 0 0 0 6px currentcolor",
+            }
+      }
+    />
   );
 }
 

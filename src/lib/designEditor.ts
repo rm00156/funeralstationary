@@ -228,6 +228,40 @@ export interface ImageElement extends ElementBase {
    * transparent cutout, whose own edges are the artwork.
    */
   fit?: "cover" | "contain";
+  /**
+   * Optional line border drawn around the photo window, using the same
+   * single/double/triple line pattern as a page `FrameElement`. It follows the
+   * window shape, so an oval photo gets an oval border and an arch an arched
+   * one. Undefined means no border.
+   */
+  border?: FrameVariant;
+  /** Border colour; only meaningful when `border` is set. */
+  borderColor?: string;
+}
+
+export type FrameVariant = "single" | "double" | "triple";
+
+export const FRAME_VARIANTS: readonly FrameVariant[] = ["single", "double", "triple"];
+
+/** Default colour for a photo border the moment one is switched on. */
+export const DEFAULT_PHOTO_BORDER_COLOR = INK_PALETTE[0];
+
+/** Gap between the lines of a frame, in base-page px. */
+export const FRAME_RING_GAP = 4;
+
+/**
+ * Line widths of a frame from the outside in, in base-page px. A page border
+ * and a photo border draw the same lines so the two match on one page.
+ */
+export function frameRings(variant: FrameVariant): number[] {
+  if (variant === "single") return [1];
+  if (variant === "double") return [1, 2.5];
+  return [1, 1, 2.5];
+}
+
+/** Total depth a frame's lines and gaps occupy from the outer edge. */
+export function frameDepth(variant: FrameVariant): number {
+  return frameRings(variant).reduce((sum, width) => sum + width + FRAME_RING_GAP, 0);
 }
 
 /** The effective window shape, honouring the legacy `round` flag. */
@@ -251,6 +285,28 @@ export function photoBorderRadius(el: ImageElement): string | undefined {
   return undefined;
 }
 
+/**
+ * The border-radius of a box sitting `inset` base-page px inside the photo
+ * window, so a border ring (or the photo inside it) keeps the window's shape:
+ * an oval stays 50%, an arch's semicircle shrinks by the inset so the ring
+ * runs parallel to the outer edge, and a rectangle stays square.
+ */
+export function photoInnerBorderRadius(el: ImageElement, inset: number): string | undefined {
+  const shape = imageShape(el);
+  if (shape === "oval") return "50%";
+  if (shape === "arch") {
+    const r = Math.max(0, ((el.w / 100) * PAGE_W) / 2 - inset);
+    return `${r}px ${r}px 0 0`;
+  }
+  return undefined;
+}
+
+export interface FrameElement extends ElementBase {
+  type: "frame";
+  variant: FrameVariant;
+  color: string;
+}
+
 export interface ShapeElement extends ElementBase {
   type: "shape";
   shape: "rect" | "circle" | "line";
@@ -261,12 +317,6 @@ export interface ShapeElement extends ElementBase {
 export interface ClipartElement extends ElementBase {
   type: "clipart";
   icon: string;
-  color: string;
-}
-
-export interface FrameElement extends ElementBase {
-  type: "frame";
-  variant: "single" | "double" | "triple";
   color: string;
 }
 

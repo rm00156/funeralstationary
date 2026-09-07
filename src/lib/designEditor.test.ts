@@ -9,7 +9,10 @@ import {
   makeBlankPage,
   makeStarterDoc,
   makeTemplateLayout,
+  frameDepth,
+  frameRings,
   photoBorderRadius,
+  photoInnerBorderRadius,
   resizeBox,
   templateAccent,
   templatePageLabel,
@@ -76,6 +79,41 @@ describe("photoBorderRadius", () => {
 
   it("leaves a rectangular window unclipped", () => {
     expect(photoBorderRadius(makeImage())).toBeUndefined();
+  });
+});
+
+describe("frameRings", () => {
+  it("draws the same lines for a page border and a photo border", () => {
+    expect(frameRings("single")).toEqual([1]);
+    expect(frameRings("double")).toEqual([1, 2.5]);
+    expect(frameRings("triple")).toEqual([1, 1, 2.5]);
+  });
+
+  it("measures the depth as every line plus its gap", () => {
+    expect(frameDepth("single")).toBe(5);
+    expect(frameDepth("double")).toBe(11.5);
+    expect(frameDepth("triple")).toBe(16.5);
+  });
+});
+
+describe("photoInnerBorderRadius", () => {
+  it("keeps an oval oval at any inset", () => {
+    expect(photoInnerBorderRadius(makeImage({ shape: "oval" }), 10)).toBe("50%");
+  });
+
+  it("shrinks an arch's semicircle by the inset so rings run parallel", () => {
+    const r = ((40 / 100) * PAGE_W) / 2;
+    expect(photoInnerBorderRadius(makeImage({ shape: "arch", w: 40 }), 5)).toBe(
+      `${r - 5}px ${r - 5}px 0 0`,
+    );
+  });
+
+  it("never goes negative on a tiny arch", () => {
+    expect(photoInnerBorderRadius(makeImage({ shape: "arch", w: 1 }), 999)).toBe("0px 0px 0 0");
+  });
+
+  it("leaves a rectangle square", () => {
+    expect(photoInnerBorderRadius(makeImage(), 5)).toBeUndefined();
   });
 });
 
