@@ -21,6 +21,7 @@ import {
   Bird,
   Ban,
   Bold,
+  BookOpen,
   ChevronDown,
   ChevronUp,
   Circle,
@@ -38,6 +39,7 @@ import {
   ImagePlus,
   Italic,
   Layers,
+  LayoutGrid,
   LayoutTemplate,
   Leaf,
   Lightbulb,
@@ -108,6 +110,7 @@ import {
   type ShapeElement,
   type TextElement,
 } from "@/lib/designEditor";
+import BookletPreview from "@/components/BookletPreview";
 import {
   defaultSelection,
   formatPence,
@@ -322,6 +325,7 @@ export default function DesignEditor({
   const [publishing, setPublishing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"pages" | "booklet">("pages");
   const [tipsOpen, setTipsOpen] = useState(true);
   const [proofState, setProofState] = useState<"idle" | "generating">("idle");
   const [addingToCart, setAddingToCart] = useState(false);
@@ -2338,8 +2342,35 @@ export default function DesignEditor({
             className="mx-auto flex max-h-full w-full max-w-5xl flex-col rounded-xl bg-surface p-6"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-4">
               <h2 className="font-display text-xl text-primary">Preview</h2>
+              <div
+                role="group"
+                aria-label="Preview as"
+                className="flex rounded-lg border border-outline-variant/60 bg-surface-container-lowest p-0.5"
+              >
+                {(
+                  [
+                    { mode: "pages", label: "Pages", Icon: LayoutGrid },
+                    { mode: "booklet", label: "Booklet", Icon: BookOpen },
+                  ] as const
+                ).map(({ mode, label, Icon }) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={previewMode === mode}
+                    onClick={() => setPreviewMode(mode)}
+                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-body text-sm transition-colors ${
+                      previewMode === mode
+                        ? "bg-primary-container text-white"
+                        : "text-on-surface-variant hover:bg-surface-container hover:text-primary"
+                    }`}
+                  >
+                    <Icon size={15} aria-hidden />
+                    {label}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 aria-label="Close preview"
@@ -2349,16 +2380,33 @@ export default function DesignEditor({
                 <X size={18} aria-hidden />
               </button>
             </div>
-            <div className="flex flex-wrap justify-center gap-6 overflow-auto pb-2">
-              {doc.pages.map((previewPage, index) => (
-                <div key={previewPage.id} className="flex flex-col items-center gap-2">
-                  <StaticPage page={previewPage} scale={0.45} />
-                  <span className="font-body text-xs text-on-surface-variant">
-                    {authoring ? templatePageLabel(index) : `Page ${index + 1}`}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {previewMode === "booklet" ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2">
+                {/* A template is only ever cover / middle / back, so show it
+                    the way a customer would actually get it: expanded to a
+                    real booklet, middle page repeated. */}
+                {authoring && (
+                  <p className="text-center font-body text-xs text-on-surface-variant">
+                    Shown as an 8-page booklet, middle page repeated.
+                  </p>
+                )}
+                <BookletPreview
+                  pages={authoring ? withPageCount(doc, 8).pages : doc.pages}
+                  renderPage={(page, scale) => <StaticPage page={page} scale={scale} plain />}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-6 overflow-auto pb-2">
+                {doc.pages.map((previewPage, index) => (
+                  <div key={previewPage.id} className="flex flex-col items-center gap-2">
+                    <StaticPage page={previewPage} scale={0.45} />
+                    <span className="font-body text-xs text-on-surface-variant">
+                      {authoring ? templatePageLabel(index) : `Page ${index + 1}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mt-4 flex flex-wrap justify-end gap-3">
               {/* Admin-only. Customers review their proof on the order page
                   after payment — the print-ready PDF is a press artefact,
@@ -2847,11 +2895,23 @@ function FrameRings({
 /* Static page (preview modal)                                         */
 /* ------------------------------------------------------------------ */
 
-function StaticPage({ page, scale }: { page: DesignPage; scale: number }) {
+function StaticPage({
+  page,
+  scale,
+  plain = false,
+}: {
+  page: DesignPage;
+  scale: number;
+  /** No shadow or rounding — for when the page sits inside something that
+      already has depth of its own, like a booklet leaf. */
+  plain?: boolean;
+}) {
   return (
     <div
       style={{ width: PAGE_W * scale, height: PAGE_H * scale }}
-      className="relative shrink-0 overflow-hidden rounded-sm shadow-[0_4px_20px_rgba(31,26,30,0.15)]"
+      className={`relative shrink-0 overflow-hidden ${
+        plain ? "" : "rounded-sm shadow-[0_4px_20px_rgba(31,26,30,0.15)]"
+      }`}
     >
       <div
         style={{
