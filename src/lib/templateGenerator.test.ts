@@ -109,7 +109,7 @@ describe("buildTemplateLayout", () => {
 describe("artwork templates", () => {
   const artworkSpec = (overrides: Partial<TemplateSpec> = {}): TemplateSpec => ({
     ...spec(),
-    archetype: "artwork",
+    archetype: "wash-portrait",
     background: "redoute-frankfort-rose",
     palette: "plum",
     ...overrides,
@@ -128,8 +128,8 @@ describe("artwork templates", () => {
     expect(parseLayoutPages(pages).ok).toBe(true);
   });
 
-  it("gives the portrait variant an empty photo placeholder above the background", () => {
-    const [cover] = buildTemplateLayout(artworkSpec({ archetype: "artwork-portrait" }), {
+  it("gives the wash variants an empty photo placeholder above the background", () => {
+    const [cover] = buildTemplateLayout(artworkSpec({ archetype: "wash-arch" }), {
       backgroundUrl: "/bg.jpg",
     });
     const placeholder = cover.elements.find((el) => el.type === "image" && el.src === null);

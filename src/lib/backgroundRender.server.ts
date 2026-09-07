@@ -349,6 +349,14 @@ async function drawSprayInBrowser(input: {
   }
   if (maxX < minX || maxY < minY) return null;
 
+  // Sanity check: if almost nothing was removed, the ground was never
+  // identified — a dark mount under the corner samplers, or a tolerance too
+  // tight for a toned scan. Returning null makes that a loud failure rather
+  // than a plate-shaped rectangle pasted onto a template.
+  let opaque = 0;
+  for (let p = 0; p < W * H; p++) if (alpha[p] > 200) opaque++;
+  if (opaque / (W * H) > 0.9) return null;
+
   for (let p = 0; p < W * H; p++) px[p * 4 + 3] = alpha[p];
   ctx.putImageData(img, 0, 0);
 

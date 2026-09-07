@@ -514,7 +514,9 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
       w: 70,
       h: 0,
     }),
-    sprayElement(src, { x: 6, y: 79, w: 34, h: 17 }),
+    // Inside the frame on every side — a spray crossing the border line reads
+    // as a mistake rather than an overlap.
+    sprayElement(src, { x: 9, y: 74, w: 30, h: 16 }),
   ],
 };
 
@@ -556,18 +558,23 @@ function sprayBackPage(style: TemplateStyle, src: string): CanvasElement[] {
 }
 
 /**
- * Compositions for templates with background artwork. The picture is the
- * artwork itself, so these put the name and dates in whichever zone the
- * background leaves clear (see BackgroundSpec.textZone) and otherwise stay
- * out of its way — no borders, no motifs competing with a Redouté rose.
+ * Compositions for the few plates that can't be cut out (see the Madonna
+ * lily's spec), where the artwork stays a full-bleed wash instead.
+ *
+ * Still photo-led: the portrait sits over the wash and the name and dates go
+ * in whichever zone the background leaves clear (BackgroundSpec.textZone).
+ * The wash is knocked well back so it reads as tone behind the person, not as
+ * a botanical print with type on it.
  */
 const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => CanvasElement[]> = {
-  /** Typographic: overline, name, rule and dates in the clear zone. No photo. */
-  artwork: (s, zone) => {
-    const top = zone === "bottom" ? 66 : 8;
+  /** Oval portrait over the wash, name and dates in the artwork's clear zone. */
+  "wash-portrait": (s, zone) => {
+    const top = zone === "bottom" ? 10 : 34;
+    const textTop = zone === "bottom" ? 58 : 8;
     return [
+      photo({ shape: "oval", x: 28, y: top, w: 44, h: squareH(44) }),
       text({
-        text: "in loving memory of",
+        text: "In loving memory of",
         fontFamily: s.body,
         fontSize: 11,
         align: "center",
@@ -575,52 +582,10 @@ const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => C
         uppercase: true,
         letterSpacing: 4,
         x: 15,
-        y: top,
+        y: textTop,
         w: 70,
         h: 0,
       }),
-      text({
-        text: PLACEHOLDER_NAME,
-        fontFamily: s.heading,
-        fontSize: 34,
-        align: "center",
-        color: s.ink,
-        x: 8,
-        y: top + 4.5,
-        w: 84,
-        h: 0,
-      }),
-      rule({ color: s.accent, strokeWidth: 1, x: 36, y: top + 14.5, w: 28, h: 0.4 }),
-      text({
-        text: PLACEHOLDER_DATES,
-        fontFamily: s.body,
-        fontSize: 14,
-        align: "center",
-        color: s.muted,
-        x: 20,
-        y: top + 18,
-        w: 60,
-        h: 0,
-      }),
-      text({
-        text: FAREWELL,
-        fontFamily: s.script,
-        fontSize: 26,
-        align: "center",
-        color: s.accent,
-        x: 15,
-        y: top + 23.5,
-        w: 70,
-        h: 0,
-      }),
-    ];
-  },
-
-  /** As above with a small oval portrait beside the artwork's clear zone. */
-  "artwork-portrait": (s, zone) => {
-    const top = zone === "bottom" ? 58 : 6;
-    return [
-      photo({ shape: "oval", x: 38, y: top, w: 24, h: squareH(24) }),
       text({
         text: PLACEHOLDER_NAME,
         fontFamily: s.heading,
@@ -628,11 +593,11 @@ const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => C
         align: "center",
         color: s.ink,
         x: 8,
-        y: top + 19,
+        y: textTop + 4,
         w: 84,
         h: 0,
       }),
-      rule({ color: s.accent, strokeWidth: 1, x: 38, y: top + 27.5, w: 24, h: 0.4 }),
+      rule({ color: s.accent, strokeWidth: 1, x: 38, y: textTop + 13, w: 24, h: 0.4 }),
       text({
         text: PLACEHOLDER_DATES,
         fontFamily: s.body,
@@ -640,8 +605,53 @@ const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => C
         align: "center",
         color: s.muted,
         x: 20,
-        y: top + 30.5,
+        y: textTop + 16,
         w: 60,
+        h: 0,
+      }),
+    ];
+  },
+
+  /** Arch portrait over the wash, with the farewell closing the page. */
+  "wash-arch": (s, zone) => {
+    const top = zone === "bottom" ? 9 : 36;
+    const textTop = zone === "bottom" ? 56 : 8;
+    return [
+      photo({ shape: "arch", x: 29, y: top, w: 42, h: 40 }),
+      text({
+        text: PLACEHOLDER_NAME,
+        fontFamily: s.heading,
+        fontSize: 29,
+        align: "center",
+        color: s.ink,
+        uppercase: true,
+        letterSpacing: 1.5,
+        x: 8,
+        y: textTop,
+        w: 84,
+        h: 0,
+      }),
+      rule({ color: s.accent, strokeWidth: 1, x: 38, y: textTop + 8.5, w: 24, h: 0.4 }),
+      text({
+        text: PLACEHOLDER_DATES,
+        fontFamily: s.body,
+        fontSize: 13,
+        align: "center",
+        color: s.muted,
+        x: 20,
+        y: textTop + 11.5,
+        w: 60,
+        h: 0,
+      }),
+      text({
+        text: FAREWELL,
+        fontFamily: s.script,
+        fontSize: 24,
+        align: "center",
+        color: s.accent,
+        x: 15,
+        y: textTop + 17,
+        w: 70,
         h: 0,
       }),
     ];
@@ -969,8 +979,8 @@ const CURATED_ARTWORK: Array<
   ["Turban Lily", "keepsake", "redoute-martagon-lily", "slate", "garamond", "flower", ["floral", "modern"]],
   // Full-bleed wash — only for the Madonna lily, whose white-on-cream plate
   // can't be cut out (see its spec).
-  ["Madonna Lily", "artwork", "redoute-madonna-lily", "stone", "cormorant", "flower", ["floral", "religious"]],
-  ["White Lily", "artwork-portrait", "redoute-madonna-lily", "bronze", "playfair", "flower", ["floral", "classic"]],
+  ["Madonna Lily", "wash-portrait", "redoute-madonna-lily", "stone", "cormorant", "flower", ["floral", "religious"]],
+  ["White Lily", "wash-arch", "redoute-madonna-lily", "bronze", "playfair", "flower", ["floral", "classic"]],
 ];
 
 export const TEMPLATE_SPECS: TemplateSpec[] = [

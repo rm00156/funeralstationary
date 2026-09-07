@@ -74,6 +74,14 @@ export interface BackgroundSpec {
    */
   spray?: {
     tolerance: number;
+    /**
+     * Overrides `inset` for the cut only. A plate with a ruled border drawn on
+     * it, or a dark mount edge, needs a deeper trim than the background crop
+     * does: the border line is dark, so no tolerance removes it, and a dark
+     * edge under the corner samplers teaches the fill the wrong ground colour
+     * entirely.
+     */
+    inset?: number;
     /** Fraction of the plate's height dropped before cutting, to lose the engraved caption. */
     cropBottom?: number;
     /** Smallest enclosed ground pocket to clear, as a fraction of the image. 0 disables. */
@@ -189,7 +197,8 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, Gloriosa Superba (Climbing Lily). The Metropolitan Museum of Art.",
     focus: { x: 0.5, y: 0.35 },
     fade: { edge: "bottom", start: 52, end: 78 },
-    spray: { tolerance: 40 },
+    // Dark plate edge under the corner samplers, so the cut needs a deeper trim.
+    spray: { tolerance: 45, inset: 0.12 },
     textZone: "bottom",
     palettes: BOTANICAL_PALETTES,
   },
@@ -201,7 +210,8 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     credit: "Pierre-Joseph Redouté, Erica Fulgida. The Metropolitan Museum of Art.",
     focus: { x: 0.5, y: 0.4 },
     fade: { edge: "bottom", start: 52, end: 78 },
-    spray: { tolerance: 38 },
+    // Ruled border drawn on the plate; no tolerance removes a dark line.
+    spray: { tolerance: 45, inset: 0.12 },
     textZone: "bottom",
     palettes: BOTANICAL_PALETTES,
   },
@@ -238,7 +248,9 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     // Bloom sits in the upper third; the plate's engraved caption at ~92% is
     // covered by the fade's solid-paper zone below `end`.
     focus: { x: 0.5, y: 0.28 },
-    fade: { edge: "bottom", start: 50, end: 76 },
+    fade: { edge: "bottom", start: 42, end: 72 },
+    // Knocked well back: this sits behind a photograph, not instead of one.
+    wash: 0.55,
     // No spray: white petals on cream ground are too close to separate, and
     // this scan's canvas weave survives any tolerance loose enough to work.
     textZone: "bottom",

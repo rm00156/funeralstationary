@@ -196,7 +196,7 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
     try {
       const png = await renderer.renderSpray(image, {
         tolerance: spec.spray.tolerance,
-        inset: spec.inset ?? DEFAULT_INSET,
+        inset: spec.spray.inset ?? spec.inset ?? DEFAULT_INSET,
         cropBottom: spec.spray.cropBottom ?? DEFAULT_SPRAY_CROP_BOTTOM,
         minEnclosedRegion: spec.spray.minEnclosedRegion ?? DEFAULT_SPRAY_MIN_ENCLOSED,
       });
@@ -204,7 +204,10 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
         const url = await saveSprayAsset(spec.id, png);
         console.log(`  ✓ ${spec.id} spray → ${url} (${Math.round(png.length / 1024)} KB)`);
       } else {
-        console.warn(`  ! ${spec.id} spray: nothing survived the cut`);
+        console.warn(
+          `  ! ${spec.id} spray: ground not separated — raise spray.tolerance, or spray.inset ` +
+            `if the plate has a ruled border or dark mount edge`,
+        );
       }
     } catch (error) {
       console.warn(`  ! ${spec.id} spray failed: ${(error as Error).message}`);
