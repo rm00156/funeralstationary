@@ -6,10 +6,10 @@
  * template thumbnails.
  */
 
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isStorageConfigured, publicUrlFor, uploadObject } from "@/lib/storage";
-import { backgroundAssetKey } from "@/lib/backgroundArtwork";
+import { backgroundAssetKey, mergeCredits, type BackgroundCredit } from "@/lib/backgroundArtwork";
 import type { PaletteId } from "@/lib/templateGenerator";
 
 function localPath(key: string): string {
@@ -46,12 +46,27 @@ export async function saveBackgroundAsset(
   return `/${key}`;
 }
 
-/** The licence record kept next to the images, regardless of where they're stored. */
+/**
+ * The licence and attribution record. Written to docs/ — deliberately NOT
+ * beside the images, since public/templates/backgrounds/ is gitignored and in
+ * S3 mode the images don't land locally at all, which would leave the
+ * attribution record untracked.
+ *
+ * Merged against what's already on disk (see mergeCredits) so a partial run
+ * records the whole manifest, not just the backgrounds it fetched.
+ */
 export async function writeBackgroundCredits(
-  entries: Array<{ id: string; name: string; licence: string; credit: string; sourceUrl: string }>,
+  resolved: readonly BackgroundCredit[],
 ): Promise<string> {
-  const file = localPath("templates/backgrounds/credits.json");
+  const file = path.join(process.cwd(), "docs", "template-artwork-credits.json");
+  let existing: BackgroundCredit[] = [];
+  try {
+    existing = JSON.parse(await readFile(file, "utf8")) as BackgroundCredit[];
+    if (!Array.isArray(existing)) existing = [];
+  } catch {
+    // no record yet, or it's unreadable — rebuild it from the manifest
+  }
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, JSON.stringify(entries, null, 2) + "\n");
+  await writeFile(file, JSON.stringify(mergeCredits(existing, resolved), null, 2) + "\n");
   return file;
 }

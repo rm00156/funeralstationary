@@ -736,10 +736,10 @@ const CURATED_ARTWORK: Array<
   ["Velvet Rose", "artwork-portrait", "redoute-burgundy-rose", "stone", "prata", "heart", ["floral", "modern"]],
   ["Cabbage Rose", "artwork", "redoute-cabbage-rose", "bronze", "baskerville", "flower", ["floral", "classic"]],
   ["Old Rose", "artwork-portrait", "redoute-cabbage-rose", "plum", "classic", "flower", ["floral", "classic"]],
-  ["Morning Glory", "artwork", "sori-morning-glories", "slate", "cormorant", "leaf", ["nature", "calm"]],
-  ["Blue Dawn", "artwork-portrait", "sori-morning-glories", "forest", "playfair", "sun", ["nature", "colourful"]],
-  ["Swallows and Peonies", "artwork", "hokuba-swallows-peonies", "slate", "prata", "bird", ["birds", "floral"]],
-  ["Spring Rain", "artwork-portrait", "hokuba-swallows-peonies", "plum", "garamond", "bird", ["birds", "classic"]],
+  ["Madonna Lily", "artwork", "redoute-madonna-lily", "stone", "cormorant", "flower", ["floral", "religious"]],
+  ["White Lily", "artwork-portrait", "redoute-madonna-lily", "bronze", "playfair", "flower", ["floral", "classic"]],
+  ["Martagon Lily", "artwork", "redoute-martagon-lily", "plum", "prata", "flower", ["floral", "colourful"]],
+  ["Turban Lily", "artwork-portrait", "redoute-martagon-lily", "slate", "garamond", "flower", ["floral", "modern"]],
 ];
 
 export const TEMPLATE_SPECS: TemplateSpec[] = [

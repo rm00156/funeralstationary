@@ -175,24 +175,26 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     palettes: BOTANICAL_PALETTES,
   },
   {
-    id: "sori-morning-glories",
-    name: "Morning Glories",
-    source: { kind: "met", objectId: 48979 },
-    licence: "Public domain (Met Open Access, CC0)",
-    credit: "Tawaraya Sōri, Morning Glories. The Metropolitan Museum of Art.",
-    focus: { x: 0.5, y: 0.6 },
-    fade: { edge: "top", start: 48, end: 22 },
-    textZone: "top",
-    palettes: ["slate", "forest", "ink", "stone"],
+    id: "redoute-madonna-lily",
+    name: "Madonna Lily",
+    source: { kind: "commons", file: "File:Lilium candidum in Les liliacees.jpg" },
+    licence: "Public domain",
+    credit: "Pierre-Joseph Redouté, Lilium candidum (Lis Blanc), from Les Liliacées. Via Wikimedia Commons.",
+    // Bloom sits in the upper third; the plate's engraved caption at ~92% is
+    // covered by the fade's solid-paper zone below `end`.
+    focus: { x: 0.5, y: 0.28 },
+    fade: { edge: "bottom", start: 50, end: 76 },
+    textZone: "bottom",
+    palettes: ["stone", "bronze", "forest", "slate"],
   },
   {
-    id: "hokuba-swallows-peonies",
-    name: "Swallows and Peonies",
-    source: { kind: "met", objectId: 54146 },
-    licence: "Public domain (Met Open Access, CC0)",
-    credit: "Teisai Hokuba, Swallows and Peonies, from the Spring Rain Collection. The Metropolitan Museum of Art.",
-    focus: { x: 0.5, y: 0.5 },
-    fade: { edge: "bottom", start: 55, end: 80 },
+    id: "redoute-martagon-lily",
+    name: "Martagon Lily",
+    source: { kind: "commons", file: "File:Lilium martagon - Les liliacées, vol. 3 - t. 146.jpg" },
+    licence: "Public domain",
+    credit: "Pierre-Joseph Redouté, Lilium martagon (Lis Martagon), from Les Liliacées. Via Wikimedia Commons.",
+    focus: { x: 0.5, y: 0.32 },
+    fade: { edge: "bottom", start: 52, end: 78 },
     textZone: "bottom",
     palettes: ["plum", "slate", "bronze", "ink"],
   },
@@ -200,4 +202,38 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
 
 export function getBackgroundSpec(id: string): BackgroundSpec | undefined {
   return BACKGROUND_SPECS.find((spec) => spec.id === id);
+}
+
+/** One line of the licence/attribution record. */
+export interface BackgroundCredit {
+  id: string;
+  name: string;
+  licence: string;
+  credit: string;
+  /** Source page the image came from; empty until that background is fetched. */
+  sourceUrl: string;
+}
+
+/**
+ * The credits record for the whole manifest, given whatever a run resolved.
+ *
+ * Always emitted for every BACKGROUND_SPECS entry in manifest order, so a
+ * partial run (`--only=...`) can't shrink the attribution record to just the
+ * backgrounds it touched — this is a licence record, it has to describe the
+ * whole catalogue. Entries for ids no longer in the manifest are dropped, and
+ * a `sourceUrl` recorded by an earlier run survives one that didn't resolve it.
+ */
+export function mergeCredits(
+  existing: readonly BackgroundCredit[],
+  resolved: readonly BackgroundCredit[],
+): BackgroundCredit[] {
+  const previous = new Map(existing.map((entry) => [entry.id, entry]));
+  const fresh = new Map(resolved.map((entry) => [entry.id, entry]));
+  return BACKGROUND_SPECS.map((spec) => ({
+    id: spec.id,
+    name: spec.name,
+    licence: spec.licence,
+    credit: spec.credit,
+    sourceUrl: fresh.get(spec.id)?.sourceUrl || previous.get(spec.id)?.sourceUrl || "",
+  }));
 }

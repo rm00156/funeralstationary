@@ -4,6 +4,7 @@ import {
   backgroundAssetKey,
   backgroundElement,
   getBackgroundSpec,
+  mergeCredits,
 } from "./backgroundArtwork";
 import { FULL_BLEED_BOX } from "./designEditor";
 import { TEMPLATE_PALETTES } from "./templateGenerator";
@@ -53,6 +54,38 @@ describe("BACKGROUND_SPECS", () => {
   it("looks specs up by id", () => {
     expect(getBackgroundSpec(BACKGROUND_SPECS[0].id)).toBe(BACKGROUND_SPECS[0]);
     expect(getBackgroundSpec("nope")).toBeUndefined();
+  });
+});
+
+describe("mergeCredits", () => {
+  const first = BACKGROUND_SPECS[0];
+
+  it("records every manifest entry even when only one was fetched", () => {
+    const merged = mergeCredits([], [
+      { id: first.id, name: first.name, licence: first.licence, credit: first.credit, sourceUrl: "https://example.test/a" },
+    ]);
+    expect(merged).toHaveLength(BACKGROUND_SPECS.length);
+    expect(merged.map((entry) => entry.id)).toEqual(BACKGROUND_SPECS.map((spec) => spec.id));
+    expect(merged.find((entry) => entry.id === first.id)!.sourceUrl).toBe("https://example.test/a");
+  });
+
+  it("keeps a source URL recorded by an earlier run", () => {
+    const existing = [
+      { id: first.id, name: "old", licence: "old", credit: "old", sourceUrl: "https://example.test/old" },
+    ];
+    const merged = mergeCredits(existing, []);
+    const entry = merged.find((e) => e.id === first.id)!;
+    expect(entry.sourceUrl).toBe("https://example.test/old");
+    // Name, licence and credit always come from the manifest, never the file.
+    expect(entry.licence).toBe(first.licence);
+  });
+
+  it("drops entries for backgrounds no longer in the manifest", () => {
+    const merged = mergeCredits(
+      [{ id: "removed-background", name: "x", licence: "x", credit: "x", sourceUrl: "x" }],
+      [],
+    );
+    expect(merged.some((entry) => entry.id === "removed-background")).toBe(false);
   });
 });
 
