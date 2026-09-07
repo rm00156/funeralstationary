@@ -28,16 +28,9 @@ import {
 import type { TemplateStatus } from "@/lib/adminValidation";
 import type { DesignPage } from "@/lib/designEditor";
 
-/** True for the MySQL duplicate-key error a unique slug collision raises. */
-export function isDuplicateKeyError(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; current && depth < 5; depth += 1) {
-    const candidate = current as { code?: unknown; errno?: unknown; cause?: unknown };
-    if (candidate.code === "ER_DUP_ENTRY" || candidate.errno === 1062) return true;
-    current = candidate.cause;
-  }
-  return false;
-}
+// Re-exported for the admin routes; the helper itself lives in src/db/errors.ts
+// so the orders seam can share it without importing the admin module.
+export { isDuplicateKeyError } from "@/db/errors";
 
 async function resolveProductId(slug: string): Promise<number | null> {
   const [row] = await db

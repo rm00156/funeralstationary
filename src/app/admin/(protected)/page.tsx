@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
+import { adminCountOrders } from "@/lib/adminOrders.server";
+
 export const dynamic = "force-dynamic";
 
 const SECTIONS = [
+  {
+    href: "/admin/orders",
+    title: "Orders",
+    description: "Paid orders: send proofs, move them through production, see their history.",
+  },
   {
     href: "/admin/products",
     title: "Products",
@@ -21,13 +28,14 @@ const SECTIONS = [
   },
 ];
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  const awaitingProof = await adminCountOrders("awaiting_proof");
   return (
     <>
       <h1 className="mb-8 font-display text-3xl font-semibold text-primary">
         Dashboard
       </h1>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         {SECTIONS.map((section) => (
           <Link
             key={section.href}
@@ -35,7 +43,14 @@ export default function AdminDashboardPage() {
             className="group rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6 ambient-shadow transition-transform duration-300 hover:-translate-y-1"
           >
             <h2 className="mb-2 flex items-center justify-between font-display text-xl text-on-surface">
-              {section.title}
+              <span className="flex items-center gap-3">
+                {section.title}
+                {section.href === "/admin/orders" && awaitingProof > 0 && (
+                  <span className="rounded-full bg-primary-container px-2.5 py-0.5 font-body text-xs font-medium text-white">
+                    {awaitingProof} awaiting proof
+                  </span>
+                )}
+              </span>
               <ArrowRight
                 size={18}
                 aria-hidden

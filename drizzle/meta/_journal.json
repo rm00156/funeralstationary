@@ -15,6 +15,13 @@
       "when": 1787696716456,
       "tag": "0001_salty_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1788530934453,
+      "tag": "0002_lumpy_mentallo",
+      "breakpoints": true
     }
   ]
 }

@@ -32,6 +32,7 @@ export default async function AdminLayout({
           </Link>
           <nav aria-label="Admin sections" className="flex items-center gap-1">
             {[
+              ["Orders", "/admin/orders"],
               ["Products", "/admin/products"],
               ["Categories", "/admin/categories"],
               ["Templates", "/admin/templates"],

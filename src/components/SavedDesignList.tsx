@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FileText, Pencil, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FileText, Pencil, ShoppingBag, Trash2 } from "lucide-react";
 
 export interface SavedDesignSummary {
   id: string;
@@ -26,9 +27,35 @@ export default function SavedDesignList({
 }: {
   initialDesigns: SavedDesignSummary[];
 }) {
+  const router = useRouter();
   const [designs, setDesigns] = useState(initialDesigns);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const addToBasket = async (design: SavedDesignSummary) => {
+    setBusyId(design.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/cart/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ designId: design.id }),
+      });
+      if (!response.ok) {
+        const { error: message } = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(message);
+      }
+      window.dispatchEvent(new Event("tfs:cart-changed"));
+      router.push("/cart");
+    } catch (caught) {
+      setError(
+        caught instanceof Error && caught.message
+          ? caught.message
+          : "Could not add that design to your basket — please try again.",
+      );
+      setBusyId(null);
+    }
+  };
 
   const rename = async (design: SavedDesignSummary) => {
     const next = window.prompt("Rename this design", design.name);
@@ -118,6 +145,15 @@ export default function SavedDesignList({
               >
                 Open
               </Link>
+              <button
+                type="button"
+                onClick={() => addToBasket(design)}
+                disabled={busyId === design.id}
+                aria-label={`Add ${design.name} to basket`}
+                className="rounded-lg p-2.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary disabled:opacity-50"
+              >
+                <ShoppingBag size={18} aria-hidden />
+              </button>
               <button
                 type="button"
                 onClick={() => rename(design)}
