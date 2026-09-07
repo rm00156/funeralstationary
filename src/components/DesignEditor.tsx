@@ -111,6 +111,10 @@ import {
   type TextElement,
 } from "@/lib/designEditor";
 import BookletPreview from "@/components/BookletPreview";
+import PreOrderCheckDialog, {
+  parsePreOrderCheck,
+  type PreOrderCheck,
+} from "@/components/PreOrderCheckDialog";
 import {
   defaultSelection,
   formatPence,
@@ -329,6 +333,12 @@ export default function DesignEditor({
   const [tipsOpen, setTipsOpen] = useState(true);
   const [proofState, setProofState] = useState<"idle" | "generating">("idle");
   const [addingToCart, setAddingToCart] = useState(false);
+  /**
+   * The pre-order check the server refused the add with — an empty photo
+   * window, or wording still at the template's default. Shown as a dialog so
+   * the customer can fix it here rather than discover it after paying.
+   */
+  const [preOrderCheck, setPreOrderCheck] = useState<PreOrderCheck | null>(null);
   const router = useRouter();
   /** Whether the active panel is open as a bottom sheet (mobile only). */
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
@@ -428,7 +438,7 @@ export default function DesignEditor({
    * design in the basket and go there. Quantity, size and colour are chosen
    * on the basket page; pages and paper come from the design itself.
    */
-  const addToCart = useCallback(async () => {
+  const addToCart = useCallback(async (acknowledgeDefaults = false) => {
     if (authoring) return;
     setAddingToCart(true);
     const id = await persist({ silent: true });
@@ -441,12 +451,21 @@ export default function DesignEditor({
       const response = await fetch("/api/cart/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ designId: id }),
+        body: JSON.stringify({ designId: id, acknowledgeDefaults }),
       });
       if (!response.ok) {
-        const { error } = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(error || "Could not add to your basket — please try again");
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        // A refused pre-order check is not an error to apologise for — it is a
+        // list of things the customer can put right, so show them the list.
+        const check = parsePreOrderCheck(body);
+        if (check) {
+          setAddingToCart(false);
+          setPreOrderCheck(check);
+          return;
+        }
+        throw new Error(body.error || "Could not add to your basket — please try again");
       }
+      setPreOrderCheck(null);
       window.dispatchEvent(new Event("tfs:cart-changed"));
       router.push("/cart");
     } catch (error) {
@@ -2327,6 +2346,16 @@ export default function DesignEditor({
         <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-inverse-surface px-5 py-2.5 font-body text-sm text-inverse-on-surface">
           {toast}
         </div>
+      )}
+
+      {/* pre-order check — the last look before a design becomes an order */}
+      {preOrderCheck && (
+        <PreOrderCheckDialog
+          check={preOrderCheck}
+          busy={addingToCart}
+          onConfirm={() => void addToCart(true)}
+          onClose={() => setPreOrderCheck(null)}
+        />
       )}
 
       {/* preview modal */}

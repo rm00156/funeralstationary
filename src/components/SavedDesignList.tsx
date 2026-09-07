@@ -5,6 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Pencil, ShoppingBag, Trash2 } from "lucide-react";
 
+import PreOrderCheckDialog, {
+  parsePreOrderCheck,
+  type PreOrderCheck,
+} from "@/components/PreOrderCheckDialog";
+
 export interface SavedDesignSummary {
   id: string;
   name: string;
@@ -31,20 +36,36 @@ export default function SavedDesignList({
   const [designs, setDesigns] = useState(initialDesigns);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * The refused pre-order check, and the design it was refused for — the
+   * confirmation has to re-send the add, so both are needed to retry.
+   */
+  const [preOrderCheck, setPreOrderCheck] = useState<
+    { check: PreOrderCheck; designId: string } | null
+  >(null);
 
-  const addToBasket = async (design: SavedDesignSummary) => {
+  const addToBasket = async (design: SavedDesignSummary, acknowledgeDefaults = false) => {
     setBusyId(design.id);
     setError(null);
     try {
       const response = await fetch("/api/cart/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ designId: design.id }),
+        body: JSON.stringify({ designId: design.id, acknowledgeDefaults }),
       });
       if (!response.ok) {
-        const { error: message } = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(message);
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        // The pre-order check refusing an add is actionable, not an error:
+        // show the customer the list rather than a red sentence.
+        const check = parsePreOrderCheck(body);
+        if (check) {
+          setBusyId(null);
+          setPreOrderCheck({ check, designId: design.id });
+          return;
+        }
+        throw new Error(body.error);
       }
+      setPreOrderCheck(null);
       window.dispatchEvent(new Event("tfs:cart-changed"));
       router.push("/cart");
     } catch (caught) {
@@ -55,6 +76,13 @@ export default function SavedDesignList({
       );
       setBusyId(null);
     }
+  };
+
+  /** Re-send the add, this time carrying the customer's confirmation. */
+  const confirmAdd = () => {
+    if (!preOrderCheck) return;
+    const design = designs.find((item) => item.id === preOrderCheck.designId);
+    if (design) void addToBasket(design, true);
   };
 
   const rename = async (design: SavedDesignSummary) => {
@@ -176,6 +204,15 @@ export default function SavedDesignList({
           </li>
         ))}
       </ul>
+
+      {preOrderCheck && (
+        <PreOrderCheckDialog
+          check={preOrderCheck.check}
+          busy={busyId === preOrderCheck.designId}
+          onConfirm={confirmAdd}
+          onClose={() => setPreOrderCheck(null)}
+        />
+      )}
     </div>
   );
 }

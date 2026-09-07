@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, ChevronRight } from "lucide-react";
 
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
-import OrderProofReview from "@/components/OrderProofReview";
-import OrderProofShare from "@/components/OrderProofShare";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { formatPence } from "@/lib/orderOfServicePricing";
-import { latestVisibleProof } from "@/lib/orders";
 import { getOrder } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
 
@@ -33,9 +29,7 @@ const formatDate = (date: Date | null) =>
     : "—";
 
 const STATUS_NOTES: Partial<Record<string, string>> = {
-  awaiting_proof: "We are preparing your digital proof and will email you as soon as it is ready to review.",
-  proof_sent: "Your proof is ready to review below. Nothing is printed until you approve it.",
-  approved: "Your proof is approved and your order is queued for printing.",
+  awaiting_print: "Your order is confirmed and queued for printing.",
   in_production: "Your stationery is being printed.",
   shipped: "Your order is on its way.",
   delivered: "Your order has been delivered.",
@@ -54,14 +48,6 @@ export default async function OrderPage({
   const owner = await readOwner();
   const order = owner ? await getOrder(owner, id) : null;
   if (!order) notFound();
-
-  // Nothing to share until a proof has actually been released.
-  const hasProof = order.items.some((item) => latestVisibleProof(item.proofs));
-  // Build the share URL server-side so it renders whole rather than
-  // appearing as a bare path until hydration supplies window.location.
-  const headerList = await headers();
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "";
-  const origin = `${headerList.get("x-forwarded-proto") ?? "http"}://${host}`;
 
   return (
     <>
@@ -88,10 +74,12 @@ export default async function OrderPage({
               <div className="mb-8 flex items-start gap-3 rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow">
                 <CheckCircle2 size={24} aria-hidden className="mt-0.5 shrink-0 text-secondary" />
                 <div>
-                  <h2 className="font-display text-2xl text-primary">Thank you — your order is placed</h2>
+                  <h2 className="font-display text-2xl text-primary">
+                    Thank you — your order is placed
+                  </h2>
                   <p className="mt-1 font-body text-on-surface-variant">
-                    We have emailed a confirmation to {order.contact.email}. Your digital
-                    proof will follow for approval before anything is printed.
+                    We have emailed a confirmation to {order.contact.email}. Your stationery is now
+                    queued for printing.
                   </p>
                 </div>
               </div>
@@ -116,46 +104,34 @@ export default async function OrderPage({
 
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="flex flex-col gap-4">
-                {order.items.map((item) => {
-                  // Versions still "generated" are the admin's working copy;
-                  // only what has actually been sent reaches the customer.
-                  const proof = latestVisibleProof(item.proofs);
-                  return (
-                    <article
-                      key={item.id}
-                      className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h2 className="font-display text-xl font-semibold text-on-surface">
-                            {item.designName}
-                          </h2>
-                          <p className="font-body text-sm text-on-surface-variant">
-                            {item.quantityCopies} copies · {item.quote.size.label} ·{" "}
-                            {item.quote.colour.label} · {item.quote.pages.label} · {item.quote.paper.label}
-                          </p>
-                          <p className="font-body text-sm text-on-surface-variant">
-                            {formatPence(item.unitPricePence)} each
-                          </p>
-                        </div>
-                        <p className="font-display text-xl text-primary">
-                          {formatPence(item.lineTotalPence)}
+                {order.items.map((item) => (
+                  <article
+                    key={item.id}
+                    className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h2 className="font-display text-xl font-semibold text-on-surface">
+                          {item.designName}
+                        </h2>
+                        <p className="font-body text-sm text-on-surface-variant">
+                          {item.quantityCopies} copies · {item.quote.size.label} ·{" "}
+                          {item.quote.colour.label} · {item.quote.pages.label} ·{" "}
+                          {item.quote.paper.label}
+                        </p>
+                        <p className="font-body text-sm text-on-surface-variant">
+                          {formatPence(item.unitPricePence)} each
                         </p>
                       </div>
-                      {proof && <OrderProofReview orderId={order.id} proof={proof} />}
-                    </article>
-                  );
-                })}
+                      <p className="font-display text-xl text-primary">
+                        {formatPence(item.lineTotalPence)}
+                      </p>
+                    </div>
+                  </article>
+                ))}
               </div>
 
               <aside className="flex h-fit flex-col gap-6">
-                {hasProof && (
-                  <OrderProofShare
-                    orderId={order.id}
-                    origin={origin}
-                    initialToken={order.shareToken}
-                  />
-                )}
                 <section className="rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow">
                   <h2 className="mb-4 font-display text-2xl text-primary">Total</h2>
                   <dl className="space-y-2 font-body text-sm text-on-surface-variant">
@@ -166,7 +142,9 @@ export default async function OrderPage({
                     <div className="flex justify-between gap-4">
                       <dt>{order.delivery?.label ?? "Delivery"}</dt>
                       <dd className="text-on-surface">
-                        {order.totals.deliveryPence === 0 ? "Free" : formatPence(order.totals.deliveryPence)}
+                        {order.totals.deliveryPence === 0
+                          ? "Free"
+                          : formatPence(order.totals.deliveryPence)}
                       </dd>
                     </div>
                   </dl>

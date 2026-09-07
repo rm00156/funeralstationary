@@ -6,7 +6,7 @@
  */
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { orderItems, orderProofs, orders } from "@/db/schema";
+import { orderItems, orders } from "@/db/schema";
 import { canTransition, type OrderStatus } from "@/lib/orders";
 import { addOrderEvent, loadOrderDetail, type OrderDetail } from "@/lib/orders.server";
 
@@ -72,10 +72,6 @@ export async function adminGetOrder(id: string): Promise<OrderDetail | null> {
  * Move an order along the status machine, recording who and why. The
  * update is conditional on the status the admin was looking at, so two
  * admins acting on a stale screen can't both "win".
- *
- * Proof bookkeeping rides along: sending the proof marks each item's
- * latest generated proof as sent (which is what makes it visible to the
- * customer), and approval marks the sent ones approved.
  */
 export async function adminUpdateOrderStatus(
   id: string,
@@ -106,23 +102,6 @@ export async function adminUpdateOrderStatus(
     note,
     actor,
   });
-
-  if (to === "proof_sent" || to === "approved") {
-    const fromProofStatus = to === "proof_sent" ? "generated" : "sent";
-    const now = new Date();
-    for (const item of current.items) {
-      const latest = item.proofs.find((proof) => proof.status === fromProofStatus);
-      if (!latest) continue;
-      await db
-        .update(orderProofs)
-        .set(
-          to === "proof_sent"
-            ? { status: "sent", sentAt: now }
-            : { status: "approved", respondedAt: now },
-        )
-        .where(eq(orderProofs.id, latest.id));
-    }
-  }
 
   return loadOrderDetail(id);
 }

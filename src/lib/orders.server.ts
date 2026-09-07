@@ -17,27 +17,28 @@
  * Nothing in this module touches Chromium or email — those side effects live
  * in orderFulfilment.server.ts so the basket routes don't trace them in.
  */
-import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
 import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders } from "@/db/schema";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
 import type { DesignDoc } from "@/lib/designEditor";
 import { getDesign } from "@/lib/designs.server";
+import {
+  describeIssue,
+  isDesignOrderable,
+  needsDefaultsConfirmation,
+} from "@/lib/designReadiness";
+import { checkDocReadiness } from "@/lib/designReadiness.server";
 import type { OrderEmailSummary } from "@/lib/orderEmails";
 import {
   DEFAULT_VAT_RATE,
-  allProofsApproved,
-  canReviewProof,
-  latestVisibleProof,
   computeOrderTotals,
   makeOrderNumber,
   resolveSelectionStrict,
   vatRateToDecimalString,
-  type OrderProofStatus,
   type OrderStatus,
   type OrderTotals,
-  type ProofDecision,
   type SelectionAxis,
 } from "@/lib/orders";
 import {
@@ -55,6 +56,12 @@ export class CartError extends Error {
   constructor(
     public readonly status: 400 | 404 | 409,
     message: string,
+    /**
+     * Extra JSON merged into the error response. Used by the pre-order check
+     * so the client gets the actual list of things to fix, not just a
+     * sentence — the customer needs to be shown *which* photo window is empty.
+     */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "CartError";
@@ -64,7 +71,7 @@ export class CartError extends Error {
 /** Route helper: the Response for a CartError / resolver miss, else null. */
 export function cartErrorResponse(error: unknown): Response | null {
   if (error instanceof CartError) {
-    return Response.json({ error: error.message }, { status: error.status });
+    return Response.json({ error: error.message, ...error.details }, { status: error.status });
   }
   if (error instanceof Error && error.message.startsWith("Unknown")) {
     return Response.json({ error: error.message }, { status: 400 });
@@ -120,23 +127,21 @@ export interface Cart {
   ready: boolean;
 }
 
-export type { OrderProofStatus };
-
 export interface OrderProofPageImage {
   pageIndex: number;
   imageUrl: string;
 }
 
+/**
+ * A rendered version of a line's artwork. Admin-only, in full: proofs are a
+ * press artefact, and nothing on the customer path reads them.
+ */
 export interface OrderProofSummary {
   id: string;
   version: number;
-  /**
-   * The print-ready PDF, which is a press artefact — null until an admin
-   * generates one. Never surfaced to the customer; they review `pages`.
-   */
+  /** The print-ready PDF — null until an admin generates one. */
   pdfUrl: string | null;
   pages: OrderProofPageImage[];
-  status: OrderProofStatus;
   createdAt: Date;
 }
 
@@ -184,8 +189,6 @@ export interface OrderDetail {
   items: OrderDetailItem[];
   events: OrderEvent[];
   stripe: { checkoutSessionId: string | null; paymentIntentId: string | null };
-  /** Null until the customer shares the proof — see ensureShareToken. */
-  shareToken: string | null;
 }
 
 export interface OrderSummary {
@@ -403,6 +406,16 @@ export async function getCartCount(owner: Owner): Promise<number> {
 
 type LineChoice = Partial<Pick<Selection, "quantity" | "size" | "colour">>;
 
+interface AddCartItemOptions extends LineChoice {
+  /**
+   * The customer has been shown the template wording they left unedited and
+   * has confirmed they meant to keep it. Without this an otherwise valid
+   * design is refused, so the confirmation can never be skipped by a client
+   * that simply doesn't implement the dialog.
+   */
+  acknowledgeDefaults?: boolean;
+}
+
 function assertLineChoiceValid(
   pricing: PricingData,
   selection: Selection,
@@ -423,7 +436,7 @@ function assertLineChoiceValid(
 export async function addCartItem(
   owner: Owner,
   designId: string,
-  choice: LineChoice = {},
+  choice: AddCartItemOptions = {},
 ): Promise<Cart> {
   const design = await getDesign(owner, designId);
   if (!design) throw new CartError(404, "Design not found");
@@ -442,6 +455,28 @@ export async function addCartItem(
     const cart = await getCart(owner);
     if (!cart) throw new Error("Basket vanished");
     return cart;
+  }
+
+  /*
+   * The pre-order gate. Everything a proof review would have caught is caught
+   * here instead, while the customer is still in front of the editor and can
+   * fix it themselves: an empty photo window is refused outright (it prints as
+   * the editor's dashed placeholder), and template wording left unedited must
+   * be confirmed. Enforced server-side because the client's copy of this check
+   * is a nicety, not a gate.
+   */
+  const readiness = await checkDocReadiness(design.templateId, design.doc);
+  if (!isDesignOrderable(readiness)) {
+    throw new CartError(409, readiness.blocking.map(describeIssue).join(". "), {
+      reason: "blocked",
+      readiness,
+    });
+  }
+  if (needsDefaultsConfirmation(readiness) && !choice.acknowledgeDefaults) {
+    throw new CartError(409, "Please confirm the wording you have left unchanged", {
+      reason: "confirm",
+      readiness,
+    });
   }
 
   const pricing = await getPricingData(design.productId);
@@ -485,6 +520,10 @@ export async function addCartItem(
     unitPricePence: quote.unitPricePence,
     lineTotalPence: quote.printCostPence,
     docSnapshot: design.doc,
+    // The audit record: what they were warned about, and when they accepted
+    // it. Null when there was nothing to warn about at all.
+    defaultsAck: readiness.warnings.length > 0 ? readiness.warnings : null,
+    defaultsAckAt: readiness.warnings.length > 0 ? new Date() : null,
   });
 
   const cart = await getCart(owner);
@@ -776,7 +815,7 @@ export async function finaliseOrder(
   const [result] = await db
     .update(orders)
     .set({
-      status: "awaiting_proof",
+      status: "awaiting_print",
       placedAt: now,
       paidAt: now,
       stripeCheckoutSessionId: payment.sessionId,
@@ -797,7 +836,7 @@ export async function finaliseOrder(
   await insertEvent(orderId, {
     type: "placed",
     fromStatus: "draft",
-    toStatus: "awaiting_proof",
+    toStatus: "awaiting_print",
     actor: "stripe",
     note: `Paid via Stripe Checkout (${payment.sessionId})`,
   });
@@ -911,7 +950,6 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       version: proof.version,
       pdfUrl: proof.pdfUrl,
       pages: pagesByProof.get(proof.id) ?? [],
-      status: proof.status,
       createdAt: proof.createdAt,
     });
     proofsByItem.set(proof.orderItemId, list);
@@ -924,7 +962,6 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
     placedAt: order.placedAt,
     paidAt: order.paidAt,
     createdAt: order.createdAt,
-    shareToken: order.shareToken,
     contact: { name: order.contactName, email: order.contactEmail, phone: order.contactPhone },
     address: {
       line1: order.addressLine1,
@@ -1017,141 +1054,3 @@ export async function getOrderEmailSummary(orderId: string): Promise<OrderEmailS
   };
 }
 
-/**
- * Record the customer's answer to a proof.
- *
- * Owner-scoped like every customer read: an order that isn't theirs 404s
- * rather than 403s, so the route can't be used to probe for order ids. A
- * version they were never sent, or one they have already answered, is not
- * reviewable — `canReviewProof` is the single rule.
- *
- * Approving the last outstanding line moves the whole order to `approved`,
- * conditionally on it still being `proof_sent`, so this can race the admin
- * doing the same thing without either of them double-writing the event.
- */
-export async function recordProofReview(
-  owner: Owner,
-  orderId: string,
-  proofId: string,
-  decision: ProofDecision,
-  note: string | null,
-): Promise<OrderDetail | null> {
-  const order = await getOrder(owner, orderId);
-  if (!order) return null;
-
-  const item = order.items.find((candidate) =>
-    candidate.proofs.some((proof) => proof.id === proofId),
-  );
-  const proof = item?.proofs.find((candidate) => candidate.id === proofId);
-  if (!proof) return null;
-  if (!canReviewProof(proof.status)) {
-    throw new CartError(409, "This proof is not awaiting your approval");
-  }
-
-  const [result] = await db
-    .update(orderProofs)
-    .set({ status: decision, respondedAt: new Date(), customerNote: note })
-    .where(and(eq(orderProofs.id, proofId), eq(orderProofs.status, "sent")));
-  if (result.affectedRows === 0) {
-    throw new CartError(409, "This proof was already answered — reload and try again");
-  }
-
-  await addOrderEvent(orderId, {
-    type: decision === "approved" ? "proof_approved" : "proof_changes_requested",
-    actor: "customer",
-    note:
-      decision === "approved"
-        ? `Proof v${proof.version} approved`
-        : `Changes requested on proof v${proof.version}${note ? `: ${note}` : ""}`,
-  });
-
-  // Re-read: this line's status has changed, and the whole-order rule
-  // depends on every other line too.
-  const updated = await loadOrderDetail(orderId, owner);
-  if (updated && updated.status === "proof_sent" && allProofsApproved(updated.items)) {
-    const [moved] = await db
-      .update(orders)
-      .set({ status: "approved" })
-      .where(and(eq(orders.id, orderId), eq(orders.status, "proof_sent")));
-    if (moved.affectedRows > 0) {
-      await addOrderEvent(orderId, {
-        type: "status_changed",
-        fromStatus: "proof_sent",
-        toStatus: "approved",
-        actor: "customer",
-        note: "All proofs approved by the customer",
-      });
-    }
-    return loadOrderDetail(orderId, owner);
-  }
-  return updated;
-}
-
-/**
- * The proof as someone the customer forwarded the link to sees it.
- *
- * Artwork and nothing else — no price, no address, no delivery, no status,
- * and no way to approve. Funerals are arranged by several relatives and the
- * one who paid will want a sibling's eyes on the spelling, but approval
- * stays with the person whose order it is.
- */
-export interface SharedProofView {
-  orderNumber: string;
-  items: { id: string; designName: string; pages: OrderProofPageImage[] }[];
-}
-
-export async function getSharedProof(token: string): Promise<SharedProofView | null> {
-  if (!token) return null;
-  const [row] = await db
-    .select({ id: orders.id })
-    .from(orders)
-    .where(eq(orders.shareToken, token))
-    .limit(1);
-  if (!row) return null;
-
-  const detail = await loadOrderDetail(row.id);
-  if (!detail || detail.status === "draft") return null;
-
-  const items = detail.items
-    .map((item) => ({
-      id: item.id,
-      designName: item.designName,
-      pages: latestVisibleProof(item.proofs)?.pages ?? [],
-    }))
-    .filter((item) => item.pages.length > 0);
-  if (items.length === 0) return null;
-
-  return { orderNumber: detail.orderNumber, items };
-}
-
-/**
- * Mint the share link, or hand back the one that already exists so the
- * customer can forward the same URL twice. Owner-scoped like every other
- * customer write.
- */
-export async function ensureShareToken(owner: Owner, orderId: string): Promise<string | null> {
-  const order = await getOrder(owner, orderId);
-  if (!order) return null;
-  if (order.shareToken) return order.shareToken;
-
-  // Conditional so two clicks can't overwrite each other's token and
-  // invalidate a link that has already been sent.
-  await db
-    .update(orders)
-    .set({ shareToken: crypto.randomUUID() })
-    .where(and(eq(orders.id, orderId), isNull(orders.shareToken)));
-  const [row] = await db
-    .select({ shareToken: orders.shareToken })
-    .from(orders)
-    .where(eq(orders.id, orderId))
-    .limit(1);
-  return row?.shareToken ?? null;
-}
-
-/** Kill a link that has been forwarded further than intended. */
-export async function revokeShareToken(owner: Owner, orderId: string): Promise<boolean> {
-  const order = await getOrder(owner, orderId);
-  if (!order) return false;
-  await db.update(orders).set({ shareToken: null }).where(eq(orders.id, orderId));
-  return true;
-}

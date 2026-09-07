@@ -23,13 +23,6 @@ const formatDateTime = (date: Date | null) =>
       }).format(date)
     : "—";
 
-const PROOF_STATUS_LABELS: Record<string, string> = {
-  generated: "Generated",
-  sent: "Sent to customer",
-  changes_requested: "Changes requested",
-  approved: "Approved",
-};
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6 ambient-shadow">
@@ -103,7 +96,7 @@ export default async function AdminOrderPage({
                     ) : (
                       <ul className="flex flex-wrap gap-2">
                         {item.proofs.map((proof) => {
-                          const label = `v${proof.version} · ${PROOF_STATUS_LABELS[proof.status] ?? proof.status}`;
+                          const label = `v${proof.version}`;
                           return (
                             <li
                               key={proof.id}
@@ -113,8 +106,7 @@ export default async function AdminOrderPage({
                                 {label} · {proof.pages.length}pp
                               </span>
                               {/* The press file is rendered on demand, so a
-                                  version the customer has already approved
-                                  may not have one yet. */}
+                                  version may not have one yet. */}
                               {proof.pdfUrl ? (
                                 <a
                                   href={proof.pdfUrl}

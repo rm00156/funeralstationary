@@ -13,6 +13,7 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 import type { DesignDoc } from "@/lib/designEditor";
+import type { ReadinessIssue } from "@/lib/designReadiness";
 import type { Quote } from "@/lib/orderOfServicePricing";
 import { designs } from "./designs";
 import { users } from "./users";
@@ -31,11 +32,15 @@ import { users } from "./users";
  * defeat the point of a snapshot.
  */
 
+/**
+ * There is no customer proof-approval state here on purpose. Mistakes are
+ * caught before payment, at the add-to-basket click (see the pre-order check
+ * in src/lib/designReadiness.ts), so a paid order goes straight to the print
+ * queue — `awaiting_print` is "paid, not yet sent to press".
+ */
 export const orderStatusValues = [
   "draft",
-  "awaiting_proof",
-  "proof_sent",
-  "approved",
+  "awaiting_print",
   "in_production",
   "shipped",
   "delivered",
@@ -81,13 +86,6 @@ export const orders = mysqlTable(
     stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }).unique(),
     stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
     paidAt: timestamp("paid_at"),
-    /**
-     * Opaque token for the read-only proof share page, minted lazily the
-     * first time the customer shares it. Deliberately not the order id:
-     * the share page shows artwork only, never price, address or status,
-     * so a forwarded link can't leak the order itself.
-     */
-    shareToken: char("share_token", { length: 36 }).unique(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },
@@ -132,31 +130,38 @@ export const orderItems = mysqlTable(
     lineTotalPence: int("line_total_pence").notNull(),
     /** The exact DesignDoc sent to press — the design itself stays editable after ordering. */
     docSnapshot: json("doc_snapshot").$type<DesignDoc>().notNull(),
+    /**
+     * The audit record of the pre-order check: exactly which template
+     * placeholders the customer was warned were still unedited, and when they
+     * confirmed they meant to keep them. Null means the design tripped no
+     * warnings at all, not that the check was skipped — an empty photo window
+     * blocks the add outright and never reaches this table.
+     *
+     * A snapshot like the spec columns above, and for the same reason: it is
+     * the evidence for "you approved this wording", so a later edit to the
+     * design must never rewrite it.
+     */
+    defaultsAck: json("defaults_ack").$type<ReadinessIssue[]>(),
+    defaultsAckAt: timestamp("defaults_ack_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },
   (t) => [index("order_items_order_idx").on(t.orderId)],
 );
 
-export const orderProofStatusValues = [
-  "generated",
-  "sent",
-  "changes_requested",
-  "approved",
-] as const;
-
 /**
- * One row per proof *version* — the approval record, not a file.
+ * One row per proof *version* — a press artefact, never shown to the
+ * customer. Admin-only: staff render it to check what will actually come off
+ * the press and to hand the printer a file.
  *
- * The customer reviews page images (order_proof_pages below); the
- * print-ready PDF is a press artefact generated on demand for the admin,
- * so pdfUrl/storageKey stay null until someone asks for one.
+ * pdfUrl/storageKey stay null until someone asks for a PDF; the page images
+ * in order_proof_pages below let an admin look at a version without one.
  *
  * docSnapshot is the artwork this version was rendered from, and it is why
- * the column lives here rather than only on order_items. When a customer
- * requests a change, the corrected artwork needs somewhere to go, and
- * order_items.docSnapshot must not move — that is the frozen record of
- * what was paid for. So v1 carries what they bought, v2 carries the fix.
+ * the column lives here rather than only on order_items. A corrected version
+ * needs somewhere to go, and order_items.docSnapshot must not move — that is
+ * the frozen record of what was paid for. So v1 carries what they bought,
+ * v2 carries the fix.
  */
 export const orderProofs = mysqlTable(
   "order_proofs",
@@ -171,10 +176,6 @@ export const orderProofs = mysqlTable(
     /** Both null until the print PDF is generated for the press. */
     pdfUrl: varchar("pdf_url", { length: 1024 }),
     storageKey: varchar("storage_key", { length: 512 }),
-    status: mysqlEnum("status", orderProofStatusValues).notNull().default("generated"),
-    sentAt: timestamp("sent_at"),
-    respondedAt: timestamp("responded_at"),
-    customerNote: text("customer_note"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("order_proofs_item_version_uq").on(t.orderItemId, t.version)],

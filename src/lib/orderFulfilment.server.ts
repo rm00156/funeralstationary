@@ -15,7 +15,6 @@ import { isEmailConfigured, sendEmail } from "@/lib/email.server";
 import {
   orderConfirmationEmail,
   orderNotificationEmail,
-  proofReadyEmail,
 } from "@/lib/orderEmails";
 import { addOrderEvent, getOrderEmailSummary, loadOrderDetail } from "@/lib/orders.server";
 import { renderProofPdf } from "@/lib/proofPdf.server";
@@ -108,7 +107,6 @@ export async function generateOrderItemProof(
     orderItemId: itemId,
     version,
     docSnapshot: doc,
-    status: "generated",
   });
   await db.insert(orderProofPages).values(pages);
   await addOrderEvent(orderId, {
@@ -221,32 +219,5 @@ export async function runPostPaymentSideEffects(orderId: string, origin: string)
         note: `${send.label}: ${error instanceof Error ? error.message : String(error)}`,
       }).catch(() => undefined);
     }
-  }
-}
-
-/**
- * Tell the customer their proof is ready to review. Called after an admin
- * moves an order to `proof_sent`, and best-effort like everything else
- * here: a mail failure is recorded, never fatal to the status change.
- */
-export async function sendProofReadyEmail(orderId: string, origin: string): Promise<void> {
-  if (!isEmailConfigured()) return;
-  const summary = await getOrderEmailSummary(orderId);
-  if (!summary) return;
-  try {
-    await sendEmail({
-      to: summary.contactEmail,
-      ...proofReadyEmail(summary, `${origin}/orders/${orderId}`),
-    });
-    await addOrderEvent(orderId, {
-      type: "email_sent",
-      note: `proof ready sent to ${summary.contactEmail}`,
-    });
-  } catch (error) {
-    console.error(`Proof-ready email failed for order ${orderId}`, error);
-    await addOrderEvent(orderId, {
-      type: "email_failed",
-      note: `proof ready: ${error instanceof Error ? error.message : String(error)}`,
-    }).catch(() => undefined);
   }
 }
