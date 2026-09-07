@@ -4,14 +4,20 @@
  */
 export async function adminMutate(
   url: string,
-  method: "POST" | "PATCH" | "PUT",
-  body: unknown,
+  method: "POST" | "PATCH" | "PUT" | "DELETE",
+  body?: unknown,
 ): Promise<string | null> {
   try {
     const response = await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      // DELETE carries no payload — sending an empty body and a JSON
+      // content-type on one is just noise.
+      ...(body === undefined
+        ? {}
+        : {
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }),
     });
     if (response.ok) return null;
     const { error } = (await response.json().catch(() => ({}))) as { error?: string };
