@@ -158,6 +158,14 @@ The raster route around the vector ceiling above: real public-domain and free-li
 - **Artwork templates use the `artwork` / `artwork-portrait` archetypes** (`ARTWORK_COVERS` in `templateGenerator.ts`) and require `TemplateSpec.background`. They put name and dates in the background's `textZone` and nothing else competes with the picture — no borders or motifs. The background element is always **element 0** on the cover and back page; the middle page is plain paper so the repeating interior stays readable. `buildTemplateLayout(spec, { backgroundUrl })` throws without the URL, for an unknown background, or for a palette the background wasn't rendered for; the runner resolves the URL via `backgroundAssetUrl` and skips a spec whose asset is missing locally with a pointer to `backgrounds:fetch`. Curate `CURATED_ARTWORK` the same way as `CURATED`: one picture per palette, never the same picture twice in one palette.
 - Order of operations for a fresh library: `npm run backgrounds:fetch` → `npm run dev` → `npm run templates:generate` → review in `/admin/templates`.
 
+## Deployment
+
+All in Frankfurt / eu-central-1 (TiDB Cloud only offers that EU region): Vercel (`fra1`, `vercel.json`) + TiDB Cloud (MySQL-compatible) + the `funeral-stationery-prod-eu-central-1` S3 bucket (eu-central-1, public-read, CORS for browser PUTs). Local dev keeps its own MySQL and the `myprintshopsaas` bucket.
+
+- **Migrations run on deploy.** Vercel runs `vercel-build` = `scripts/migrate-on-deploy.ts && next build`; the script runs `drizzle-kit migrate` **only when `VERCEL_ENV === "production"`**, so a preview deploy of a branch carrying a new migration can never move the production schema (`ALLOW_PREVIEW_MIGRATIONS=1` is the opt-in for a preview with its *own* database). Still scope `DATABASE_URL` to Production only in Vercel. A failed migration fails the build, so code never goes live against a schema it doesn't match. CI fails any schema change that arrives without its generated migration — always `npm run db:generate` and commit the result; never `db:push` against production.
+- **TLS is switched on by host.** `src/db/index.ts`, `drizzle.config.ts` and `scripts/copy-catalogue.ts` enable TLS when the host ends in `.tidbcloud.com` (TiDB refuses plaintext); local MySQL stays plaintext.
+- **The first production catalogue is copied, not seeded.** `scripts/copy-catalogue.ts` copies products/categories/templates/pricing from a source DB into an empty, migrated target, rewriting the absolute storage URLs in `preview_image_url`/`layout`/`draft_layout` to the new bucket (the objects themselves were copied with `aws s3`). It dry-runs by default and refuses a target that already has products. Anything admin-uploaded later goes to the prod bucket directly.
+
 ## Claude Code Execution Directives
 
 1. **Targeted Edits Only:** Do NOT rewrite entire files for localized changes. Use surgical diffs.
