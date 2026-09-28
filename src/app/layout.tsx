@@ -189,6 +189,14 @@ export const metadata: Metadata = {
   title: "The Funeral Stationery | You design the tribute. We print the memories.",
   description:
     "Personalise a tribute booklet in minutes, delivered next day. Fast turnaround for your most precious tributes, delivered with compassionate professionalism.",
+  // favicon.ico comes from src/app/favicon.ico (file convention, wired automatically).
+  icons: {
+    icon: [
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
