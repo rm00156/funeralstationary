@@ -52,7 +52,7 @@ export default function PricingDelivery() {
           <div className="flex flex-col gap-8 items-center justify-center">
             <div className="relative w-full max-w-xs aspect-square">
               <Image
-                src="https://lh3.googleusercontent.com/aida/AEtjO1XG3QPJZS1qyzNTsc_hIhUT5WqIOAp0uJsdYJL3u8FWMS1VPR2YsQHqdPvPxXHLoDUS6SzUJEpTIQc-mdJFtHSzKW8VTV035QmY8XN_TMS0toD85KvZo_55gdLsU4F6LFJKR75AA4Qvke1o32YPectG1Q-h8elMYKdXxDr-UYlrjZW431oMhBjZRyzJn7xcl6RukCOx59A2lfSgIMDtyp07fNxYG3EBJHEhnHlUvZLDFggdcO3P8GAAUiw"
+                src="/professional-printing.webp"
                 alt="Professional Printing"
                 fill
                 sizes="320px"
