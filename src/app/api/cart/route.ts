@@ -1,12 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { parseCheckoutDetails } from "@/lib/checkoutValidation";
-import {
-  cartErrorResponse,
-  getCart,
-  setCartDelivery,
-  setCheckoutDetails,
-} from "@/lib/orders.server";
+import { cartErrorResponse, getCart, setCheckoutDetails } from "@/lib/orders.server";
 import { getOrCreateOwner, readOwner } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -22,7 +17,10 @@ export async function GET() {
   return Response.json({ cart });
 }
 
-/** PATCH /api/cart — order-level choices: delivery option and/or checkout details. */
+/**
+ * PATCH /api/cart — the order-level choice: checkout details. Delivery is
+ * per line and goes through PATCH /api/cart/items/:itemId.
+ */
 export async function PATCH(request: NextRequest) {
   let body: unknown;
   try {
@@ -30,17 +28,11 @@ export async function PATCH(request: NextRequest) {
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { delivery, details } = (body ?? {}) as Record<string, unknown>;
+  const { details } = (body ?? {}) as Record<string, unknown>;
 
   const owner = await getOrCreateOwner();
   try {
     let cart = null;
-    if (delivery !== undefined) {
-      if (typeof delivery !== "string") {
-        return Response.json({ error: "Invalid delivery option" }, { status: 400 });
-      }
-      cart = await setCartDelivery(owner, delivery);
-    }
     if (details !== undefined) {
       const parsed = parseCheckoutDetails(details);
       if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });

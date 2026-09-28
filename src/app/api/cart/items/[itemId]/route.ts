@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 const optionalSlug = (value: unknown): string | undefined =>
   typeof value === "string" && value ? value : undefined;
 
-/** PATCH /api/cart/items/:itemId — change a line's quantity/size/colour. */
+/** PATCH /api/cart/items/:itemId — change a line's quantity/delivery. */
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/cart/items/[itemId]">) {
   const { itemId } = await ctx.params;
 
@@ -18,14 +18,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/cart/i
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { quantity, size, colour } = (body ?? {}) as Record<string, unknown>;
+  const { quantity, delivery } = (body ?? {}) as Record<string, unknown>;
 
   const owner = await getOrCreateOwner();
   try {
     const cart = await updateCartItem(owner, itemId, {
       quantity: optionalSlug(quantity),
-      size: optionalSlug(size),
-      colour: optionalSlug(colour),
+      delivery: optionalSlug(delivery),
     });
     return Response.json({ cart });
   } catch (error) {

@@ -3,25 +3,21 @@ import { sql } from "drizzle-orm";
 import type { AnyMySqlTable, MySqlColumn } from "drizzle-orm/mysql-core";
 import { db } from "./index";
 import {
-  colourOptions,
   deliveryOptions,
   pageCountOptions,
   paperOptions,
   products,
   quantityOptions,
-  sizeOptions,
   templateCategories,
   templateCategoryLinks,
   templates,
 } from "./schema";
 import {
-  buildColourOptionsSeed,
   buildDeliveryOptionsSeed,
   buildPageCountOptionsSeed,
   buildPaperOptionsSeed,
   buildProductsSeed,
   buildQuantityOptionsSeed,
-  buildSizeOptionsSeed,
   buildTemplateCategoriesSeed,
   buildTemplateCategoryLinksSeed,
   buildTemplatesSeed,
@@ -147,8 +143,6 @@ async function main() {
       .onDuplicateKeyUpdate({ set: valuesOf(table, ...updateColumns) });
   }
 
-  await upsertPricingTable(sizeOptions, buildSizeOptionsSeed(), [...specColumns]);
-  await upsertPricingTable(colourOptions, buildColourOptionsSeed(), [...specColumns]);
   await upsertPricingTable(paperOptions, buildPaperOptionsSeed(), [...specColumns]);
   await upsertPricingTable(quantityOptions, buildQuantityOptionsSeed(), [...specColumns, "copies"]);
   await upsertPricingTable(pageCountOptions, buildPageCountOptionsSeed(), [

@@ -9,9 +9,12 @@ export interface PreviewTemplate {
   image: string;
 }
 
-export default function OrderOfServicePreviewGallery({
+/** The product page's picture: the product's first few templates, with thumbnails to flick between them. */
+export default function ProductPreviewGallery({
+  productLabel,
   templates,
 }: {
+  productLabel: string;
   templates: PreviewTemplate[];
 }) {
   const [activeId, setActiveId] = useState(templates[0]?.id);
@@ -25,7 +28,7 @@ export default function OrderOfServicePreviewGallery({
       <div className="relative w-full aspect-4/3 rounded-xl bg-surface-container-low ambient-shadow overflow-hidden">
         <Image
           src={active.image}
-          alt={`${active.name} order of service booklet`}
+          alt={`${active.name} — ${productLabel}`}
           fill
           priority
           sizes="(min-width: 1024px) 50vw, 100vw"
@@ -40,7 +43,7 @@ export default function OrderOfServicePreviewGallery({
               key={template.id}
               type="button"
               onClick={() => setActiveId(template.id)}
-              aria-label={`Preview the ${template.name} theme`}
+              aria-label={`Preview the ${template.name} design`}
               className="relative aspect-4/3 flex-1 max-w-[96px] rounded-lg overflow-hidden bg-surface-container-low border-2 border-transparent transition-colors hover:border-primary-container"
             >
               <Image

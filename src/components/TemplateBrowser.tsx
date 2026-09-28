@@ -18,6 +18,7 @@ export default function TemplateBrowser({
   templates: allTemplates,
   initialProductId = null,
   initialCategoryId = null,
+  carriedSelection = "",
 }: {
   products: Product[];
   categories: TemplateCategory[];
@@ -25,6 +26,11 @@ export default function TemplateBrowser({
   /** ?product= / ?category= from the URL, already validated server-side. */
   initialProductId?: string | null;
   initialCategoryId?: string | null;
+  /**
+   * The product page's copies/pages/paper/delivery as a query string. It only
+   * belongs to the product it was chosen for, so switching product drops it.
+   */
+  carriedSelection?: string;
 }) {
   const [productId, setProductId] = useState(
     initialProductId ?? products[0]?.id ?? "",
@@ -176,7 +182,11 @@ export default function TemplateBrowser({
 
                 <div className="mt-auto flex flex-col gap-3 p-5">
                   <Link
-                    href={`/design?template=${template.id}&product=${productId}`}
+                    href={`/design?template=${template.id}&product=${productId}${
+                      carriedSelection && productId === initialProductId
+                        ? `&${carriedSelection}`
+                        : ""
+                    }`}
                     className="rounded-lg bg-primary-container px-5 py-3 text-center font-body font-medium tracking-wide text-white transition-colors duration-300 hover:bg-primary"
                   >
                     Edit this design

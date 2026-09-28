@@ -1,7 +1,7 @@
 /**
  * Server-side reads for a product's pricing options.
  *
- * Loads the six option tables into the pure PricingData shape getQuote()
+ * Loads the four option tables into the pure PricingData shape getQuote()
  * consumes. Money columns are already integer pence; multiplier columns are
  * decimal(6,4) strings from the driver and become plain numbers here (exact
  * for 4dp values). Only active rows are returned, in sort order — the admin
@@ -11,13 +11,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { cache } from "react";
 import { db } from "@/db";
 import {
-  colourOptions,
   deliveryOptions,
   pageCountOptions,
   paperOptions,
   products,
   quantityOptions,
-  sizeOptions,
 } from "@/db/schema";
 import type {
   DeliveryOption,
@@ -37,15 +35,8 @@ async function resolveProductId(productSlug: string): Promise<number> {
   return row.id;
 }
 
-type MultiplierTable =
-  | typeof sizeOptions
-  | typeof colourOptions
-  | typeof paperOptions;
-
-async function loadMultiplierOptions(
-  table: MultiplierTable,
-  productId: number,
-): Promise<SelectOption[]> {
+async function loadPaperOptions(productId: number): Promise<SelectOption[]> {
+  const table = paperOptions;
   const rows = await db
     .select({
       slug: table.slug,
@@ -68,11 +59,9 @@ export const getPricingData = cache(
   async (productSlug: string): Promise<PricingData> => {
     const productId = await resolveProductId(productSlug);
 
-    const [size, colour, paper, quantityRows, pageRows, deliveryRows] =
+    const [paper, quantityRows, pageRows, deliveryRows] =
       await Promise.all([
-        loadMultiplierOptions(sizeOptions, productId),
-        loadMultiplierOptions(colourOptions, productId),
-        loadMultiplierOptions(paperOptions, productId),
+        loadPaperOptions(productId),
         db
           .select({
             slug: quantityOptions.slug,
@@ -143,7 +132,7 @@ export const getPricingData = cache(
       note: row.note,
     }));
 
-    return { quantity, size, colour, pages, paper, delivery };
+    return { quantity, pages, paper, delivery };
   },
 );
 

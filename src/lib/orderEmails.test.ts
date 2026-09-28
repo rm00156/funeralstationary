@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   orderConfirmationEmail,
   orderNotificationEmail,
+  signInEmail,
   type OrderEmailSummary,
 } from "@/lib/orderEmails";
 
@@ -11,9 +12,15 @@ const summary: OrderEmailSummary = {
   contactName: "Jane <Doe>",
   contactEmail: "jane@example.com",
   items: [
-    { name: "Order of Service — Whispering Petals", spec: "50 copies · A5 · Silk", copies: 50, lineTotalPence: 9000 },
+    {
+      name: "Order of Service — Whispering Petals",
+      spec: "50 copies · A5 · Silk",
+      copies: 50,
+      lineTotalPence: 9000,
+      deliveryLabel: "Next day",
+      deliveryPence: 999,
+    },
   ],
-  deliveryLabel: "Next day",
   deliveryPence: 999,
   subtotalPence: 9000,
   vatPence: 1667,
@@ -43,6 +50,17 @@ describe("orderNotificationEmail", () => {
     const email = orderNotificationEmail(summary, "https://example.com/admin/orders/abc");
     expect(email.subject).toBe("New order TFS-2026-004210 — £99.99");
     expect(email.text).toContain("jane@example.com");
-    expect(email.text).toContain("Next day");
+    expect(email.text).toContain("Delivery: Next day (£9.99)");
+  });
+});
+
+describe("signInEmail", () => {
+  it("carries the link, escaped in the html, and says nothing about the account", () => {
+    const url = "https://tfs.example/api/auth/verify?token=a%2Bb&x=1";
+    const { subject, text, html } = signInEmail(url);
+    expect(subject).toContain("sign-in link");
+    expect(text).toContain(url);
+    expect(html).toContain('href="https://tfs.example/api/auth/verify?token=a%2Bb&amp;x=1"');
+    expect(text).not.toMatch(/no account|not found|unknown/i);
   });
 });

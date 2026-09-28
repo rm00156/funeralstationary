@@ -2,7 +2,7 @@
 
 import { AlertTriangle, ImageOff } from "lucide-react";
 
-import { issueLocation, type DesignReadiness } from "@/lib/designReadiness";
+import { issueLocation, quoted, type DesignReadiness } from "@/lib/designReadiness";
 
 /**
  * The 409 payload from POST /api/cart/items when the pre-order check refuses
@@ -84,7 +84,7 @@ export default function PreOrderCheckDialog({
               className="rounded-xl border border-outline-variant/60 bg-surface p-4"
             >
               <p className="font-body text-on-surface">
-                {issue.kind === "empty-photo" ? "Empty photo window" : `“${issue.text}”`}
+                {issue.kind === "empty-photo" ? "Empty photo window" : quoted(issue.text ?? "")}
               </p>
               <p className="mt-1 font-body text-sm text-on-surface-variant">
                 {issueLocation(issue)}

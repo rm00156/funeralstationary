@@ -15,14 +15,12 @@
 import { asc, eq, and, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  colourOptions,
   designs,
   deliveryOptions,
   pageCountOptions,
   paperOptions,
   products,
   quantityOptions,
-  sizeOptions,
   templateCategories,
   templateCategoryLinks,
   templates,
@@ -104,8 +102,6 @@ export async function adminUpdateProduct(
 /* ------------------------------------------------------------------ */
 
 export const OPTION_KINDS = [
-  "size",
-  "colour",
   "paper",
   "quantity",
   "page-count",
@@ -137,7 +133,7 @@ export interface AdminOptionInput {
   label: string;
   note: string | null;
   sortOrder: number;
-  /** decimal(6,4) string, e.g. "0.9000" — size/colour/paper/quantity only. */
+  /** decimal(6,4) string, e.g. "0.9000" — paper/quantity only. */
   multiplier?: string;
   copies?: number;
   pageCount?: number;
@@ -157,14 +153,6 @@ export type AdminOptionPatch = Partial<{
   pricePence: number;
 }>;
 
-type MultiplierTable = typeof sizeOptions | typeof colourOptions | typeof paperOptions;
-
-const MULTIPLIER_TABLES: Record<"size" | "colour" | "paper", MultiplierTable> = {
-  size: sizeOptions,
-  colour: colourOptions,
-  paper: paperOptions,
-};
-
 export async function adminListOptions(
   productSlug: string,
   kind: OptionKind,
@@ -172,8 +160,8 @@ export async function adminListOptions(
   const productId = await resolveProductId(productSlug);
   if (!productId) return null;
 
-  if (kind === "size" || kind === "colour" || kind === "paper") {
-    const table = MULTIPLIER_TABLES[kind];
+  if (kind === "paper") {
+    const table = paperOptions;
     const rows = await db
       .select({
         slug: table.slug,
@@ -260,9 +248,9 @@ export async function adminCreateOption(
     note: input.note,
     sortOrder: input.sortOrder,
   };
-  if (kind === "size" || kind === "colour" || kind === "paper") {
+  if (kind === "paper") {
     await db
-      .insert(MULTIPLIER_TABLES[kind])
+      .insert(paperOptions)
       .values({ ...base, multiplier: input.multiplier! });
   } else if (kind === "quantity") {
     await db
@@ -304,8 +292,8 @@ export async function adminUpdateOption(
   // route rejects nulling it, so dropping it here is belt-and-braces).
   const nullableNote = patch.note !== undefined ? { note: patch.note } : {};
 
-  if (kind === "size" || kind === "colour" || kind === "paper") {
-    const table = MULTIPLIER_TABLES[kind];
+  if (kind === "paper") {
+    const table = paperOptions;
     await db
       .update(table)
       .set({

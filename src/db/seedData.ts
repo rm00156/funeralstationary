@@ -13,14 +13,12 @@
 import { CATEGORY_ACCENTS } from "@/lib/designEditor";
 import {
   CATEGORIES,
-  COLOUR_OPTIONS,
   DEFAULT_PRODUCT,
   DELIVERY_OPTIONS,
   PAGE_OPTIONS,
   PAPER_OPTIONS,
   PRODUCTS,
   QUANTITY_OPTIONS,
-  SIZE_OPTIONS,
   TEMPLATES,
 } from "./seedCatalogue";
 
@@ -66,30 +64,6 @@ export function buildTemplateCategoryLinksSeed() {
       position,
     })),
   );
-}
-
-export function buildSizeOptionsSeed() {
-  return SIZE_OPTIONS.map((option, index) => ({
-    productSlug: DEFAULT_PRODUCT,
-    slug: option.id,
-    label: option.label,
-    multiplier: toMultiplier(option.multiplier),
-    note: option.note ?? null,
-    sortOrder: index,
-    isActive: true,
-  }));
-}
-
-export function buildColourOptionsSeed() {
-  return COLOUR_OPTIONS.map((option, index) => ({
-    productSlug: DEFAULT_PRODUCT,
-    slug: option.id,
-    label: option.label,
-    multiplier: toMultiplier(option.multiplier),
-    note: option.note ?? null,
-    sortOrder: index,
-    isActive: true,
-  }));
 }
 
 export function buildPaperOptionsSeed() {

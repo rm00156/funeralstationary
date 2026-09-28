@@ -21,8 +21,6 @@ const pricing: PricingData = {
     { id: "q15", label: "15", multiplier: 1, value: 15 },
     { id: "q50", label: "50", multiplier: 0.9, value: 50 },
   ],
-  size: [{ id: "a5", label: "A5", multiplier: 1 }],
-  colour: [{ id: "colour", label: "Full colour", multiplier: 1 }],
   pages: [{ id: "p8", label: "8 pages", pages: 8, baseRatePence: 200 }],
   paper: [{ id: "silk", label: "Silk", multiplier: 1 }],
   delivery: [{ id: "standard", label: "Standard", pricePence: 0, note: "" }],
@@ -92,8 +90,6 @@ describe("VAT and totals", () => {
 describe("resolveSelectionStrict", () => {
   const selection = {
     quantity: "q50",
-    size: "a5",
-    colour: "colour",
     pages: "p8",
     paper: "silk",
     delivery: "standard",
@@ -128,21 +124,29 @@ describe("makeOrderNumber", () => {
 });
 
 describe("buildStripeLineItems", () => {
-  const items = [
-    { name: "Order of service — Whispering Petals", unitPricePence: 180, copies: 50 },
-    { name: "Order of service — Second", unitPricePence: 250, copies: 15 },
-  ];
+  const nextDay = { label: "Next day", pricePence: 999 };
+  const standard = { label: "Standard", pricePence: 0 };
 
-  it("sums to the order total, delivery included", () => {
-    const lines = buildStripeLineItems(items, { label: "Next day", pricePence: 999 });
-    expect(lines).toHaveLength(3);
-    expect(lines[2]).toEqual({ name: "Delivery — Next day", unitAmountPence: 999, quantity: 1 });
-    expect(sumLineItems(lines)).toBe(computeOrderTotals([9000, 3750], 999).totalPence);
+  it("sums to the order total, per-line delivery included", () => {
+    const lines = buildStripeLineItems([
+      { name: "Order of service — Whispering Petals", unitPricePence: 180, copies: 50, delivery: nextDay },
+      { name: "Memorial cards — Second", unitPricePence: 250, copies: 15, delivery: nextDay },
+    ]);
+    expect(lines).toHaveLength(4);
+    expect(lines[1]).toEqual({
+      name: "Delivery — Next day (Order of service — Whispering Petals)",
+      unitAmountPence: 999,
+      quantity: 1,
+    });
+    expect(sumLineItems(lines)).toBe(computeOrderTotals([9000, 3750], 999 + 999).totalPence);
   });
 
-  it("omits a free delivery line", () => {
-    const lines = buildStripeLineItems(items, { label: "Standard", pricePence: 0 });
-    expect(lines).toHaveLength(2);
-    expect(sumLineItems(lines)).toBe(12750);
+  it("omits a free delivery line but keeps a paid one on the same order", () => {
+    const lines = buildStripeLineItems([
+      { name: "First", unitPricePence: 180, copies: 50, delivery: standard },
+      { name: "Second", unitPricePence: 250, copies: 15, delivery: nextDay },
+    ]);
+    expect(lines.map((line) => line.name)).toEqual(["First", "Second", "Delivery — Next day (Second)"]);
+    expect(sumLineItems(lines)).toBe(12750 + 999);
   });
 });

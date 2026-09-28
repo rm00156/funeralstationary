@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { CheckCircle2, ChevronRight } from "lucide-react";
 
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
+import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
 import { formatPence } from "@/lib/orderOfServicePricing";
 import { getOrder } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
+import { authConfigured } from "@/lib/userSession";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +49,14 @@ export default async function OrderPage({
   const [{ id }, { placed }] = await Promise.all([params, searchParams]);
   const owner = await readOwner();
   const order = owner ? await getOrder(owner, id) : null;
-  if (!order) notFound();
+  // A guest who can't see this order may simply be on a different device from
+  // the one that placed it — the confirmation email is read anywhere. Send
+  // them to sign in, for every id alike so nothing is revealed about whether
+  // the order exists. A signed-in customer who still can't see it gets a 404.
+  if (!order) {
+    if (!owner?.userId && authConfigured()) redirect(`/account?next=/orders/${encodeURIComponent(id)}`);
+    notFound();
+  }
 
   return (
     <>
@@ -63,10 +72,15 @@ export default async function OrderPage({
                 Home
               </Link>
               <ChevronRight size={14} aria-hidden />
-              <Link href="/orders" className="transition-colors hover:text-primary">
-                My Orders
-              </Link>
-              <ChevronRight size={14} aria-hidden />
+              {/* A guest has no "My Account" — only a signed-in customer gets that crumb. */}
+              {owner?.userId && (
+                <>
+                  <Link href="/account" className="transition-colors hover:text-primary">
+                    My Account
+                  </Link>
+                  <ChevronRight size={14} aria-hidden />
+                </>
+              )}
               <span className="text-on-surface">{order.orderNumber}</span>
             </nav>
 
@@ -115,12 +129,18 @@ export default async function OrderPage({
                           {item.designName}
                         </h2>
                         <p className="font-body text-sm text-on-surface-variant">
-                          {item.quantityCopies} copies · {item.quote.size.label} ·{" "}
-                          {item.quote.colour.label} · {item.quote.pages.label} ·{" "}
+                          {item.quantityCopies} copies · {PAGE_SIZE_LABEL} ·{" "}
+                          {item.quote.pages.label} ·{" "}
                           {item.quote.paper.label}
                         </p>
                         <p className="font-body text-sm text-on-surface-variant">
                           {formatPence(item.unitPricePence)} each
+                        </p>
+                        <p className="font-body text-sm text-on-surface-variant">
+                          {item.delivery.label} ·{" "}
+                          {item.delivery.pricePence === 0
+                            ? "Free"
+                            : formatPence(item.delivery.pricePence)}
                         </p>
                       </div>
                       <p className="font-display text-xl text-primary">
@@ -140,7 +160,7 @@ export default async function OrderPage({
                       <dd className="text-on-surface">{formatPence(order.totals.subtotalPence)}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <dt>{order.delivery?.label ?? "Delivery"}</dt>
+                      <dt>Delivery</dt>
                       <dd className="text-on-surface">
                         {order.totals.deliveryPence === 0
                           ? "Free"

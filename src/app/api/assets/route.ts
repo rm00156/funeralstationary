@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { db } from "@/db";
 import { designAssets } from "@/db/schema";
-import { getOrCreateOwner } from "@/lib/session";
+import { getOrCreateOwner, ownerKey } from "@/lib/session";
 import {
   MAX_UPLOAD_BYTES,
   createUploadUrl,
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
   const owner = await getOrCreateOwner();
   const id = crypto.randomUUID();
-  const storageKey = `designs/${owner.guestToken}/${id}.${extensionFor(contentType)}`;
+  const storageKey = `designs/${ownerKey(owner)}/${id}.${extensionFor(contentType)}`;
 
   const [uploadUrl, url] = [await createUploadUrl(storageKey, contentType), publicUrlFor(storageKey)];
 

@@ -7,6 +7,7 @@ import AdminPrintPdfButton from "@/components/AdminPrintPdfButton";
 import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { adminGetOrder } from "@/lib/adminOrders.server";
+import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
 import { formatPence } from "@/lib/orderOfServicePricing";
 import { ORDER_STATUS_LABELS } from "@/lib/orders";
 
@@ -72,11 +73,12 @@ export default async function AdminOrderPage({
                     <div>
                       <p className="font-body font-medium text-on-surface">{item.designName}</p>
                       <p className="font-body text-sm text-on-surface-variant">
-                        {item.quantityCopies} copies · {item.quote.size.label} · {item.quote.colour.label} ·{" "}
+                        {item.quantityCopies} copies · {PAGE_SIZE_LABEL} ·{" "}
                         {item.quote.pages.label} · {item.quote.paper.label}
                       </p>
                       <p className="font-body text-xs text-on-surface-variant">
-                        {formatPence(item.unitPricePence)} each · template {item.templateId}
+                        {formatPence(item.unitPricePence)} each · {item.delivery.label} (
+                        {formatPence(item.delivery.pricePence)}) · template {item.templateId}
                         {item.designId && (
                           <>
                             {" · "}
@@ -197,7 +199,7 @@ export default async function AdminOrderPage({
                 <dd className="text-on-surface">{formatPence(order.totals.subtotalPence)}</dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt>{order.delivery?.label ?? "Delivery"}</dt>
+                <dt>Delivery</dt>
                 <dd className="text-on-surface">{formatPence(order.totals.deliveryPence)}</dd>
               </div>
               <div className="flex justify-between gap-4">

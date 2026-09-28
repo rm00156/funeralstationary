@@ -8,7 +8,11 @@ import {
   setCheckoutDetails,
 } from "@/lib/orders.server";
 import { getOrCreateOwner } from "@/lib/session";
-import { createCheckoutSessionForOrder, isStripeConfigured } from "@/lib/stripe.server";
+import {
+  createCheckoutSessionForOrder,
+  isStripeConfigured,
+  resolveRequestOrigin,
+} from "@/lib/stripe.server";
 
 export const runtime = "nodejs";
 
@@ -48,7 +52,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const origin = new URL(request.url).origin;
+  const origin = resolveRequestOrigin(request);
   const session = await createCheckoutSessionForOrder(prepared.order, origin);
   await attachCheckoutSession(prepared.order.id, session.id);
   return Response.json({ url: session.url });

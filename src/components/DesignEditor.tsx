@@ -61,6 +61,7 @@ import {
   Square,
   Star,
   Sun,
+  TextCursorInput,
   Trash2,
   TreeDeciduous,
   Type,
@@ -85,7 +86,10 @@ import {
   INK_PALETTE,
   PAGE_BACKGROUND_PALETTE,
   PAGE_H,
+  PAGE_H_MM,
+  PAGE_SIZE_LABEL,
   PAGE_W,
+  PAGE_W_MM,
   RESIZE_HANDLES,
   instantiateLayout,
   makeStarterDoc,
@@ -120,8 +124,12 @@ import {
   formatPence,
   getQuote,
   type PricingData,
+  type Selection,
 } from "@/lib/orderOfServicePricing";
 import type { Template } from "@/lib/templates";
+
+/** A stable default, so memos keyed on initialSelection don't churn. */
+const NO_SELECTION: Partial<Selection> = {};
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
@@ -228,6 +236,7 @@ export default function DesignEditor({
   templates,
   pricing,
   initialLayout,
+  initialSelection = NO_SELECTION,
   templateAuthoring,
   savedDesign,
 }: {
@@ -240,6 +249,12 @@ export default function DesignEditor({
   pricing: PricingData;
   /** The initial template's authored layout (templates.layout), if any. */
   initialLayout?: DesignPage[] | null;
+  /**
+   * Options carried from the product page, already validated against
+   * `pricing`. pages/paper seed a new design; quantity/delivery are sent with
+   * "Add to basket" so the line starts on what the customer priced.
+   */
+  initialSelection?: Partial<Selection>;
   /**
    * Admin template-authoring mode: the document IS the template's layout.
    * Saves PUT /api/admin/templates/:slug/layout instead of /api/designs, and
@@ -279,9 +294,11 @@ export default function DesignEditor({
   const initialPageOption =
     (savedDesign
       ? pricing.pages.find((option) => option.id === savedDesign.pagesOptionId)
-      : startingPages
-        ? pricing.pages.find((option) => option.pages === startingPages.length)
-        : undefined) ?? pricing.pages[0];
+      : !authoring && initialSelection.pages
+        ? pricing.pages.find((option) => option.id === initialSelection.pages)
+        : startingPages
+          ? pricing.pages.find((option) => option.pages === startingPages.length)
+          : undefined) ?? pricing.pages[0];
   const [doc, setDoc] = useState<DesignDoc>(() => {
     if (savedDesign && !templateAuthoring) return savedDesign.doc;
     if (startingPages) {
@@ -307,7 +324,7 @@ export default function DesignEditor({
     savedDesign?.pagesOptionId ?? initialPageOption?.id ?? "",
   );
   const [paperId, setPaperId] = useState(
-    savedDesign?.paperId ?? pricing.paper[0]?.id ?? "",
+    savedDesign?.paperId ?? initialSelection.paper ?? pricing.paper[0]?.id ?? "",
   );
   const [uploads, setUploads] = useState<string[]>([]);
   const [designId, setDesignId] = useState<string | null>(savedDesign?.id ?? null);
@@ -418,7 +435,7 @@ export default function DesignEditor({
 
         if (!designId) setDesignId(saved.id);
         setSaveState("saved");
-        if (!options.silent) flash("Design saved to your account");
+        if (!options.silent) flash("Design saved");
         return designId ?? saved.id;
       } catch {
         setSaveState("error");
@@ -435,8 +452,9 @@ export default function DesignEditor({
 
   /**
    * Save first (the row may not exist yet — see persist), then put the
-   * design in the basket and go there. Quantity, size and colour are chosen
-   * on the basket page; pages and paper come from the design itself.
+   * design in the basket and go there. Pages and paper come from the design
+   * itself; copies and delivery start on whatever the product page carried
+   * (else the defaults) and stay editable on the basket page.
    */
   const addToCart = useCallback(async (acknowledgeDefaults = false) => {
     if (authoring) return;
@@ -451,7 +469,12 @@ export default function DesignEditor({
       const response = await fetch("/api/cart/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ designId: id, acknowledgeDefaults }),
+        body: JSON.stringify({
+          designId: id,
+          quantity: initialSelection.quantity,
+          delivery: initialSelection.delivery,
+          acknowledgeDefaults,
+        }),
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
@@ -460,6 +483,10 @@ export default function DesignEditor({
         const check = parsePreOrderCheck(body);
         if (check) {
           setAddingToCart(false);
+          // The preview modal shares this dialog's z-index and renders after
+          // it in the DOM, so it would otherwise stack on top and hide the
+          // check — close it so the customer actually sees what to fix.
+          setPreview(false);
           setPreOrderCheck(check);
           return;
         }
@@ -472,7 +499,7 @@ export default function DesignEditor({
       setAddingToCart(false);
       flash(error instanceof Error ? error.message : "Could not add to your basket — please try again");
     }
-  }, [authoring, persist, flash, router]);
+  }, [authoring, persist, flash, router, setPreview, initialSelection.quantity, initialSelection.delivery]);
 
   /**
    * Authoring only: promote the draft to the live layout. Saves first, so
@@ -507,18 +534,24 @@ export default function DesignEditor({
    * template and product, and both can change from inside the editor. A
    * lingering ?template=/?product= would start lying the moment a different
    * template was applied, so they're dropped here (they only ever seed a new
-   * design, from /templates).
+   * design, from /templates) — and so are ?pages=/?paper=, which the row now
+   * owns. ?quantity=/?delivery= stay: they're basket choices, not properties
+   * of the design, so a refresh must still add the line on what was priced.
    */
   useEffect(() => {
     if (!designId) return;
     const url = new URL(window.location.href);
     const alreadyClean =
       url.searchParams.get("design") === designId &&
-      !url.searchParams.has("template") &&
-      !url.searchParams.has("product");
+      ["template", "product", "pages", "paper"].every((key) => !url.searchParams.has(key));
     if (alreadyClean) return;
+    const lineChoice = ["quantity", "delivery"].flatMap((key) => {
+      const value = url.searchParams.get(key);
+      return value ? [[key, value] as const] : [];
+    });
     url.search = "";
     url.searchParams.set("design", designId);
+    for (const [key, value] of lineChoice) url.searchParams.set(key, value);
     window.history.replaceState(null, "", url);
   }, [designId]);
 
@@ -1055,10 +1088,11 @@ export default function DesignEditor({
     () =>
       getQuote(pricing, {
         ...defaultSelection(pricing),
+        ...initialSelection,
         pages: pagesOptionId,
         paper: paperId,
       }),
-    [pricing, pagesOptionId, paperId],
+    [pricing, initialSelection, pagesOptionId, paperId],
   );
 
   const reorderSelectedWith = (from: number, to: number) => {
@@ -1379,6 +1413,19 @@ export default function DesignEditor({
           )}
 
           <div className="ml-auto flex items-center gap-1">
+            {authoring && selected.type === "text" && (
+              <ToolbarButton
+                label={
+                  selected.placeholder
+                    ? "Placeholder — customers are asked to check it if unchanged"
+                    : "Mark as placeholder wording the customer should replace"
+                }
+                active={!!selected.placeholder}
+                onClick={() => updateSelected({ placeholder: !selected.placeholder })}
+              >
+                <TextCursorInput size={16} aria-hidden />
+              </ToolbarButton>
+            )}
             {authoring && (
               <ToolbarButton
                 label={selected.locked ? "Unlock element" : "Lock element"}
@@ -1461,9 +1508,9 @@ export default function DesignEditor({
                 </h2>
                 <PanelHeading>Finished size</PanelHeading>
                 <div className="rounded-xl border-2 border-secondary bg-surface-container-lowest p-4 text-center ambient-shadow">
-                  <p className="font-display text-2xl text-primary">A5</p>
+                  <p className="font-display text-2xl text-primary">{PAGE_SIZE_LABEL}</p>
                   <p className="font-body text-xs text-on-surface-variant">
-                    148 x 210mm portrait
+                    {PAGE_W_MM} x {PAGE_H_MM}mm portrait
                   </p>
                 </div>
               </div>
@@ -1558,11 +1605,12 @@ export default function DesignEditor({
               {!authoring && (
               <div className="rounded-xl border border-soft-sage bg-surface-container-lowest p-4 ambient-shadow">
                 <p className="font-body text-sm text-on-surface-variant">
-                  15 copies from{" "}
+                  {quote.quantity.value} copies for{" "}
                   <span className="font-semibold text-secondary">
                     {formatPence(quote.totalPence)}
                   </span>{" "}
-                  with free UK delivery.
+                  with {quote.delivery.label.toLowerCase()}
+                  {quote.delivery.pricePence === 0 ? " (free)" : ""}.
                 </p>
               </div>
               )}
@@ -2118,6 +2166,13 @@ export default function DesignEditor({
                           <span className="truncate font-body text-xs text-on-surface">
                             {layerLabel(element)}
                           </span>
+                          {authoring && element.type === "text" && element.placeholder && (
+                            <TextCursorInput
+                              size={12}
+                              aria-label="Placeholder"
+                              className="shrink-0 text-on-surface-variant"
+                            />
+                          )}
                           {element.locked && (
                             <Lock
                               size={12}

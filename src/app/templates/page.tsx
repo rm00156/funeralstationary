@@ -6,7 +6,8 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import HowItWorks from "@/components/HowItWorks";
 import TemplateBrowser from "@/components/TemplateBrowser";
-import { getCategories, getProducts, getTemplates } from "@/lib/catalogue.server";
+import { getCategories, getSellableProducts, getTemplates } from "@/lib/catalogue.server";
+import { selectionSearchParams, type Selection } from "@/lib/orderOfServicePricing";
 
 // The catalogue lives in MySQL and is editable from /admin, so this page
 // must render per-request rather than being frozen at build time.
@@ -15,22 +16,25 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Funeral Stationery Templates | The Funeral Stationery",
   description:
-    "Browse our funeral order of service templates and personalise the wording, photographs, colours and pages. Design it yourself, or send us your content and we will put every page together for you.",
+    "Browse our funeral stationery templates and personalise the wording, photographs, colours and pages. Design it yourself, or send us your content and we will put every page together for you.",
 };
 
 export default async function TemplatesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ product?: string; category?: string }>;
+  searchParams: Promise<{ product?: string; category?: string } & Partial<Selection>>;
 }) {
-  const [{ product: productParam, category: categoryParam }, products, categories, templates] =
-    await Promise.all([searchParams, getProducts(), getCategories(), getTemplates()]);
+  const [
+    { product: productParam, category: categoryParam, ...carried },
+    products,
+    categories,
+    templates,
+  ] = await Promise.all([searchParams, getSellableProducts(), getCategories(), getTemplates()]);
 
-  // The home page's category tiles and product pills deep-link in here.
-  // Unknown slugs fall back to the defaults rather than 404ing — a stale
-  // bookmark for an archived category should still show the browser.
-  const initialProductId =
-    products.find((product) => product.id === productParam)?.id ?? null;
+  // The product pages, the shop menu and their theme chips deep-link in
+  // here. Unknown slugs fall back to the defaults rather than 404ing — a
+  // stale bookmark for an archived category should still show the browser.
+  const initialProduct = products.find((product) => product.id === productParam) ?? null;
   const initialCategoryId =
     categories.find((category) => category.id === categoryParam)?.id ?? null;
 
@@ -53,7 +57,7 @@ export default async function TemplatesPage({
 
             <div className="text-center flex flex-col items-center">
               <h1 className="font-display text-4xl md:text-5xl font-semibold text-primary max-w-4xl leading-tight mb-8">
-                Funeral Order of Service Templates
+                {initialProduct ? `${initialProduct.label} Templates` : "Funeral Stationery Templates"}
               </h1>
 
               <p className="font-body text-lg md:text-xl text-on-surface-variant max-w-3xl mb-10">
@@ -85,11 +89,16 @@ export default async function TemplatesPage({
 
             <div className="mt-12 md:mt-16">
               <TemplateBrowser
-                products={products}
+                products={products.map(({ id, label }) => ({ id, label }))}
                 categories={categories}
                 templates={templates}
-                initialProductId={initialProductId}
+                initialProductId={initialProduct?.id ?? null}
                 initialCategoryId={initialCategoryId}
+                // The product page's options, forwarded untouched — /design
+                // validates them against the product's pricing.
+                carriedSelection={
+                  initialProduct ? selectionSearchParams(carried).toString() : ""
+                }
               />
             </div>
           </div>

@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 
 import { runPostPaymentSideEffects } from "@/lib/orderFulfilment.server";
 import { finaliseOrder } from "@/lib/orders.server";
-import { isStripeConfigured, retrieveCheckoutSession } from "@/lib/stripe.server";
+import {
+  isStripeConfigured,
+  resolveRequestOrigin,
+  retrieveCheckoutSession,
+} from "@/lib/stripe.server";
 
 export const runtime = "nodejs";
 // Post-payment side effects (Chromium proofs, email) run in after() and get
@@ -36,7 +40,7 @@ export async function GET(request: NextRequest) {
   });
   if (result === "not-found") redirect("/cart");
   if (result === "finalised") {
-    const origin = new URL(request.url).origin;
+    const origin = resolveRequestOrigin(request);
     after(() => runPostPaymentSideEffects(orderId, origin));
   }
   redirect(`/orders/${orderId}?placed=1`);

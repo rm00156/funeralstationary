@@ -14,6 +14,10 @@
  * silently repricing it). Snapshots (doc + quote) become authoritative only
  * at the pay click, in prepareOrderForPayment().
  *
+ * Every axis, delivery included, belongs to the line: delivery options are
+ * product-scoped and a line is its own print job, so a basket can mix
+ * products and each line is priced against its own product's catalogue.
+ *
  * Nothing in this module touches Chromium or email — those side effects live
  * in orderFulfilment.server.ts so the basket routes don't trace them in.
  */
@@ -22,7 +26,7 @@ import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
 import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders } from "@/db/schema";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
-import type { DesignDoc } from "@/lib/designEditor";
+import { PAGE_SIZE_LABEL, type DesignDoc } from "@/lib/designEditor";
 import { getDesign } from "@/lib/designs.server";
 import {
   describeIssue,
@@ -48,6 +52,8 @@ import {
   type Quote,
   type Selection,
 } from "@/lib/orderOfServicePricing";
+// getPricingData is React-cached per request, so pricingByProduct's per-line
+// loads collapse to one query set per distinct product.
 import { getPageCountOption, getPricingData } from "@/lib/pricing.server";
 import type { Owner } from "@/lib/session";
 
@@ -95,12 +101,16 @@ export interface CartItem {
   templateName: string;
   templateImage: string | null;
   pageCount: number;
-  /** pages/paper follow the live design; quantity/size/colour are the line's. */
+  /** pages/paper follow the live design; quantity/delivery are the line's. */
   selection: Selection;
   /** Live-priced from the catalogue; null while any axis is stale. */
   quote: Quote | null;
   /** Axes whose option no longer exists / is inactive. */
   stale: SelectionAxis[];
+  /** Null when the stored option was since deactivated (then also in `stale`). */
+  delivery: CartDelivery | null;
+  /** This line's product's delivery options, for the basket's picker. */
+  deliveryOptions: DeliveryOption[];
   quantityCopies: number;
   unitPricePence: number;
   lineTotalPence: number;
@@ -115,13 +125,9 @@ export interface CartDelivery {
 export interface Cart {
   id: string;
   orderNumber: string;
-  /** Slug of the product every line belongs to; null while empty. */
-  productId: string | null;
   items: CartItem[];
-  /** Null until set, or when the stored option was since deactivated. */
-  delivery: CartDelivery | null;
-  deliveryOptions: DeliveryOption[];
   details: CheckoutDetails | null;
+  /** `deliveryPence` is Σ of the lines' delivery charges. */
   totals: OrderTotals;
   /** Everything prices and nothing is missing — checkout may proceed. */
   ready: boolean;
@@ -156,6 +162,7 @@ export interface OrderDetailItem {
   quantityCopies: number;
   unitPricePence: number;
   lineTotalPence: number;
+  delivery: CartDelivery;
   proofs: OrderProofSummary[];
 }
 
@@ -184,7 +191,6 @@ export interface OrderDetail {
     postcode: string | null;
     country: string;
   };
-  delivery: CartDelivery | null;
   totals: OrderTotals;
   items: OrderDetailItem[];
   events: OrderEvent[];
@@ -205,8 +211,13 @@ export interface FrozenOrder {
   id: string;
   orderNumber: string;
   contactEmail: string;
-  items: { id: string; name: string; unitPricePence: number; copies: number }[];
-  delivery: { label: string; pricePence: number };
+  items: {
+    id: string;
+    name: string;
+    unitPricePence: number;
+    copies: number;
+    delivery: { label: string; pricePence: number };
+  }[];
   totals: OrderTotals;
 }
 
@@ -214,11 +225,11 @@ export interface FrozenOrder {
 /* Internals                                                           */
 /* ------------------------------------------------------------------ */
 
-/** Owner predicate. Falls back to the guest token until accounts exist. */
+/** Owner predicate: a signed-in customer by user_id, a guest by guest_token. */
 function ownedBy(owner: Owner) {
-  return owner.userId
-    ? eq(orders.userId, owner.userId)
-    : eq(orders.guestToken, owner.guestToken);
+  return owner.userId === null
+    ? eq(orders.guestToken, owner.guestToken)
+    : eq(orders.userId, owner.userId);
 }
 
 type OrderRow = typeof orders.$inferSelect;
@@ -287,15 +298,34 @@ function detailsFrom(order: OrderRow): CheckoutDetails | null {
   };
 }
 
-function resolveDelivery(order: OrderRow, pricing: PricingData): CartDelivery | null {
-  if (!order.deliveryOptionId) return null;
-  const option = pricing.delivery.find((candidate) => candidate.id === order.deliveryOptionId);
+/** A line's delivery option, if it is still live in its product's catalogue. */
+function resolveDelivery(item: OrderItemRow, pricing: PricingData): CartDelivery | null {
+  if (!item.deliveryOptionId) return null;
+  const option = pricing.delivery.find((candidate) => candidate.id === item.deliveryOptionId);
   return option ? { optionId: option.id, label: option.label, pricePence: option.pricePence } : null;
 }
 
-/** The delivery slug to price a line with: the order's if still live, else the default. */
-function deliverySlugFor(order: OrderRow, pricing: PricingData): string {
-  return resolveDelivery(order, pricing)?.optionId ?? defaultSelection(pricing).delivery;
+/**
+ * The delivery to start a new line on: what the customer already chose for
+ * another line of the same product (so a second booklet doesn't silently
+ * revert to standard post), else the product's default.
+ */
+function initialDeliverySlug(
+  existing: OrderItemRow[],
+  productId: string,
+  pricing: PricingData,
+): string {
+  const sibling = existing.find(
+    (item) => item.productId === productId && resolveDelivery(item, pricing),
+  );
+  return sibling?.deliveryOptionId ?? defaultSelection(pricing).delivery;
+}
+
+/** One PricingData per product present in the lines; the loader is React-cached. */
+async function pricingByProduct(items: OrderItemRow[]): Promise<Map<string, PricingData>> {
+  const slugs = [...new Set(items.map((item) => item.productId))];
+  const loaded = await Promise.all(slugs.map((slug) => getPricingData(slug)));
+  return new Map(slugs.map((slug, index) => [slug, loaded[index]]));
 }
 
 async function insertEvent(
@@ -334,23 +364,19 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     if (item.designId) liveDesigns.set(item.designId, await getDesign(owner, item.designId));
   }
 
-  const productId = rows[0]?.productId ?? null;
-  const pricing = productId ? await getPricingData(productId) : null;
-  const delivery = pricing ? resolveDelivery(order, pricing) : null;
-  const deliverySlug = pricing ? deliverySlugFor(order, pricing) : "";
+  const pricings = await pricingByProduct(rows);
 
   const items: CartItem[] = rows.map((item) => {
     const design = item.designId ? liveDesigns.get(item.designId) ?? null : null;
+    const pricing = pricings.get(item.productId)!;
     const selection: Selection = {
       quantity: item.quantityOptionId ?? "",
-      size: item.sizeOptionId ?? "",
-      colour: item.colourOptionId ?? "",
       pages: design?.pagesOptionId ?? item.pageCountOptionId ?? "",
       paper: design?.paperId ?? item.paperOptionId ?? "",
-      delivery: deliverySlug,
+      delivery: item.deliveryOptionId ?? "",
     };
-    const resolved = pricing ? resolveSelectionStrict(pricing, selection) : null;
-    const quote = resolved?.ok ? resolved.quote : null;
+    const resolved = resolveSelectionStrict(pricing, selection);
+    const quote = resolved.ok ? resolved.quote : null;
     return {
       id: item.id,
       designId: item.designId,
@@ -364,7 +390,9 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
       pageCount: design?.pageCount ?? item.docSnapshot.pages.length,
       selection,
       quote,
-      stale: resolved && !resolved.ok ? resolved.invalid : [],
+      stale: resolved.ok ? [] : resolved.invalid,
+      delivery: resolveDelivery(item, pricing),
+      deliveryOptions: pricing.delivery,
       quantityCopies: quote?.quantity.value ?? item.quantityCopies,
       unitPricePence: quote?.unitPricePence ?? item.unitPricePence,
       lineTotalPence: quote?.printCostPence ?? item.lineTotalPence,
@@ -373,20 +401,16 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
 
   const totals = computeOrderTotals(
     items.map((item) => item.lineTotalPence),
-    delivery?.pricePence ?? 0,
+    items.reduce((sum, item) => sum + (item.delivery?.pricePence ?? 0), 0),
   );
   const ready =
     items.length > 0 &&
-    delivery !== null &&
     items.every((item) => !item.designMissing && item.stale.length === 0);
 
   return {
     id: order.id,
     orderNumber: order.orderNumber,
-    productId,
     items,
-    delivery,
-    deliveryOptions: pricing?.delivery ?? [],
     details: detailsFrom(order),
     totals,
     ready,
@@ -404,7 +428,7 @@ export async function getCartCount(owner: Owner): Promise<number> {
   return rows.length;
 }
 
-type LineChoice = Partial<Pick<Selection, "quantity" | "size" | "colour">>;
+type LineChoice = Partial<Pick<Selection, "quantity" | "delivery">>;
 
 interface AddCartItemOptions extends LineChoice {
   /**
@@ -430,8 +454,8 @@ function assertLineChoiceValid(
 
 /**
  * Add a design to the basket. Idempotent per design — adding twice returns
- * the existing line. The basket is single-product (delivery options are
- * product-scoped), so a design from a different product is refused.
+ * the existing line. Lines from different products sit side by side, each
+ * with its own delivery.
  */
 export async function addCartItem(
   owner: Owner,
@@ -444,13 +468,6 @@ export async function addCartItem(
   const order = await getOrCreateDraftOrder(owner);
   const existing = await listDraftItems(order.id);
 
-  const otherProduct = existing.find((item) => item.productId !== design.productId);
-  if (otherProduct) {
-    throw new CartError(
-      409,
-      `Your basket already contains ${otherProduct.productId.replace(/-/g, " ")} items — order those first`,
-    );
-  }
   if (existing.some((item) => item.designId === design.id)) {
     const cart = await getCart(owner);
     if (!cart) throw new Error("Basket vanished");
@@ -483,24 +500,11 @@ export async function addCartItem(
   const base = defaultSelection(pricing);
   const selection: Selection = {
     quantity: choice.quantity ?? base.quantity,
-    size: choice.size ?? base.size,
-    colour: choice.colour ?? base.colour,
     pages: design.pagesOptionId,
     paper: design.paperId,
-    delivery: deliverySlugFor(order, pricing),
+    delivery: choice.delivery ?? initialDeliverySlug(existing, design.productId, pricing),
   };
   const quote = assertLineChoiceValid(pricing, selection);
-
-  if (!order.deliveryOptionId) {
-    await db
-      .update(orders)
-      .set({
-        deliveryOptionId: quote.delivery.id,
-        deliveryLabel: quote.delivery.label,
-        deliveryPricePence: quote.delivery.pricePence,
-      })
-      .where(eq(orders.id, order.id));
-  }
 
   await db.insert(orderItems).values({
     id: crypto.randomUUID(),
@@ -510,11 +514,11 @@ export async function addCartItem(
     productId: design.productId,
     templateId: design.templateId,
     quantityOptionId: selection.quantity,
-    sizeOptionId: selection.size,
-    colourOptionId: selection.colour,
     pageCountOptionId: selection.pages,
     paperOptionId: selection.paper,
     deliveryOptionId: selection.delivery,
+    deliveryLabel: quote.delivery.label,
+    deliveryPricePence: quote.delivery.pricePence,
     quoteSnapshot: quote,
     quantityCopies: quote.quantity.value,
     unitPricePence: quote.unitPricePence,
@@ -543,13 +547,13 @@ async function getOwnedDraftItem(owner: Owner, itemId: string) {
   return { order, item };
 }
 
-/** Change a line's quantity/size/colour. Reprices from the live catalogue. */
+/** Change a line's quantity/delivery. Reprices from the live catalogue. */
 export async function updateCartItem(
   owner: Owner,
   itemId: string,
   choice: LineChoice,
 ): Promise<Cart> {
-  const { order, item } = await getOwnedDraftItem(owner, itemId);
+  const { item } = await getOwnedDraftItem(owner, itemId);
   const design = item.designId ? await getDesign(owner, item.designId) : null;
   if (!design) {
     throw new CartError(409, "That design has been removed — take it out of your basket");
@@ -558,11 +562,9 @@ export async function updateCartItem(
   const pricing = await getPricingData(design.productId);
   const selection: Selection = {
     quantity: choice.quantity ?? item.quantityOptionId ?? "",
-    size: choice.size ?? item.sizeOptionId ?? "",
-    colour: choice.colour ?? item.colourOptionId ?? "",
     pages: design.pagesOptionId,
     paper: design.paperId,
-    delivery: deliverySlugFor(order, pricing),
+    delivery: choice.delivery ?? item.deliveryOptionId ?? "",
   };
   const quote = assertLineChoiceValid(pricing, selection);
 
@@ -570,11 +572,11 @@ export async function updateCartItem(
     .update(orderItems)
     .set({
       quantityOptionId: selection.quantity,
-      sizeOptionId: selection.size,
-      colourOptionId: selection.colour,
       pageCountOptionId: selection.pages,
       paperOptionId: selection.paper,
       deliveryOptionId: selection.delivery,
+      deliveryLabel: quote.delivery.label,
+      deliveryPricePence: quote.delivery.pricePence,
       quoteSnapshot: quote,
       quantityCopies: quote.quantity.value,
       unitPricePence: quote.unitPricePence,
@@ -591,30 +593,6 @@ export async function updateCartItem(
 export async function removeCartItem(owner: Owner, itemId: string): Promise<Cart> {
   const { item } = await getOwnedDraftItem(owner, itemId);
   await db.delete(orderItems).where(eq(orderItems.id, item.id));
-  const cart = await getCart(owner);
-  if (!cart) throw new Error("Basket vanished");
-  return cart;
-}
-
-export async function setCartDelivery(owner: Owner, deliverySlug: string): Promise<Cart> {
-  const order = await findDraftOrder(owner);
-  if (!order) throw new CartError(404, "Your basket is empty");
-  const [first] = await listDraftItems(order.id);
-  if (!first) throw new CartError(400, "Your basket is empty");
-
-  const pricing = await getPricingData(first.productId);
-  const option = pricing.delivery.find((candidate) => candidate.id === deliverySlug);
-  if (!option) throw new CartError(400, `Unknown delivery option "${deliverySlug}"`);
-
-  await db
-    .update(orders)
-    .set({
-      deliveryOptionId: option.id,
-      deliveryLabel: option.label,
-      deliveryPricePence: option.pricePence,
-    })
-    .where(eq(orders.id, order.id));
-
   const cart = await getCart(owner);
   if (!cart) throw new Error("Basket vanished");
   return cart;
@@ -665,16 +643,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
   const details = detailsFrom(order);
   if (!details) return { ok: false, status: 400, error: "Please enter your delivery details" };
 
-  const productId = items[0].productId;
-  const pricing = await getPricingData(productId);
-  const delivery = resolveDelivery(order, pricing);
-  if (!delivery) {
-    return {
-      ok: false,
-      status: 409,
-      error: "That delivery option is no longer available — please choose another",
-    };
-  }
+  const pricings = await pricingByProduct(items);
 
   const frozenLines: {
     item: OrderItemRow;
@@ -708,13 +677,14 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
     }
     const selection: Selection = {
       quantity: item.quantityOptionId ?? "",
-      size: item.sizeOptionId ?? "",
-      colour: item.colourOptionId ?? "",
       pages: design.pagesOptionId,
       paper: design.paperId,
-      delivery: delivery.optionId,
+      delivery: item.deliveryOptionId ?? "",
     };
-    const resolved = resolveSelectionStrict(pricing, selection);
+    // The line's product, not the design's: the two only differ if the
+    // design was re-pointed at another product after being added, and the
+    // line's slugs were priced against the product it was added under.
+    const resolved = resolveSelectionStrict(pricings.get(item.productId)!, selection);
     if (!resolved.ok) {
       return {
         ok: false,
@@ -734,7 +704,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
 
   const totals = computeOrderTotals(
     frozenLines.map((line) => line.quote.printCostPence),
-    delivery.pricePence,
+    frozenLines.reduce((sum, line) => sum + line.quote.delivery.pricePence, 0),
     DEFAULT_VAT_RATE,
   );
 
@@ -744,11 +714,11 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
         .update(orderItems)
         .set({
           quantityOptionId: line.selection.quantity,
-          sizeOptionId: line.selection.size,
-          colourOptionId: line.selection.colour,
           pageCountOptionId: line.selection.pages,
           paperOptionId: line.selection.paper,
           deliveryOptionId: line.selection.delivery,
+          deliveryLabel: line.quote.delivery.label,
+          deliveryPricePence: line.quote.delivery.pricePence,
           quoteSnapshot: line.quote,
           quantityCopies: line.quote.quantity.value,
           unitPricePence: line.quote.unitPricePence,
@@ -760,9 +730,6 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
     await tx
       .update(orders)
       .set({
-        deliveryOptionId: delivery.optionId,
-        deliveryLabel: delivery.label,
-        deliveryPricePence: delivery.pricePence,
         subtotalPence: totals.subtotalPence,
         deliveryPence: totals.deliveryPence,
         vatPence: totals.vatPence,
@@ -783,8 +750,11 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
         name: line.name,
         unitPricePence: line.quote.unitPricePence,
         copies: line.quote.quantity.value,
+        delivery: {
+          label: line.quote.delivery.label,
+          pricePence: line.quote.delivery.pricePence,
+        },
       })),
-      delivery: { label: delivery.label, pricePence: delivery.pricePence },
       totals,
     },
   };
@@ -970,13 +940,6 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       postcode: order.postcode,
       country: order.country,
     },
-    delivery: order.deliveryOptionId
-      ? {
-          optionId: order.deliveryOptionId,
-          label: order.deliveryLabel ?? order.deliveryOptionId,
-          pricePence: order.deliveryPricePence ?? 0,
-        }
-      : null,
     totals: {
       subtotalPence: order.subtotalPence,
       deliveryPence: order.deliveryPence,
@@ -995,6 +958,13 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       quantityCopies: item.quantityCopies,
       unitPricePence: item.unitPricePence,
       lineTotalPence: item.lineTotalPence,
+      // The snapshot columns are authoritative; the quote snapshot is only a
+      // fallback for a line frozen before they existed.
+      delivery: {
+        optionId: item.deliveryOptionId ?? item.quoteSnapshot.delivery.id,
+        label: item.deliveryLabel ?? item.quoteSnapshot.delivery.label,
+        pricePence: item.deliveryPricePence ?? item.quoteSnapshot.delivery.pricePence,
+      },
       proofs: proofsByItem.get(item.id) ?? [],
     })),
     events: eventRows.map((event) => ({
@@ -1031,15 +1001,15 @@ export async function getOrderEmailSummary(orderId: string): Promise<OrderEmailS
       name: item.designName,
       spec: [
         `${item.quantityCopies} copies`,
-        item.quote.size.label,
-        item.quote.colour.label,
+        PAGE_SIZE_LABEL,
         item.quote.pages.label,
         item.quote.paper.label,
       ].join(" · "),
       copies: item.quantityCopies,
       lineTotalPence: item.lineTotalPence,
+      deliveryLabel: item.delivery.label,
+      deliveryPence: item.delivery.pricePence,
     })),
-    deliveryLabel: order.delivery?.label ?? null,
     deliveryPence: order.totals.deliveryPence,
     subtotalPence: order.totals.subtotalPence,
     vatPence: order.totals.vatPence,

@@ -69,6 +69,18 @@ describe("buildTemplateLayout", () => {
     }
   });
 
+  it("flags the name and dates as placeholders but never the farewell", () => {
+    for (const archetype of ARCHETYPE_IDS) {
+      const pages = buildTemplateLayout(spec({ archetype }));
+      const texts = pages.flatMap((page) => page.elements).filter((el) => el.type === "text");
+      const flagged = (value: string) =>
+        texts.find((el) => el.type === "text" && el.text === value)?.placeholder;
+      expect(flagged("Robert Bayne"), archetype).toBe(true);
+      expect(flagged("YOUR TEXT HERE"), archetype).toBe(true);
+      expect(flagged("Forever in our hearts"), archetype).toBeUndefined();
+    }
+  });
+
   it("produces output the admin layout validator accepts", () => {
     for (const archetype of ARCHETYPE_IDS) {
       const result = parseLayoutPages(buildTemplateLayout(spec({ archetype })));

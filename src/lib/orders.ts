@@ -83,7 +83,11 @@ export interface OrderTotals {
   vatRate: number;
 }
 
-/** subtotal = Σ line totals; total = subtotal + delivery; VAT backed out of total. */
+/**
+ * subtotal = Σ line totals; total = subtotal + delivery; VAT backed out of
+ * total. Delivery is chosen per line (each product ships on its own options),
+ * so `deliveryPence` is the sum across lines.
+ */
 export function computeOrderTotals(
   lineTotalsPence: number[],
   deliveryPence: number,
@@ -108,8 +112,6 @@ export type SelectionAxis = keyof Selection;
 
 export const SELECTION_AXES: readonly SelectionAxis[] = [
   "quantity",
-  "size",
-  "colour",
   "pages",
   "paper",
   "delivery",
@@ -163,26 +165,32 @@ export interface StripeLineItem {
 
 /**
  * One Stripe line per order line (unit price x copies, so Stripe's sum is
- * exactly our subtotal) plus a delivery line when it costs anything.
- * SDK-agnostic so it can be tested; stripe.server.ts maps it to price_data.
+ * exactly our subtotal), each followed by its own delivery line when that
+ * costs anything — delivery is per line, so the customer sees on the Stripe
+ * page which item each charge belongs to. SDK-agnostic so it can be tested;
+ * stripe.server.ts maps it to price_data.
  */
 export function buildStripeLineItems(
-  items: ReadonlyArray<{ name: string; unitPricePence: number; copies: number }>,
-  delivery: { label: string; pricePence: number } | null,
+  items: ReadonlyArray<{
+    name: string;
+    unitPricePence: number;
+    copies: number;
+    delivery: { label: string; pricePence: number };
+  }>,
 ): StripeLineItem[] {
-  const lines: StripeLineItem[] = items.map((item) => ({
-    name: item.name,
-    unitAmountPence: item.unitPricePence,
-    quantity: item.copies,
-  }));
-  if (delivery && delivery.pricePence > 0) {
-    lines.push({
-      name: `Delivery — ${delivery.label}`,
-      unitAmountPence: delivery.pricePence,
-      quantity: 1,
-    });
-  }
-  return lines;
+  return items.flatMap((item) => {
+    const lines: StripeLineItem[] = [
+      { name: item.name, unitAmountPence: item.unitPricePence, quantity: item.copies },
+    ];
+    if (item.delivery.pricePence > 0) {
+      lines.push({
+        name: `Delivery — ${item.delivery.label} (${item.name})`,
+        unitAmountPence: item.delivery.pricePence,
+        quantity: 1,
+      });
+    }
+    return lines;
+  });
 }
 
 export function sumLineItems(lines: ReadonlyArray<StripeLineItem>): number {

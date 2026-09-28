@@ -11,25 +11,21 @@ import "dotenv/config";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  colourOptions,
   deliveryOptions,
   pageCountOptions,
   paperOptions,
   products,
   quantityOptions,
-  sizeOptions,
   templateCategories,
   templateCategoryLinks,
   templates,
 } from "@/db/schema";
 import {
-  buildColourOptionsSeed,
   buildDeliveryOptionsSeed,
   buildPageCountOptionsSeed,
   buildPaperOptionsSeed,
   buildProductsSeed,
   buildQuantityOptionsSeed,
-  buildSizeOptionsSeed,
   buildTemplateCategoriesSeed,
   buildTemplateCategoryLinksSeed,
   buildTemplatesSeed,
@@ -60,12 +56,6 @@ async function main() {
     "template_category_links",
     (await db.select().from(templateCategoryLinks)).length,
     buildTemplateCategoryLinksSeed().length,
-  );
-  expect("size_options", (await db.select().from(sizeOptions)).length, buildSizeOptionsSeed().length);
-  expect(
-    "colour_options",
-    (await db.select().from(colourOptions)).length,
-    buildColourOptionsSeed().length,
   );
   expect("paper_options", (await db.select().from(paperOptions)).length, buildPaperOptionsSeed().length);
   expect(

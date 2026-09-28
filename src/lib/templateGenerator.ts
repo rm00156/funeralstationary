@@ -63,9 +63,10 @@ const serviceDetails = (
     h: 0,
   });
 
-const text = (props: Omit<TextElement, "id" | "type">): CanvasElement => ({
+const text = (props: Omit<TextElement, "id" | "type" | "placeholder">): CanvasElement => ({
   id: uid("text"),
   type: "text",
+  ...(PLACEHOLDER_TEXTS.has(props.text) ? { placeholder: true } : {}),
   ...props,
 });
 
@@ -162,6 +163,16 @@ const FAREWELL = "Forever in our hearts";
 const PLACEHOLDER_SERVICE = "Reading Crematorium\nTuesday 16th June 2026, 11am";
 const THANKS =
   "The family would like to thank you\nfor your kindness, support and\npresence here today.";
+/**
+ * The wording a customer must replace. FAREWELL and THANKS are deliberately
+ * absent: plenty of families keep them, so they shouldn't nag at checkout.
+ */
+const PLACEHOLDER_TEXTS: ReadonlySet<string> = new Set([
+  PLACEHOLDER_NAME,
+  PLACEHOLDER_DATES,
+  PLACEHOLDER_INTERIOR,
+  PLACEHOLDER_SERVICE,
+]);
 
 /**
  * Cover compositions. Each is a distinct arrangement — a different frame

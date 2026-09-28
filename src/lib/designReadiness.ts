@@ -31,9 +31,13 @@ export interface ReadinessIssue {
   /**
    * How many pages carry this same issue. Interior pages are copies of one
    * authored middle page, so an untouched booklet would otherwise report the
-   * same line a dozen times — the dialog shows one row and a count instead.
+   * same line a dozen times — the dialog shows one row instead.
    */
   occurrences: number;
+  /** Every 0-based page the issue appears on, ascending. */
+  pages: number[];
+  /** Pages in the document, so a location can name the back page. */
+  pageCount: number;
   /** The still-default wording, for "unchanged-text". */
   text?: string;
 }
@@ -71,6 +75,11 @@ const isImage = (element: { type: string }): element is ImageElement => element.
  * design page is compared only against the template page it was instantiated
  * from, so a customer who moves the cover's wording onto an interior page has
  * still plainly written something.
+ *
+ * Only text flagged `placeholder` counts — a heading like "Order of Service"
+ * is meant to stay, and warning about it buries the one warning that matters
+ * (a name nobody changed). A layout with no flags at all predates the flag, so
+ * it falls back to every text run until an admin marks it up.
  */
 function defaultTextsByRole(pages: DesignPage[]): Record<PageRole, Set<string>> {
   const byRole: Record<PageRole, Set<string>> = {
@@ -78,21 +87,23 @@ function defaultTextsByRole(pages: DesignPage[]): Record<PageRole, Set<string>> 
     middle: new Set(),
     back: new Set(),
   };
-  pages.forEach((page, index) => {
-    const role = roleOf(index, pages.length);
-    for (const element of page.elements) {
-      if (!isText(element)) continue;
-      const value = normaliseText(element.text);
-      if (value) byRole[role].add(value);
-    }
-  });
+  const texts = pages.flatMap((page, index) =>
+    page.elements.filter(isText).map((element) => ({ element, role: roleOf(index, pages.length) })),
+  );
+  const flagged = texts.some(({ element }) => element.placeholder);
+  for (const { element, role } of texts) {
+    if (flagged && !element.placeholder) continue;
+    const value = normaliseText(element.text);
+    if (value) byRole[role].add(value);
+  }
   return byRole;
 }
 
-/** Collapse per-page hits into one issue carrying the first page and a count. */
+/** Collapse per-page hits into one issue per distinct problem, listing its pages. */
 function collapse(
   hits: { page: number; text?: string }[],
   kind: ReadinessIssueKind,
+  pageCount: number,
 ): ReadinessIssue[] {
   const byKey = new Map<string, ReadinessIssue>();
   for (const hit of hits) {
@@ -100,9 +111,17 @@ function collapse(
     const existing = byKey.get(key);
     if (existing) {
       existing.occurrences += 1;
+      if (!existing.pages.includes(hit.page)) existing.pages.push(hit.page);
       continue;
     }
-    byKey.set(key, { kind, page: hit.page, occurrences: 1, text: hit.text });
+    byKey.set(key, {
+      kind,
+      page: hit.page,
+      occurrences: 1,
+      pages: [hit.page],
+      pageCount,
+      text: hit.text,
+    });
   }
   return [...byKey.values()];
 }
@@ -143,8 +162,8 @@ export function checkDesignReadiness(
   });
 
   return {
-    blocking: collapse(emptyPhotos, "empty-photo"),
-    warnings: collapse(unchangedText, "unchanged-text"),
+    blocking: collapse(emptyPhotos, "empty-photo", doc.pages.length),
+    warnings: collapse(unchangedText, "unchanged-text", doc.pages.length),
   };
 }
 
@@ -158,10 +177,36 @@ export function needsDefaultsConfirmation(readiness: DesignReadiness): boolean {
   return readiness.warnings.length > 0;
 }
 
-/** Where an issue is, in the customer's terms — "the cover", "4 pages". */
+function joinList(parts: string[]): string {
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * Where an issue is, in the customer's terms: "the cover", "the cover and the
+ * back page", "pages 2 and 3", "every inside page". Always names the pages
+ * rather than a bare count, so the customer knows where to look.
+ */
 export function issueLocation(issue: ReadinessIssue): string {
-  if (issue.occurrences > 1) return `${issue.occurrences} pages`;
-  return issue.page === 0 ? "the cover" : `page ${issue.page + 1}`;
+  const pages = [...issue.pages].sort((a, b) => a - b);
+  const last = issue.pageCount - 1;
+  const inside = pages.filter((page) => page !== 0 && page !== last);
+  const parts: string[] = [];
+  if (pages.includes(0)) parts.push("the cover");
+  if (inside.length > 0) {
+    const insideCount = issue.pageCount - 2;
+    if (inside.length === insideCount && insideCount > 2) parts.push("every inside page");
+    else if (inside.length > 3) parts.push(`${inside.length} inside pages`);
+    else if (inside.length === 1) parts.push(`page ${inside[0] + 1}`);
+    else parts.push(`pages ${joinList(inside.map((page) => String(page + 1)))}`);
+  }
+  if (last > 0 && pages.includes(last)) parts.push("the back page");
+  return joinList(parts);
+}
+
+/** Text in curly quotes, unless it already carries its own. */
+export function quoted(text: string): string {
+  return /^["'“‘][\s\S]*["'”’]$/.test(text) ? text : `“${text}”`;
 }
 
 /** Human-readable one-liner for an issue — shared by the dialog and the API error. */
@@ -172,5 +217,5 @@ export function describeIssue(issue: ReadinessIssue): string {
       ? `${issue.occurrences} photo windows are still empty`
       : `A photo window on ${where} is still empty`;
   }
-  return `“${issue.text ?? ""}” on ${where} is still the template's wording`;
+  return `${quoted(issue.text ?? "")} on ${where} is still the template's wording`;
 }

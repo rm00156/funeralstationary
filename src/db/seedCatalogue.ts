@@ -8,7 +8,7 @@
  * original placeholder price list) and converted to pence by seedData.ts.
  *
  * PLACEHOLDER RATES — calibrated so the known real-world quote (15 copies /
- * A5 / full-colour both sides / 4 page / Silk = £33.00) comes out exact,
+ * A5 / 4 page / Silk = £33.00) comes out exact,
  * then extrapolated linearly.
  *
  * PLACEHOLDER ARTWORK — every template points at one of the Stitch export
@@ -201,37 +201,7 @@ export const QUANTITY_OPTIONS: (SeedOption & { value: number })[] = [
   { id: "300", label: "300", value: 300, multiplier: 0.74 },
 ];
 
-export const SIZE_OPTIONS: SeedOption[] = [
-  {
-    id: "a5",
-    label: "A5",
-    multiplier: 1,
-    note: "148 x 210mm portrait — our most popular booklet",
-  },
-];
-
-export const COLOUR_OPTIONS: SeedOption[] = [
-  {
-    id: "full-colour-both",
-    label: "Full-colour both sides",
-    multiplier: 1,
-    note: "Colour throughout, inside and out",
-  },
-  {
-    id: "full-colour-cover",
-    label: "Full-colour cover, mono inside",
-    multiplier: 0.85,
-    note: "Colour cover with black & white inner pages",
-  },
-  {
-    id: "mono",
-    label: "Black & white",
-    multiplier: 0.7,
-    note: "Traditional monochrome throughout",
-  },
-];
-
-/** Base per-copy `rate` in pounds (A5, silk, full-colour both sides). */
+/** Base per-copy `rate` in pounds (A5, silk). */
 export const PAGE_OPTIONS = [
   { id: "4", label: "4 page", pages: 4, rate: 2.2, note: "A single folded sheet" },
   { id: "8", label: "8 page", pages: 8, rate: 3.0 },

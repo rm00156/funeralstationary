@@ -4,8 +4,8 @@
  * STRIPE_SECRET_KEY unset the checkout route answers 503, like /api/assets
  * does without S3.
  *
- * Amounts: one Stripe line per order line (unit price x copies) plus a
- * delivery line, built by the pure buildStripeLineItems so the sum is
+ * Amounts: one Stripe line per order line (unit price x copies) plus that
+ * line's delivery, built by the pure buildStripeLineItems so the sum is
  * exactly orders.total_pence — asserted here before a session is created.
  */
 import Stripe from "stripe";
@@ -15,6 +15,23 @@ import type { FrozenOrder } from "@/lib/orders.server";
 
 export function isStripeConfigured(): boolean {
   return !!process.env.STRIPE_SECRET_KEY;
+}
+
+/**
+ * The origin Stripe should redirect back to. Prefers `x-forwarded-host` /
+ * `x-forwarded-proto` — the headers a reverse proxy (ngrok, Vercel's edge)
+ * sets to the request's *original* host/scheme — over `request.url`, which
+ * only ever reflects what this server process itself is bound to
+ * (`localhost:3000` in dev, even when reached through a tunnel). This is the
+ * same header pair Next.js itself trusts to fill in `x-forwarded-host` when
+ * absent (see `base-server.js`), so it self-adjusts to whatever ngrok URL is
+ * fronting the dev server that request — no env var to keep in sync.
+ */
+export function resolveRequestOrigin(request: Request): string {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  if (!forwardedHost) return new URL(request.url).origin;
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return `${forwardedProto ?? "https"}://${forwardedHost}`;
 }
 
 let client: Stripe | undefined;
@@ -36,7 +53,7 @@ export async function createCheckoutSessionForOrder(
   order: FrozenOrder,
   origin: string,
 ): Promise<{ id: string; url: string }> {
-  const lines = buildStripeLineItems(order.items, order.delivery);
+  const lines = buildStripeLineItems(order.items);
   const charged = sumLineItems(lines);
   if (charged !== order.totals.totalPence) {
     throw new Error(

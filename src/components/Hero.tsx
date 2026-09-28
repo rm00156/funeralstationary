@@ -35,7 +35,7 @@ export default function Hero() {
 
         <div className="flex flex-col sm:flex-row gap-6 w-full sm:w-auto mb-6">
           <a
-            href="#templates"
+            href="#products"
             className="px-10 py-4 bg-primary-container text-white rounded-lg hover:bg-primary hover:scale-105 shadow-lg shadow-primary-container/30 transition-all duration-300 text-lg font-medium tracking-wide text-center"
           >
             Start your design

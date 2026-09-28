@@ -52,12 +52,17 @@ export function filterTemplates(
 }
 
 /**
- * A category as shown on the home page's product range grid: the real
- * category row plus a preview image borrowed from its first published
- * template, so the tiles can never drift from the actual catalogue.
+ * A product the shop can actually sell — it has published templates and a
+ * complete set of pricing options — as shown on the home page's product
+ * cards, the header's shop menu and the product page. Products that aren't
+ * ready are simply absent, so a product configured half-way in /admin never
+ * appears as an empty shelf.
  */
-export interface CategoryShowcase extends TemplateCategory {
-  /** Preview image of the first published template in this category. */
+export interface ProductShowcase extends Product {
+  /** Preview image of the product's first published template. */
   image: string;
   templateCount: number;
+  /** The cheapest configuration — see cheapestQuote(). */
+  fromPence: number;
+  fromCopies: number;
 }
