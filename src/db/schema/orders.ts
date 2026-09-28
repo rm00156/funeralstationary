@@ -66,11 +66,13 @@ export const orders = mysqlTable(
     city: varchar("city", { length: 120 }),
     postcode: varchar("postcode", { length: 20 }),
     country: char("country", { length: 2 }).notNull().default("GB"),
-    /** Snapshot of the chosen delivery option, not a live FK — see file note. */
-    deliveryOptionId: varchar("delivery_option_id", { length: 64 }),
-    deliveryLabel: varchar("delivery_label", { length: 200 }),
-    deliveryPricePence: int("delivery_price_pence"),
     subtotalPence: int("subtotal_pence").notNull().default(0),
+    /**
+     * Σ of the lines' delivery charges. Delivery is chosen per line (see
+     * order_items below), which is what lets one basket hold several
+     * products: delivery options are product-scoped, so an order-level choice
+     * could only ever describe one product.
+     */
     deliveryPence: int("delivery_pence").notNull().default(0),
     /** The VAT contained within subtotal+delivery — prices are VAT-inclusive. */
     vatPence: int("vat_pence").notNull().default(0),
@@ -112,17 +114,23 @@ export const orderItems = mysqlTable(
     productId: varchar("product_id", { length: 64 }).notNull(),
     templateId: varchar("template_id", { length: 64 }).notNull(),
     quantityOptionId: varchar("quantity_option_id", { length: 64 }),
-    sizeOptionId: varchar("size_option_id", { length: 64 }),
-    colourOptionId: varchar("colour_option_id", { length: 64 }),
     pageCountOptionId: varchar("page_count_option_id", { length: 64 }),
     paperOptionId: varchar("paper_option_id", { length: 64 }),
+    /**
+     * Delivery is a per-line choice: each product ships on its own delivery
+     * options, and a line is priced and dispatched as its own print job.
+     * Label and price are snapshotted beside the slug like the order's totals
+     * are — `orders.delivery_pence` is their sum.
+     */
     deliveryOptionId: varchar("delivery_option_id", { length: 64 }),
+    deliveryLabel: varchar("delivery_label", { length: 200 }),
+    deliveryPricePence: int("delivery_price_pence"),
     /**
      * The fully resolved Quote (labels, multipliers, rates) as the customer
-     * saw it. Its `delivery` is the order-level option and its `totalPence`
-     * therefore includes delivery — `lineTotalPence` below (print cost only)
-     * is the authoritative per-line figure. While the order is still a draft
-     * this is a placeholder; it is rewritten at the pay click.
+     * saw it. Its `totalPence` includes this line's delivery —
+     * `lineTotalPence` below (print cost only) and `deliveryPricePence`
+     * above are the authoritative per-line figures. While the order is still
+     * a draft this is a placeholder; it is rewritten at the pay click.
      */
     quoteSnapshot: json("quote_snapshot").$type<Quote>().notNull(),
     quantityCopies: int("quantity_copies").notNull(),

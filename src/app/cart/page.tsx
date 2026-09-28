@@ -20,7 +20,14 @@ export const metadata: Metadata = {
 export default async function CartPage() {
   const owner = await readOwner();
   const cart = owner ? await getCart(owner) : null;
-  const pricing = cart?.productId ? await getPricingData(cart.productId) : null;
+  // Each line's option lists come from its own product — a basket can hold
+  // several. getPricingData is request-cached, so repeats are free.
+  const productIds = [...new Set(cart?.items.map((item) => item.productId) ?? [])];
+  const pricingByProduct = Object.fromEntries(
+    await Promise.all(
+      productIds.map(async (productId) => [productId, await getPricingData(productId)] as const),
+    ),
+  );
 
   return (
     <>
@@ -47,7 +54,7 @@ export default async function CartPage() {
               delivered. The price updates as you go.
             </p>
 
-            <CartView initialCart={cart} pricing={pricing} />
+            <CartView initialCart={cart} pricingByProduct={pricingByProduct} />
           </div>
         </section>
       </main>

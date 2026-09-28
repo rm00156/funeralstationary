@@ -20,9 +20,11 @@ import {
   templates,
 } from "@/db/schema";
 import type { DesignPage } from "@/lib/designEditor";
+import { cheapestQuote } from "@/lib/orderOfServicePricing";
+import { getPricingData } from "@/lib/pricing.server";
 import type {
-  CategoryShowcase,
   Product,
+  ProductShowcase,
   Template,
   TemplateCategory,
 } from "@/lib/templates";
@@ -46,57 +48,64 @@ export const getCategories = cache(async (): Promise<TemplateCategory[]> => {
 });
 
 /**
- * Active categories that actually have published templates, each carrying the
- * preview image of its first template — what the home page's product range
- * grid renders, so those tiles are the real catalogue rather than a parallel
- * hardcoded list. Categories with no published template are omitted: a tile
- * that leads to an empty results page is worse than no tile.
+ * The products the shop can sell right now: active, with at least one
+ * published template and options on every pricing axis. This is what the
+ * home page's product cards, the header's shop menu, the template browser's
+ * product picker and the product page are built from, so a product that is
+ * still being set up in /admin (no templates yet, or a pricing table left
+ * empty) is simply absent rather than an empty shelf, and appears by itself
+ * the moment it is complete. Each carries its first published template's
+ * preview as its picture and its cheapest configuration as the "from" price.
  */
-export const getCategoryShowcase = cache(
-  async (): Promise<CategoryShowcase[]> => {
-    const rows = await db
-      .select({
-        slug: templateCategories.slug,
-        label: templateCategories.label,
-        image: templates.previewImageUrl,
-      })
-      .from(templateCategories)
-      .innerJoin(
-        templateCategoryLinks,
-        eq(templateCategoryLinks.categoryId, templateCategories.id),
-      )
-      .innerJoin(templates, eq(templateCategoryLinks.templateId, templates.id))
-      .where(
-        and(
-          eq(templateCategories.isActive, true),
-          eq(templates.status, "published"),
-        ),
-      )
-      .orderBy(
-        asc(templateCategories.sortOrder),
-        asc(templateCategories.id),
-        asc(templates.sortOrder),
-        asc(templates.id),
-      );
+export const getSellableProducts = cache(async (): Promise<ProductShowcase[]> => {
+  const rows = await db
+    .select({
+      slug: products.slug,
+      label: products.label,
+      image: templates.previewImageUrl,
+    })
+    .from(products)
+    .innerJoin(templates, eq(templates.productId, products.id))
+    .where(and(eq(products.isActive, true), eq(templates.status, "published")))
+    .orderBy(
+      asc(products.sortOrder),
+      asc(products.id),
+      asc(templates.sortOrder),
+      asc(templates.id),
+    );
 
-    // Rows arrive category-ordered then template-ordered, so the first row of
-    // each group is both the tile's image and the start of its count.
-    const byCategory = new Map<string, CategoryShowcase>();
-    for (const row of rows) {
-      const existing = byCategory.get(row.slug);
-      if (existing) {
-        existing.templateCount += 1;
-        continue;
-      }
-      byCategory.set(row.slug, {
-        id: row.slug,
-        label: row.label,
-        image: row.image,
-        templateCount: 1,
-      });
+  // Rows arrive product-ordered then template-ordered, so the first row of
+  // each group is both the card's image and the start of its count.
+  const byProduct = new Map<string, { label: string; image: string; templateCount: number }>();
+  for (const row of rows) {
+    const existing = byProduct.get(row.slug);
+    if (existing) {
+      existing.templateCount += 1;
+    } else {
+      byProduct.set(row.slug, { label: row.label, image: row.image, templateCount: 1 });
     }
-    return [...byCategory.values()];
-  },
+  }
+
+  const sellable: ProductShowcase[] = [];
+  for (const [slug, entry] of byProduct) {
+    // cheapestQuote is null when any axis has no active option — the product
+    // can't be priced, so it can't be sold.
+    const quote = cheapestQuote(await getPricingData(slug));
+    if (!quote) continue;
+    sellable.push({
+      id: slug,
+      ...entry,
+      fromPence: quote.totalPence,
+      fromCopies: quote.quantity.value,
+    });
+  }
+  return sellable;
+});
+
+/** One sellable product by slug, or null — the product page's loader. */
+export const getSellableProduct = cache(
+  async (slug: string): Promise<ProductShowcase | null> =>
+    (await getSellableProducts()).find((product) => product.id === slug) ?? null,
 );
 
 /**

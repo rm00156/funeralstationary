@@ -38,6 +38,23 @@ jobs:
 
       - run: npm run lint
 
+      # Production applies the committed drizzle/ migrations on deploy
+      # (scripts/migrate-on-deploy.ts) — there's no live-DB diffing. That only
+      # works if every schema change arrives with its migration already
+      # generated: this re-runs `generate` (a pure file diff; DATABASE_URL is
+      # only there because drizzle.config.ts requires one) and fails if it
+      # would produce anything not already committed.
+      - name: Check schema migrations are up to date
+        env:
+          DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+        run: |
+          npx drizzle-kit generate
+          if [ -n "$(git status --porcelain drizzle/)" ]; then
+            echo "::error::src/db/schema changed without a matching migration. Run 'npm run db:generate' locally and commit the result."
+            git status --porcelain drizzle/
+            exit 1
+          fi
+
       - run: npm test
 
       # Deliberately run WITHOUT DATABASE_URL. A build imports every Route

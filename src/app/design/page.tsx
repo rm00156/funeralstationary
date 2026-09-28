@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import DesignEditor from "@/components/DesignEditor";
 import { getProducts, getTemplateBySlug, getTemplates } from "@/lib/catalogue.server";
 import { getDesign } from "@/lib/designs.server";
+import { parseCarriedSelection, type Selection } from "@/lib/orderOfServicePricing";
 import { getPricingData } from "@/lib/pricing.server";
 import { readOwner } from "@/lib/session";
 
@@ -19,12 +20,15 @@ export const metadata: Metadata = {
 export default async function DesignPage({
   searchParams,
 }: {
-  searchParams: Promise<{ template?: string; product?: string; design?: string }>;
+  searchParams: Promise<
+    { template?: string; product?: string; design?: string } & Partial<Selection>
+  >;
 }) {
   const {
     template: templateParam,
     product: productParam,
     design: designParam,
+    ...carriedParams
   } = await searchParams;
 
   // ?design=<id> is the canonical address for an existing design and is
@@ -52,6 +56,13 @@ export default async function DesignPage({
     getPricingData(product.id),
     saved ? null : getTemplateBySlug(template.id),
   ]);
+  // The options picked on the product page. Pages and paper belong to the
+  // design, so they only seed a new one; copies and delivery are basket-line
+  // choices and ride along to "Add to basket" either way.
+  const carried = parseCarriedSelection(pricing, carriedParams);
+  const initialSelection: Partial<Selection> = saved
+    ? { quantity: carried.quantity, delivery: carried.delivery }
+    : carried;
 
   return (
     <DesignEditor
@@ -61,6 +72,7 @@ export default async function DesignPage({
       templates={templates}
       pricing={pricing}
       initialLayout={templateWithLayout?.layout ?? null}
+      initialSelection={initialSelection}
       savedDesign={
         saved
           ? {

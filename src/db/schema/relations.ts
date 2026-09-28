@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 import { products, templateCategories, templateCategoryLinks, templates } from "./catalogue";
 import { designAssets, designs, designVersions } from "./designs";
 import { orderEvents, orderItems, orderProofPages, orderProofs, orders } from "./orders";
-import { colourOptions, deliveryOptions, pageCountOptions, paperOptions, quantityOptions, sizeOptions } from "./pricing";
+import { deliveryOptions, pageCountOptions, paperOptions, quantityOptions } from "./pricing";
 import { users } from "./users";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -12,8 +12,6 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export const productsRelations = relations(products, ({ many }) => ({
   templates: many(templates),
-  sizeOptions: many(sizeOptions),
-  colourOptions: many(colourOptions),
   paperOptions: many(paperOptions),
   quantityOptions: many(quantityOptions),
   pageCountOptions: many(pageCountOptions),

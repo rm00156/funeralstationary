@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Lock } from "lucide-react";
 
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
+import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
 import { formatPence } from "@/lib/orderOfServicePricing";
 import type { Cart } from "@/lib/orders.server";
 
@@ -39,15 +40,18 @@ export default function CheckoutForm({
   cart,
   cancelled,
   paymentsConfigured,
+  accountEmail = null,
 }: {
   cart: Cart;
   /** The customer backed out of Stripe Checkout. */
   cancelled: boolean;
   paymentsConfigured: boolean;
+  /** The signed-in customer's email, used only to prefill the contact field. */
+  accountEmail?: string | null;
 }) {
   const [form, setForm] = useState<FormState>({
     contactName: cart.details?.contactName ?? "",
-    contactEmail: cart.details?.contactEmail ?? "",
+    contactEmail: cart.details?.contactEmail ?? accountEmail ?? "",
     contactPhone: cart.details?.contactPhone ?? "",
     addressLine1: cart.details?.addressLine1 ?? "",
     addressLine2: cart.details?.addressLine2 ?? "",
@@ -112,7 +116,7 @@ export default function CheckoutForm({
             </Field>
           </div>
           <p className="mt-4 font-body text-sm text-on-surface-variant">
-            We will send your digital proof to this email address for approval before printing.
+            We will send your order confirmation to this email address.
           </p>
         </section>
 
@@ -169,8 +173,14 @@ export default function CheckoutForm({
                 <p className="font-medium text-on-surface">{item.designName}</p>
                 <p className="text-on-surface-variant">
                   {item.quantityCopies} copies
-                  {item.quote ? ` · ${item.quote.size.label} · ${item.quote.colour.label} · ${item.quote.pages.label} · ${item.quote.paper.label}` : ""}
+                  {item.quote ? ` · ${PAGE_SIZE_LABEL} · ${item.quote.pages.label} · ${item.quote.paper.label}` : ""}
                 </p>
+                {item.delivery && (
+                  <p className="text-on-surface-variant">
+                    {item.delivery.label} ·{" "}
+                    {item.delivery.pricePence === 0 ? "Free" : formatPence(item.delivery.pricePence)}
+                  </p>
+                )}
               </div>
               <span className="whitespace-nowrap text-on-surface">{formatPence(item.lineTotalPence)}</span>
             </li>
@@ -182,7 +192,7 @@ export default function CheckoutForm({
             <dd className="text-on-surface">{formatPence(cart.totals.subtotalPence)}</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt>{cart.delivery?.label ?? "Delivery"}</dt>
+            <dt>Delivery</dt>
             <dd className="text-on-surface">
               {cart.totals.deliveryPence === 0 ? "Free" : formatPence(cart.totals.deliveryPence)}
             </dd>

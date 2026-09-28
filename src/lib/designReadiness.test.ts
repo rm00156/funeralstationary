@@ -4,7 +4,10 @@ import type { CanvasElement, DesignDoc, DesignPage } from "@/lib/designEditor";
 import {
   checkDesignReadiness,
   isDesignOrderable,
+  issueLocation,
   needsDefaultsConfirmation,
+  quoted,
+  type ReadinessIssue,
 } from "@/lib/designReadiness";
 
 let seq = 0;
@@ -152,7 +155,66 @@ describe("checkDesignReadiness", () => {
       template,
     );
     expect(readiness.warnings).toHaveLength(1);
-    expect(readiness.warnings[0]).toMatchObject({ occurrences: 3, page: 1 });
+    expect(readiness.warnings[0]).toMatchObject({ occurrences: 3, page: 1, pages: [1, 2, 3] });
+  });
+
+  it("warns only about flagged placeholders once a template flags any", () => {
+    // "Order of Service" is meant to stay; nagging about it buries the
+    // warning that matters — a name nobody changed.
+    const flagged: DesignPage[] = [
+      page(text("Order of Service"), text("Name Surname", { placeholder: true })),
+      page(text("Hymn")),
+      page(text("Forever in our hearts")),
+    ];
+    const readiness = checkDesignReadiness(
+      doc(
+        page(text("Order of Service"), text("Name Surname")),
+        page(text("Hymn")),
+        page(text("Forever in our hearts")),
+      ),
+      flagged,
+    );
+    expect(readiness.warnings.map((issue) => issue.text)).toEqual(["Name Surname"]);
+  });
+
+  it("falls back to every text run for a layout with no placeholder flags", () => {
+    const readiness = checkDesignReadiness(
+      doc(page(text("In loving memory")), page(text("Order of Service")), page(text("x"))),
+      template,
+    );
+    expect(readiness.warnings).toHaveLength(2);
+  });
+});
+
+describe("issueLocation", () => {
+  const issue = (pages: number[], pageCount: number): ReadinessIssue => ({
+    kind: "unchanged-text",
+    page: pages[0],
+    occurrences: pages.length,
+    pages,
+    pageCount,
+    text: "x",
+  });
+
+  it("names the cover and the back page rather than counting them", () => {
+    expect(issueLocation(issue([0], 4))).toBe("the cover");
+    expect(issueLocation(issue([3], 4))).toBe("the back page");
+    expect(issueLocation(issue([0, 3], 4))).toBe("the cover and the back page");
+  });
+
+  it("lists a few inside pages and summarises many", () => {
+    expect(issueLocation(issue([1], 4))).toBe("page 2");
+    expect(issueLocation(issue([1, 2], 4))).toBe("pages 2 and 3");
+    expect(issueLocation(issue([1, 2, 3, 4, 5, 6], 8))).toBe("every inside page");
+    expect(issueLocation(issue([1, 2, 3, 4], 12))).toBe("4 inside pages");
+    expect(issueLocation(issue([0, 1, 2, 3], 4))).toBe("the cover, pages 2 and 3 and the back page");
+  });
+});
+
+describe("quoted", () => {
+  it("does not double up quotes the text already has", () => {
+    expect(quoted("JAMAICA")).toBe("“JAMAICA”");
+    expect(quoted('"Out of many, one people."')).toBe('"Out of many, one people."');
   });
 
   it("still blocks empty photos when the source template is unknown", () => {

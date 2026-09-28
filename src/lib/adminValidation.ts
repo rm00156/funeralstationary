@@ -108,11 +108,11 @@ export function parseImageUrl(value: unknown): string | null {
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
 const usesMultiplier = (kind: OptionKind) =>
-  kind === "size" || kind === "colour" || kind === "paper" || kind === "quantity";
+  kind === "paper" || kind === "quantity";
 
 /**
  * Full create payload for one pricing-option row. Which fields are required
- * depends on the table: size/colour/paper take a multiplier, quantity adds
+ * depends on the table: paper takes a multiplier, quantity adds
  * copies, page-count takes pageCount + baseRatePence, delivery takes
  * pricePence and a mandatory note. Money crosses the wire as integer pence.
  */

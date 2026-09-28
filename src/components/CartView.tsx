@@ -6,6 +6,7 @@ import { useState } from "react";
 import { AlertTriangle, ShoppingBag, Trash2 } from "lucide-react";
 
 import ConfigField from "@/components/ConfigField";
+import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
 import { formatPence, type PricingData } from "@/lib/orderOfServicePricing";
 import type { Cart, CartItem } from "@/lib/orders.server";
 import type { SelectionAxis } from "@/lib/orders";
@@ -13,21 +14,20 @@ import type { SelectionAxis } from "@/lib/orders";
 /** Tell the header badge (and anything else listening) the basket changed. */
 export const notifyCartChanged = () => window.dispatchEvent(new Event("tfs:cart-changed"));
 
-type LineAxis = "quantity" | "size" | "colour";
+type LineAxis = "quantity" | "delivery";
 
 const AXIS_LABELS: Record<LineAxis, string> = {
-  quantity: "Quantity",
-  size: "Size",
-  colour: "Colour",
+  quantity: "Copies",
+  delivery: "Delivery",
 };
 
 export default function CartView({
   initialCart,
-  pricing,
+  pricingByProduct,
 }: {
   initialCart: Cart | null;
-  /** The basket's product's option lists — null while the basket is empty. */
-  pricing: PricingData | null;
+  /** Option lists keyed by product slug, for every product in the basket. */
+  pricingByProduct: Record<string, PricingData>;
 }) {
   const [cart, setCart] = useState<Cart | null>(initialCart);
   const [busy, setBusy] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export default function CartView({
             <CartLine
               key={item.id}
               item={item}
-              pricing={pricing}
+              pricing={pricingByProduct[item.productId] ?? null}
               busy={busy === item.id}
               onChange={(axis, value) =>
                 mutate(item.id, `/api/cart/items/${item.id}`, "PATCH", { [axis]: value })
@@ -97,20 +97,7 @@ export default function CartView({
       <aside className="h-fit rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow lg:sticky lg:top-28">
         <h2 className="mb-5 font-display text-2xl text-primary">Summary</h2>
 
-        <ConfigField
-          id="cart-delivery"
-          label="Delivery"
-          value={cart.delivery?.optionId ?? ""}
-          disabled={busy !== null}
-          options={[
-            ...(cart.delivery ? [] : [{ id: "", label: "Choose delivery…" }]),
-            ...cart.deliveryOptions,
-          ]}
-          onChange={(value) => value && mutate("delivery", "/api/cart", "PATCH", { delivery: value })}
-          note={cart.deliveryOptions.find((option) => option.id === cart.delivery?.optionId)?.note}
-        />
-
-        <dl className="mt-6 space-y-3 font-body text-on-surface-variant">
+        <dl className="space-y-3 font-body text-on-surface-variant">
           <div className="flex justify-between gap-4">
             <dt>Subtotal</dt>
             <dd className="text-on-surface">{formatPence(totals.subtotalPence)}</dd>
@@ -118,7 +105,7 @@ export default function CartView({
           <div className="flex justify-between gap-4">
             <dt>Delivery</dt>
             <dd className="text-on-surface">
-              {cart.delivery ? (totals.deliveryPence === 0 ? "Free" : formatPence(totals.deliveryPence)) : "—"}
+              {totals.deliveryPence === 0 ? "Free" : formatPence(totals.deliveryPence)}
             </dd>
           </div>
         </dl>
@@ -154,7 +141,7 @@ export default function CartView({
           </>
         )}
         <p className="mt-4 font-body text-sm text-on-surface-variant">
-          Every order includes a digital proof for your approval before we print.
+          Each item is delivered on the option you choose for it.
         </p>
       </aside>
     </div>
@@ -202,8 +189,8 @@ function CartLine({
                 {item.productLabel} · {item.templateName}
               </p>
               <p className="font-body text-sm text-on-surface-variant">
-                {item.quote?.pages.label ?? `${item.pageCount} pages`}
-                {item.quote ? ` · ${item.quote.paper.label}` : ""}
+                {PAGE_SIZE_LABEL} · {item.pageCount} pages
+                {item.quote ? ` · ${item.quote.paper.label} paper` : ""}
                 {item.designId && (
                   <>
                     {" · "}
@@ -235,10 +222,14 @@ function CartLine({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        {(["quantity", "size", "colour"] as const).map((axis) => {
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        {(["quantity", "delivery"] as const).map((axis) => {
           const stale = item.stale.includes(axis);
-          const options = pricing?.[axis] ?? [];
+          // Copies are listed as "15 copies" so the number can't be read as a page count.
+          const options =
+            axis === "quantity"
+              ? (pricing?.quantity ?? []).map((option) => ({ id: option.id, label: `${option.value} copies` }))
+              : pricing?.delivery ?? [];
           return (
             <ConfigField
               key={axis}
@@ -248,6 +239,13 @@ function CartLine({
               disabled={busy || item.designMissing}
               options={stale ? [{ id: "", label: "Choose…" }, ...options] : options}
               onChange={(value) => value && onChange(axis, value)}
+              note={
+                axis === "delivery" && item.delivery
+                  ? `${item.delivery.pricePence === 0 ? "Free" : formatPence(item.delivery.pricePence)} · ${
+                      item.deliveryOptions.find((option) => option.id === item.delivery?.optionId)?.note ?? ""
+                    }`
+                  : undefined
+              }
             />
           );
         })}

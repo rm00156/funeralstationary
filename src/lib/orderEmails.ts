@@ -7,10 +7,13 @@ import { formatPence } from "@/lib/orderOfServicePricing";
 
 export interface OrderEmailItem {
   name: string;
-  /** e.g. "50 copies · A5 · Full colour · 8 pages · Silk" */
+  /** e.g. "50 copies · A5 · 8 pages · Silk" */
   spec: string;
   copies: number;
   lineTotalPence: number;
+  /** Delivery is chosen per line, so each item names its own. */
+  deliveryLabel: string;
+  deliveryPence: number;
 }
 
 export interface OrderEmailSummary {
@@ -18,7 +21,7 @@ export interface OrderEmailSummary {
   contactName: string;
   contactEmail: string;
   items: OrderEmailItem[];
-  deliveryLabel: string | null;
+  /** Σ of the items' delivery charges. */
   deliveryPence: number;
   subtotalPence: number;
   vatPence: number;
@@ -39,18 +42,21 @@ const escapeHtml = (value: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+const freeOr = (pence: number) => (pence === 0 ? "Free" : formatPence(pence));
+
 function itemsText(summary: OrderEmailSummary): string {
   return summary.items
-    .map((item) => `- ${item.name}\n  ${item.spec}\n  ${formatPence(item.lineTotalPence)}`)
+    .map(
+      (item) =>
+        `- ${item.name}\n  ${item.spec}\n  ${formatPence(item.lineTotalPence)}\n  Delivery: ${item.deliveryLabel} (${freeOr(item.deliveryPence)})`,
+    )
     .join("\n");
 }
 
 function totalsText(summary: OrderEmailSummary): string {
-  const delivery =
-    summary.deliveryPence === 0 ? "Free" : formatPence(summary.deliveryPence);
   return [
     `Subtotal: ${formatPence(summary.subtotalPence)}`,
-    `Delivery (${summary.deliveryLabel ?? "standard"}): ${delivery}`,
+    `Delivery: ${freeOr(summary.deliveryPence)}`,
     `Total: ${formatPence(summary.totalPence)} (includes VAT of ${formatPence(summary.vatPence)})`,
   ].join("\n");
 }
@@ -59,14 +65,12 @@ function itemsHtml(summary: OrderEmailSummary): string {
   const rows = summary.items
     .map(
       (item) =>
-        `<tr><td style="padding:8px 0;border-bottom:1px solid #e6e1dc"><strong>${escapeHtml(item.name)}</strong><br><span style="color:#6b6560">${escapeHtml(item.spec)}</span></td><td style="padding:8px 0;border-bottom:1px solid #e6e1dc;text-align:right;white-space:nowrap">${formatPence(item.lineTotalPence)}</td></tr>`,
+        `<tr><td style="padding:8px 0;border-bottom:1px solid #e6e1dc"><strong>${escapeHtml(item.name)}</strong><br><span style="color:#6b6560">${escapeHtml(item.spec)}<br>Delivery: ${escapeHtml(item.deliveryLabel)} (${freeOr(item.deliveryPence)})</span></td><td style="padding:8px 0;border-bottom:1px solid #e6e1dc;text-align:right;white-space:nowrap">${formatPence(item.lineTotalPence)}</td></tr>`,
     )
     .join("");
-  const delivery =
-    summary.deliveryPence === 0 ? "Free" : formatPence(summary.deliveryPence);
   return `<table style="width:100%;border-collapse:collapse;font-family:Georgia,serif">${rows}
 <tr><td style="padding:8px 0">Subtotal</td><td style="text-align:right">${formatPence(summary.subtotalPence)}</td></tr>
-<tr><td style="padding:8px 0">Delivery (${escapeHtml(summary.deliveryLabel ?? "standard")})</td><td style="text-align:right">${delivery}</td></tr>
+<tr><td style="padding:8px 0">Delivery</td><td style="text-align:right">${freeOr(summary.deliveryPence)}</td></tr>
 <tr><td style="padding:8px 0"><strong>Total</strong><br><span style="color:#6b6560">includes VAT of ${formatPence(summary.vatPence)}</span></td><td style="text-align:right"><strong>${formatPence(summary.totalPence)}</strong></td></tr>
 </table>`;
 }
@@ -129,6 +133,33 @@ export function orderNotificationEmail(
 ${itemsHtml(summary)}
 <p style="margin-top:24px"><strong>Deliver to</strong><br>${summary.addressLines.map(escapeHtml).join("<br>")}</p>
 <p><a href="${escapeHtml(adminUrl)}">Open in admin</a></p>
+</div>`;
+  return { subject, text, html };
+}
+
+/**
+ * The one-time sign-in link. Deliberately says nothing about whether the
+ * address already has designs or orders — the sign-in form answers the same
+ * way for every address, and so does this.
+ */
+export function signInEmail(linkUrl: string): EmailContent {
+  const subject = "Your sign-in link — The Funeral Stationery";
+  const text = [
+    "Hello,",
+    "",
+    "Use the link below to sign in and see the designs and orders saved to this email address:",
+    linkUrl,
+    "",
+    "The link works once and expires in 15 minutes. If you did not ask for it, you can ignore this email — nothing has changed.",
+    "",
+    "The Funeral Stationery",
+  ].join("\n");
+  const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
+<p>Hello,</p>
+<p>Use the link below to sign in and see the designs and orders saved to this email address.</p>
+<p><a href="${escapeHtml(linkUrl)}" style="display:inline-block;padding:12px 20px;background:#5c4b51;color:#ffffff;text-decoration:none;border-radius:8px">Sign in</a></p>
+<p style="color:#6b6560;font-size:13px">The link works once and expires in 15 minutes. If you did not ask for it, you can ignore this email — nothing has changed.</p>
+<p>The Funeral Stationery</p>
 </div>`;
   return { subject, text, html };
 }

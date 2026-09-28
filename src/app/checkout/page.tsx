@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react";
 import CheckoutForm from "@/components/CheckoutForm";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import { getCurrentUser } from "@/lib/auth.server";
 import { getCart } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
 import { isStripeConfigured } from "@/lib/stripe.server";
@@ -26,6 +27,7 @@ export default async function CheckoutPage({
   const cart = owner ? await getCart(owner) : null;
   if (!cart || cart.items.length === 0) redirect("/cart");
   const { cancelled } = await searchParams;
+  const user = owner?.userId ? await getCurrentUser() : null;
 
   return (
     <>
@@ -52,12 +54,13 @@ export default async function CheckoutPage({
               Checkout
             </h1>
             <p className="mb-10 max-w-3xl font-body text-lg text-on-surface-variant">
-              Tell us where to send your stationery, then pay securely. Nothing is
-              printed until you have approved a digital proof.
+              Tell us where to send your stationery, then pay securely. Your
+              order goes straight to print exactly as you designed it.
             </p>
 
             <CheckoutForm
               cart={cart}
+              accountEmail={user?.email ?? null}
               cancelled={cancelled === "1"}
               paymentsConfigured={isStripeConfigured()}
             />

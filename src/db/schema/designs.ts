@@ -15,12 +15,10 @@ import {
 import type { DesignDoc } from "@/lib/designEditor";
 import { products, templates } from "./catalogue";
 import {
-  colourOptions,
   deliveryOptions,
   pageCountOptions,
   paperOptions,
   quantityOptions,
-  sizeOptions,
 } from "./pricing";
 import { users } from "./users";
 
@@ -53,8 +51,6 @@ export const designs = mysqlTable(
       .notNull()
       .generatedAlwaysAs(sql`json_length(\`doc\`, '$.pages')`, { mode: "stored" }),
     quantityOptionId: int("quantity_option_id"),
-    sizeOptionId: int("size_option_id"),
-    colourOptionId: int("colour_option_id"),
     /**
      * Required, but with no DB-level default: a literal default can't safely
      * hardcode a surrogate id (it depends on seed insertion order), so
@@ -78,16 +74,6 @@ export const designs = mysqlTable(
       columns: [t.productId, t.quantityOptionId],
       foreignColumns: [quantityOptions.productId, quantityOptions.id],
       name: "designs_quantity_option_fk",
-    }),
-    foreignKey({
-      columns: [t.productId, t.sizeOptionId],
-      foreignColumns: [sizeOptions.productId, sizeOptions.id],
-      name: "designs_size_option_fk",
-    }),
-    foreignKey({
-      columns: [t.productId, t.colourOptionId],
-      foreignColumns: [colourOptions.productId, colourOptions.id],
-      name: "designs_colour_option_fk",
     }),
     foreignKey({
       columns: [t.productId, t.pageCountOptionId],

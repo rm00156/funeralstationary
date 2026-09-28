@@ -15,7 +15,13 @@ function createDb(): Database {
   }
   // Reuse the pool across Next.js dev-server hot reloads instead of leaking connections.
   if (!globalThis.__dbPool) {
-    globalThis.__dbPool = mysql.createPool(process.env.DATABASE_URL);
+    const url = process.env.DATABASE_URL;
+    // TiDB Cloud (production) refuses plaintext connections; local MySQL has
+    // no certificate, so TLS is switched on by host rather than always.
+    const ssl = new URL(url).hostname.endsWith(".tidbcloud.com")
+      ? { minVersion: "TLSv1.2" as const }
+      : undefined;
+    globalThis.__dbPool = mysql.createPool({ uri: url, ssl });
   }
   return drizzle(globalThis.__dbPool, { schema, mode: "default" });
 }

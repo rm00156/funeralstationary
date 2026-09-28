@@ -20,6 +20,12 @@ import type { Template } from "@/lib/templates";
  */
 export const PAGE_W_MM = 148;
 export const PAGE_H_MM = 210;
+/**
+ * The trim size's name. Size isn't a pricing option: every design is drawn on
+ * this one artboard and printed at it, so a size picker could only ever charge
+ * for a format the artwork doesn't have.
+ */
+export const PAGE_SIZE_LABEL = "A5";
 export const PAGE_W = 444;
 export const PAGE_H = 630;
 export const BLEED_MM = 3;
@@ -222,6 +228,13 @@ export interface TextElement extends ElementBase {
   color: string;
   letterSpacing?: number;
   uppercase?: boolean;
+  /**
+   * Template wording the customer is expected to replace — the name, dates,
+   * service details. Only these warn at the pre-order check when left
+   * unchanged; fixed headings ("Order of Service") never do. Set by the
+   * authoring editor and the generators, meaningless on a customer's own text.
+   */
+  placeholder?: boolean;
 }
 
 export type PhotoShape = "rect" | "oval" | "arch";
@@ -553,6 +566,7 @@ function coverElements(template: Template): CanvasElement[] {
       id: uid("text"),
       type: "text",
       text: "Robert Bayne",
+      placeholder: true,
       fontFamily: "display",
       fontSize: 30,
       align: "center",
@@ -568,6 +582,7 @@ function coverElements(template: Template): CanvasElement[] {
       id: uid("text"),
       type: "text",
       text: "1971 – 2024",
+      placeholder: true,
       fontFamily: "body",
       fontSize: 15,
       align: "center",
@@ -609,6 +624,7 @@ function interiorPageElements(): CanvasElement[] {
       id: uid("text"),
       type: "text",
       text: "YOUR TEXT HERE",
+      placeholder: true,
       fontFamily: "display",
       fontSize: 26,
       align: "center",

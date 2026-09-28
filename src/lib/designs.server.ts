@@ -48,11 +48,11 @@ export interface SavedDesign {
   updatedAt: Date;
 }
 
-/** Owner predicate. Falls back to the guest token until accounts exist. */
+/** Owner predicate: a signed-in customer by user_id, a guest by guest_token. */
 function ownedBy(owner: Owner) {
-  return owner.userId
-    ? eq(designs.userId, owner.userId)
-    : eq(designs.guestToken, owner.guestToken);
+  return owner.userId === null
+    ? eq(designs.guestToken, owner.guestToken)
+    : eq(designs.userId, owner.userId);
 }
 
 function isLiveDesign() {

@@ -14,8 +14,6 @@ export const dynamic = "force-dynamic";
 
 const KIND_TITLES: Record<OptionKind, string> = {
   quantity: "Quantities",
-  size: "Sizes",
-  colour: "Colour options",
   "page-count": "Page counts",
   paper: "Paper stocks",
   delivery: "Delivery options",
@@ -24,8 +22,6 @@ const KIND_TITLES: Record<OptionKind, string> = {
 /** Display order — mirrors the order the customer configurator asks in. */
 const KIND_ORDER: OptionKind[] = [
   "quantity",
-  "size",
-  "colour",
   "page-count",
   "paper",
   "delivery",
@@ -62,7 +58,7 @@ export default async function AdminProductPricingPage({
       </h1>
       <p className="mb-8 max-w-2xl font-body text-on-surface-variant">
         Prices are entered in pounds and stored to the penny. A quote multiplies
-        the page-count base rate by the size, colour, paper and quantity
+        the page-count base rate by the paper and quantity
         multipliers, then adds delivery.
       </p>
 

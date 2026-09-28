@@ -8,7 +8,7 @@
  * float drift end-to-end.
  *
  * total = (quantity x unitPrice) + delivery
- * unitPrice = pageRate x size x colour x paper x quantity-break
+ * unitPrice = pageRate x paper x quantity-break
  */
 
 export interface SelectOption {
@@ -27,7 +27,7 @@ export interface PageCountOption {
   id: string;
   label: string;
   pages: number;
-  /** Base per-copy rate (A5, silk, full-colour both sides), in pence. */
+  /** Base per-copy rate (A5, silk), in pence. */
   baseRatePence: number;
   note?: string;
 }
@@ -42,8 +42,6 @@ export interface DeliveryOption {
 /** One product's full option set, as loaded from the DB. */
 export interface PricingData {
   quantity: QuantityOption[];
-  size: SelectOption[];
-  colour: SelectOption[];
   pages: PageCountOption[];
   paper: SelectOption[];
   delivery: DeliveryOption[];
@@ -51,19 +49,52 @@ export interface PricingData {
 
 export interface Selection {
   quantity: string;
-  size: string;
-  colour: string;
   pages: string;
   paper: string;
   delivery: string;
+}
+
+export const SELECTION_AXES = ["quantity", "pages", "paper", "delivery"] as const;
+
+/**
+ * The product page's selection as query params, so it survives the hops
+ * /products/[slug] → /templates → /design → basket. Axis names double as the
+ * param names.
+ */
+export function selectionSearchParams(selection: Partial<Selection>): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const axis of SELECTION_AXES) {
+    const value = selection[axis];
+    if (value) params.set(axis, value);
+  }
+  return params;
+}
+
+/**
+ * Read a carried selection back out of the URL, keeping only slugs this
+ * product actually offers. Anything else — a stale bookmark, a different
+ * product's option — is dropped so the caller falls back to its default
+ * rather than pricing a slug that doesn't exist.
+ */
+export function parseCarriedSelection(
+  data: PricingData,
+  params: Partial<Record<keyof Selection, string | string[] | undefined>>,
+): Partial<Selection> {
+  const carried: Partial<Selection> = {};
+  for (const axis of SELECTION_AXES) {
+    const value = params[axis];
+    if (typeof value !== "string") continue;
+    if ((data[axis] as { id: string }[]).some((option) => option.id === value)) {
+      carried[axis] = value;
+    }
+  }
+  return carried;
 }
 
 /** The first option on every axis — the DB rows are ordered by sort_order. */
 export function defaultSelection(data: PricingData): Selection {
   return {
     quantity: data.quantity[0]?.id ?? "",
-    size: data.size[0]?.id ?? "",
-    colour: data.colour[0]?.id ?? "",
     pages: data.pages[0]?.id ?? "",
     paper: data.paper[0]?.id ?? "",
     delivery: data.delivery[0]?.id ?? "",
@@ -72,8 +103,6 @@ export function defaultSelection(data: PricingData): Selection {
 
 export interface Quote {
   quantity: QuantityOption;
-  size: SelectOption;
-  colour: SelectOption;
   pages: PageCountOption;
   paper: SelectOption;
   delivery: DeliveryOption;
@@ -90,16 +119,12 @@ function find<T extends { id: string }>(options: T[], id: string): T {
 
 export function getQuote(data: PricingData, selection: Selection): Quote {
   const quantity = find(data.quantity, selection.quantity);
-  const size = find(data.size, selection.size);
-  const colour = find(data.colour, selection.colour);
   const pages = find(data.pages, selection.pages);
   const paper = find(data.paper, selection.paper);
   const delivery = find(data.delivery, selection.delivery);
 
   const unitPricePence = Math.round(
     pages.baseRatePence *
-      size.multiplier *
-      colour.multiplier *
       paper.multiplier *
       quantity.multiplier,
   );
@@ -107,8 +132,6 @@ export function getQuote(data: PricingData, selection: Selection): Quote {
 
   return {
     quantity,
-    size,
-    colour,
     pages,
     paper,
     delivery,
@@ -116,6 +139,33 @@ export function getQuote(data: PricingData, selection: Selection): Quote {
     printCostPence,
     totalPence: printCostPence + delivery.pricePence,
   };
+}
+
+function cheapest<T>(options: T[], cost: (option: T) => number): T | undefined {
+  return options.reduce<T | undefined>(
+    (best, option) => (best === undefined || cost(option) < cost(best) ? option : best),
+    undefined,
+  );
+}
+
+/**
+ * The lowest total this product can be bought for — the "from £X" figure on
+ * the product cards and product page. Cheapest option on every multiplier
+ * axis, cheapest page rate and delivery, and whichever quantity gives the
+ * lowest print cost (a bigger break lowers the unit price but multiplies it
+ * by more copies, so that axis is searched rather than min'd). Null when any
+ * axis has no options, since then nothing can be priced at all.
+ */
+export function cheapestQuote(data: PricingData): Quote | null {
+  const paper = cheapest(data.paper, (option) => option.multiplier);
+  const pages = cheapest(data.pages, (option) => option.baseRatePence);
+  const delivery = cheapest(data.delivery, (option) => option.pricePence);
+  if (!paper || !pages || !delivery || data.quantity.length === 0) {
+    return null;
+  }
+  const base = { paper: paper.id, pages: pages.id, delivery: delivery.id };
+  const quotes = data.quantity.map((quantity) => getQuote(data, { ...base, quantity: quantity.id }));
+  return cheapest(quotes, (quote) => quote.totalPence) ?? null;
 }
 
 const GBP = new Intl.NumberFormat("en-GB", {

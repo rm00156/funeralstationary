@@ -1,23 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   CATEGORIES,
-  COLOUR_OPTIONS,
   DELIVERY_OPTIONS,
   PAGE_OPTIONS,
   PAPER_OPTIONS,
   PRODUCTS,
   QUANTITY_OPTIONS,
-  SIZE_OPTIONS,
   TEMPLATES,
 } from "./seedCatalogue";
 import {
-  buildColourOptionsSeed,
   buildDeliveryOptionsSeed,
   buildPageCountOptionsSeed,
   buildPaperOptionsSeed,
   buildProductsSeed,
   buildQuantityOptionsSeed,
-  buildSizeOptionsSeed,
   buildTemplateCategoriesSeed,
   buildTemplateCategoryLinksSeed,
   buildTemplatesSeed,
@@ -62,8 +58,6 @@ describe("catalogue seed coverage", () => {
 
 describe("pricing seed coverage", () => {
   it("builds one row per pricing option", () => {
-    expect(buildSizeOptionsSeed()).toHaveLength(SIZE_OPTIONS.length);
-    expect(buildColourOptionsSeed()).toHaveLength(COLOUR_OPTIONS.length);
     expect(buildPaperOptionsSeed()).toHaveLength(PAPER_OPTIONS.length);
     expect(buildQuantityOptionsSeed()).toHaveLength(QUANTITY_OPTIONS.length);
     expect(buildPageCountOptionsSeed()).toHaveLength(PAGE_OPTIONS.length);

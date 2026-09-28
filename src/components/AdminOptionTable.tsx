@@ -19,8 +19,6 @@ interface FieldDef {
 }
 
 const KIND_FIELDS: Record<OptionKind, FieldDef[]> = {
-  size: [{ key: "multiplier", label: "Multiplier", input: "number" }],
-  colour: [{ key: "multiplier", label: "Multiplier", input: "number" }],
   paper: [{ key: "multiplier", label: "Multiplier", input: "number" }],
   quantity: [
     { key: "multiplier", label: "Multiplier", input: "number" },

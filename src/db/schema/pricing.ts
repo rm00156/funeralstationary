@@ -19,7 +19,7 @@ import { products } from "./catalogue";
  * designs.* spec columns hold a composite FK on (product_id, *_option_id)
  * into these tables — not just *_option_id alone — so a design can only ever
  * reference a pricing row that belongs to its own product. That's why
- * size/colour/paper each get their own table rather than one polymorphic
+ * paper/quantity/page-count each get their own table rather than one polymorphic
  * table keyed by kind: a MySQL FK must target an exact unique key, and
  * (product_id, kind, id) can't be targeted by a two-column FK.
  */
@@ -40,16 +40,6 @@ const specOptionColumns = {
 // (product_id, id) backs the composite FK from the designs table's pricing
 // columns; (product_id, slug) is the natural conflict key the seed upserts
 // against, and stops two rows for one product reusing the same slug.
-export const sizeOptions = mysqlTable("size_options", { ...specOptionColumns }, (t) => [
-  uniqueIndex("size_options_product_id_uq").on(t.productId, t.id),
-  uniqueIndex("size_options_product_slug_uq").on(t.productId, t.slug),
-]);
-
-export const colourOptions = mysqlTable("colour_options", { ...specOptionColumns }, (t) => [
-  uniqueIndex("colour_options_product_id_uq").on(t.productId, t.id),
-  uniqueIndex("colour_options_product_slug_uq").on(t.productId, t.slug),
-]);
-
 export const paperOptions = mysqlTable("paper_options", { ...specOptionColumns }, (t) => [
   uniqueIndex("paper_options_product_id_uq").on(t.productId, t.id),
   uniqueIndex("paper_options_product_slug_uq").on(t.productId, t.slug),
@@ -78,7 +68,7 @@ export const pageCountOptions = mysqlTable(
     slug: varchar("slug", { length: 64 }).notNull(),
     label: varchar("label", { length: 200 }).notNull(),
     pageCount: int("page_count").notNull(),
-    /** Base per-copy rate (A5, silk, full-colour both sides), in pence. */
+    /** Base per-copy rate (A5, silk), in pence. */
     baseRatePence: int("base_rate_pence").notNull(),
     note: varchar("note", { length: 500 }),
     sortOrder: smallint("sort_order").notNull().default(0),
