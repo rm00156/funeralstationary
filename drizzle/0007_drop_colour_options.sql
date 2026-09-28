@@ -8,6 +8,7 @@
 -- The FK must go before the table it points at. Placed orders keep what they
 -- chose in order_items.quote_snapshot, which is never rewritten.
 ALTER TABLE `designs` DROP FOREIGN KEY `designs_colour_option_fk`;--> statement-breakpoint
+ALTER TABLE `designs` DROP INDEX `designs_colour_option_fk`;--> statement-breakpoint
 ALTER TABLE `designs` DROP COLUMN `colour_option_id`;--> statement-breakpoint
 ALTER TABLE `order_items` DROP COLUMN `colour_option_id`;--> statement-breakpoint
 DROP TABLE `colour_options`;
