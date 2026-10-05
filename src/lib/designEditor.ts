@@ -188,6 +188,10 @@ export const INK_PALETTE = [
   "#5b4a2f",
   "#33506b",
   "#81737d",
+  "#a3325f",
+  "#7a1f2e",
+  "#5e3a8c",
+  "#2f5597",
   "#ffffff",
 ];
 

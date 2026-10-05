@@ -188,6 +188,7 @@ describe("TEMPLATE_SPECS", () => {
       const pages = buildTemplateLayout(entry, {
         backgroundUrl: "/bg.jpg",
         sprayUrl: "/spray.png",
+        accentUrl: "/accent.png",
       });
       expect(parseLayoutPages(pages).ok, entry.slug).toBe(true);
     }
@@ -234,6 +235,7 @@ describe("TEMPLATE_SPECS", () => {
       const [cover] = buildTemplateLayout(entry, {
         backgroundUrl: "/bg.jpg",
         sprayUrl: "/spray.png",
+        accentUrl: "/accent.png",
       });
       const hasService = cover.elements.some(
         (el) => el.type === "text" && el.text.includes("Crematorium"),
@@ -277,6 +279,55 @@ describe("TEMPLATE_SPECS", () => {
         ARTWORK_ARCHETYPE_IDS.length +
         SPRAY_ARCHETYPE_IDS.length +
         SOLID_ARCHETYPE_IDS.length,
+    );
+  });
+
+  it("only decorates with accent sprays that exist, and refuses to build without one", () => {
+    const accented = TEMPLATE_SPECS.filter((entry) => entry.accent);
+    expect(accented.length).toBeGreaterThan(0);
+    for (const entry of accented) {
+      expect(getBackgroundSpec(entry.accent!)?.spray, entry.slug).toBeDefined();
+      expect(() => buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg" }), entry.slug).toThrow(
+        /accentUrl/,
+      );
+      const pages = buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg", accentUrl: "/accent.png" });
+      for (const index of [0, 2]) {
+        const accent = pages[index].elements.find((el) => el.type === "image" && el.src === "/accent.png");
+        expect(accent?.locked, `${entry.slug} page ${index}`).toBe(true);
+      }
+    }
+  });
+
+  it("keeps every cover's type above a flower band", () => {
+    for (const entry of TEMPLATE_SPECS) {
+      // Bands only: a corner piece clears by its radial fade, not its box.
+      const background = getBackgroundSpec(entry.background ?? "");
+      const placement = background?.fade ? background.placement : undefined;
+      if (!placement || !isArtworkArchetype(entry.archetype)) continue;
+      const [cover] = buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg", accentUrl: "/accent.png" });
+      for (const el of cover.elements) {
+        if (el.type === "text") expect(el.y, `${entry.slug}: ${el.text}`).toBeLessThan(placement.y);
+      }
+    }
+  });
+
+  it("sets light type over a dark ground, on the cover and the back page", () => {
+    const silk = TEMPLATE_SPECS.find((entry) => entry.archetype === "silk-frame")!;
+    const style = styleFor(silk);
+    const pages = buildTemplateLayout(silk, { backgroundUrl: "/bg.jpg", accentUrl: "/accent.png" });
+    for (const index of [0, 2]) {
+      for (const el of pages[index].elements) {
+        if (el.type === "text") expect(el.color, el.text).toBe(style.paper);
+      }
+    }
+  });
+
+  it("flags the Sunrise and Sunset dates as placeholders", () => {
+    const entry = TEMPLATE_SPECS.find((e) => e.archetype === "band-oval")!;
+    const [cover] = buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg" });
+    const flagged = cover.elements.filter((el) => el.type === "text" && el.placeholder);
+    expect(flagged.map((el) => el.type === "text" && el.text)).toEqual(
+      expect.arrayContaining(["1st May 1936", "12th June 2024"]),
     );
   });
 

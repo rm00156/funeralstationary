@@ -22,7 +22,13 @@ export type BackgroundSourceRef =
   /** Pexels photo id — needs PEXELS_API_KEY. Pexels licence: free commercial use, no attribution. */
   | { kind: "pexels"; photoId: number }
   /** Anything else — record the licence and credit by hand. */
-  | { kind: "url"; url: string };
+  | { kind: "url"; url: string }
+  /**
+   * Draped satin, generated on the render canvas rather than sourced: there is
+   * no public-domain photograph of plain satin worth printing. Own work, so no
+   * licence question. `seed` fixes the folds, so a re-render is identical.
+   */
+  | { kind: "satin"; base: string; light: string; dark: string; seed: number };
 
 /** Which part of the page the artwork leaves clear for text. */
 export type TextZone = "top" | "bottom";
@@ -55,6 +61,14 @@ export interface BackgroundSpec {
   /** Soften the artwork's edges into the paper, in percent of the artboard width. */
   feather?: number;
   /**
+   * Fade the artwork to paper radially around a point, for flowers tucked
+   * into a corner: fully visible within `inner`, fully paper beyond `outer`.
+   * The centre is in percent of the artboard (it may sit on or past an edge);
+   * both radii are in percent of the artboard width. A straight feather on a
+   * corner-placed photograph still reads as a pasted rectangle — this doesn't.
+   */
+  radialFade?: { cx: number; cy: number; inner: number; outer: number };
+  /**
    * Fade the artwork into paper over the text zone. `start` is where the
    * artwork is still fully visible and `end` where it is fully paper, both in
    * percent of the artboard height — so for a bottom fade start < end, and
@@ -65,6 +79,12 @@ export interface BackgroundSpec {
   wash?: number;
   /** How strongly to tint toward the palette accent, 0–1. Default 0.2. */
   tint?: number;
+  /**
+   * A colour washed in from the top edge, fully transparent by `end` percent
+   * of the artboard height — the soft yellow or blush sky above a flower band.
+   * Drawn last, over the paper the fade left, so it never muddies the flowers.
+   */
+  glow?: { color: string; end: number };
   /**
    * Cut this specimen out of its ground as a transparent PNG, for use as a
    * corner or edge spray over a photo-led layout. Only suitable for a plate
@@ -86,6 +106,18 @@ export interface BackgroundSpec {
     cropBottom?: number;
     /** Smallest enclosed ground pocket to clear, as a fraction of the image. 0 disables. */
     minEnclosedRegion?: number;
+    /**
+     * Largest stray opaque island to drop, as a fraction of the image — the
+     * foxing specks and plate-edge slivers of a worn scan. Default 0 (off):
+     * a plate with genuinely separate small parts (a fallen petal) needs it off.
+     */
+    minIsland?: number;
+    /**
+     * Redraw the cutout in a single colour — its shadows in this ink, its
+     * highlights toward white — so a coloured study prints as the quiet
+     * one-colour flourish a monochrome template wants.
+     */
+    monochrome?: string;
   };
   /** Which zone compositions should put the name and dates in. */
   textZone: TextZone;
@@ -267,6 +299,178 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     spray: { tolerance: 42 },
     textZone: "bottom",
     palettes: ["plum", "slate", "bronze", "ink"],
+  },
+
+  // Photographic flower bands and corners. These are what the competitor
+  // catalogue leans on most: real flowers along the foot of a white page, the
+  // photograph and type in the clear space above. Commons-hosted CC0 imports
+  // from Unsplash, Pixabay and Flickr; placed untinted and unwashed, since a
+  // photograph's own colour is the point of it.
+  {
+    id: "crocus-meadow",
+    name: "Crocus Meadow",
+    source: { kind: "commons", file: "File:Purple crocuses in grass (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Purple crocuses in grass, via Unsplash. Via Wikimedia Commons.",
+    placement: { x: 0, y: 56, w: 100, h: 44 },
+    // Low in the frame: the flowers, not the blurred grass behind them.
+    focus: { x: 0.5, y: 0.8 },
+    fade: { edge: "top", start: 72, end: 58 },
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["violet"],
+  },
+  {
+    id: "white-blossom",
+    name: "White Blossom",
+    source: { kind: "commons", file: "File:White blossom branches (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "White blossom branches, via Unsplash. Via Wikimedia Commons.",
+    placement: { x: 0, y: 54, w: 100, h: 46 },
+    focus: { x: 0.5, y: 0.6 },
+    fade: { edge: "top", start: 70, end: 55 },
+    wash: 0,
+    tint: 0,
+    glow: { color: "#f3df93", end: 46 },
+    textZone: "top",
+    palettes: ["bronze"],
+  },
+  {
+    id: "pastel-rose-band",
+    name: "Pastel Rose Band",
+    source: { kind: "commons", file: "File:Pastel pink roses (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Pastel pink roses, via Unsplash. Via Wikimedia Commons.",
+    placement: { x: 0, y: 58, w: 100, h: 42 },
+    focus: { x: 0.4, y: 0.9 },
+    fade: { edge: "top", start: 74, end: 58 },
+    // Kept soft: this is the quiet one of the family, petals as a blush.
+    wash: 0.25,
+    tint: 0,
+    textZone: "top",
+    palettes: ["rose"],
+  },
+  {
+    id: "pastel-rose-corner",
+    name: "Pastel Rose Corner",
+    source: { kind: "commons", file: "File:Roses in pastel pink (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Roses in pastel pink, via Unsplash. Via Wikimedia Commons.",
+    placement: { x: 22, y: 44, w: 84, h: 62 },
+    focus: { x: 0.5, y: 0.5 },
+    radialFade: { cx: 100, cy: 100, inner: 30, outer: 72 },
+    wash: 0,
+    tint: 0,
+    glow: { color: "#efbfcf", end: 44 },
+    textZone: "top",
+    palettes: ["rose"],
+  },
+  {
+    id: "red-petal-band",
+    name: "Red Petal Band",
+    source: { kind: "commons", file: "File:Flower Power (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Flower Power, via Unsplash. Via Wikimedia Commons.",
+    placement: { x: 0, y: 60, w: 100, h: 40 },
+    focus: { x: 0.5, y: 0.6 },
+    fade: { edge: "top", start: 74, end: 60 },
+    wash: 0,
+    tint: 0,
+    glow: { color: "#f5d2d8", end: 40 },
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "rose-bush-band",
+    name: "Rose Bush Band",
+    source: { kind: "commons", file: "File:Spring Rose Bush (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Spring Rose Bush, via Unsplash. Via Wikimedia Commons.",
+    placement: { x: 0, y: 58, w: 100, h: 42 },
+    focus: { x: 0.5, y: 0.5 },
+    fade: { edge: "top", start: 72, end: 58 },
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["wine"],
+  },
+  {
+    id: "white-rose-corner",
+    name: "White Rose Corner",
+    source: { kind: "commons", file: "File:White Rose (18923655755).jpg" },
+    licence: "CC0",
+    credit: "White Rose, via Flickr. Via Wikimedia Commons.",
+    placement: { x: 26, y: 48, w: 80, h: 58 },
+    focus: { x: 0.5, y: 0.5 },
+    radialFade: { cx: 100, cy: 100, inner: 26, outer: 66 },
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["violet"],
+  },
+  {
+    id: "sky-blossom",
+    name: "Blossom and Sky",
+    source: { kind: "commons", file: "File:Sky-rose.jpg" },
+    licence: "CC0",
+    credit: "Sky-rose. Via Wikimedia Commons.",
+    focus: { x: 0.5, y: 0.5 },
+    // Type sits directly on this one, so it is washed further back than the bands.
+    wash: 0.58,
+    tint: 0,
+    textZone: "top",
+    palettes: ["rose"],
+  },
+  {
+    id: "royal-satin",
+    name: "Royal Blue Satin",
+    source: { kind: "satin", base: "#264a94", light: "#6d93d8", dark: "#0f1f4a", seed: 7 },
+    licence: "Own work (generated)",
+    credit: "Generated satin, The Funeral Stationery.",
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["blue"],
+  },
+  // Watercolour studies for cutout corner sprays. CC0 museum scans (the
+  // Rijksmuseum and the Met), on clean grounds that cut well.
+  {
+    id: "rijks-bouquet",
+    name: "Bouquet with Morning Glory",
+    source: { kind: "commons", file: "File:Een boeket Boeket, RP-T-FM-73.jpg" },
+    licence: "CC0 (Rijksmuseum)",
+    credit: "Een boeket, RP-T-FM-73. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    // The tolerance stays low and enclosed pockets are left alone: the pale
+    // rose touches the ground through its highlights, so anything looser cuts
+    // it. The foxing and plate edge that leaves behind go as islands instead.
+    spray: { tolerance: 34, inset: 0.07, minEnclosedRegion: 0, minIsland: 0.015 },
+    textZone: "bottom",
+    palettes: ["blue"],
+  },
+  {
+    id: "sebastiana-sprig",
+    name: "Sebastiana Sprig",
+    source: {
+      kind: "commons",
+      file: "File:Study of a Plant with Red-Purple Flowers (Sebastiana africana purpurea) MET DP830841.jpg",
+    },
+    licence: "Public domain (Met Open Access, CC0)",
+    credit: "Study of a Plant with Red-Purple Flowers (Sebastiana africana purpurea). The Metropolitan Museum of Art. Via Wikimedia Commons.",
+    // Recoloured to one blue-grey ink: the quiet, damask-like corner flourish.
+    spray: { tolerance: 42, monochrome: "#33506b" },
+    textZone: "bottom",
+    palettes: ["slate"],
+  },
+  {
+    id: "wild-rose-sprig",
+    name: "Wild Rose Sprig",
+    source: { kind: "commons", file: "File:Takje wilde rozen, RP-T-1943-81.jpg" },
+    licence: "CC0 (Rijksmuseum)",
+    credit: "Takje wilde rozen, RP-T-1943-81. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    spray: { tolerance: 36 },
+    textZone: "bottom",
+    palettes: ["forest"],
   },
 ];
 
