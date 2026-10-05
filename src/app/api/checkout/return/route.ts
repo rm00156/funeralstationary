@@ -1,6 +1,7 @@
 import { after, type NextRequest } from "next/server";
 import { redirect } from "next/navigation";
 
+import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { runPostPaymentSideEffects } from "@/lib/orderFulfilment.server";
 import { finaliseOrder } from "@/lib/orders.server";
 import {
@@ -40,8 +41,8 @@ export async function GET(request: NextRequest) {
   });
   if (result === "not-found") redirect("/cart");
   if (result === "finalised") {
-    const origin = resolveRequestOrigin(request);
-    after(() => runPostPaymentSideEffects(orderId, origin));
+    const origins = { site: resolveRequestOrigin(request), render: renderOrigin(request) };
+    after(() => runPostPaymentSideEffects(orderId, origins));
   }
   redirect(`/orders/${orderId}?placed=1`);
 }

@@ -1,21 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, ChevronRight, Clock, Heart, Palette } from "lucide-react";
 
-import Header from "@/components/Header";
+import Breadcrumb from "@/components/Breadcrumb";
 import Footer from "@/components/Footer";
-import HowItWorks from "@/components/HowItWorks";
-import ProductConfigurator from "@/components/ProductConfigurator";
-import ProductPreviewGallery from "@/components/ProductPreviewGallery";
+import Header from "@/components/Header";
+import { DesignForYouCard, UploadDesignCard } from "@/components/OtherWaysCards";
+import ProductDesigns from "@/components/ProductDesigns";
 import {
   getCategories,
   getSellableProduct,
   getTemplates,
 } from "@/lib/catalogue.server";
 import { PAGE_H_MM, PAGE_SIZE_LABEL, PAGE_W_MM } from "@/lib/designEditor";
-import { formatPence, type PricingData } from "@/lib/orderOfServicePricing";
+import {
+  defaultSelection,
+  formatPence,
+  getQuote,
+  type PricingData,
+} from "@/lib/orderOfServicePricing";
 import { getPricingData } from "@/lib/pricing.server";
+import { ORDER_CUTOFF } from "@/lib/site";
 
 // Pricing and the catalogue live in MySQL and are editable from /admin, so
 // this page must render per-request rather than being frozen at build time.
@@ -29,63 +34,41 @@ export async function generateMetadata({
   if (!product) return { title: "Not found | The Funeral Stationery" };
   return {
     title: `${product.label} | The Funeral Stationery`,
-    description: `Personalised ${product.label.toLowerCase()} from ${formatPence(product.fromPence)} for ${product.fromCopies} copies. Choose your options, see the price instantly, and have them delivered next day.`,
+    description: `${product.templateCount} ${product.label.toLowerCase()} designs to personalise online, from ${formatPence(product.fromPence)} for ${product.fromCopies} copies. Printed on heavyweight paper and delivered anywhere in the UK.`,
   };
 }
 
-const INCLUDED = [
-  {
-    icon: Palette,
-    title: "Your design, or ours",
-    description:
-      "Start from one of our designs and personalise every page yourself, or send us your content and we will put it together for you.",
-  },
-  {
-    icon: Heart,
-    title: "Checked before it prints",
-    description:
-      "Empty photo windows and unedited template wording are caught before you pay, so what arrives is exactly what you approved.",
-  },
-  {
-    icon: Clock,
-    title: "24hrs to 72hrs turnaround",
-    description:
-      "Order before 11am with next day delivery selected and it is with you the next working day.",
-  },
-];
+const priceOrFree = (pence: number) => (pence === 0 ? "Free" : formatPence(pence));
 
 /**
- * The specification table, read straight from the product's pricing options
- * so it can never disagree with what the calculator offers. An axis with no
- * choices to list is left out.
+ * "Prices at a glance": print cost for every copies × page-count pair, on the
+ * product's default paper, read from the same PricingData as the buy box — so
+ * the table can never disagree with what a design's page goes on to charge.
+ * Delivery is left out (it is chosen per order) and listed beside the table.
  */
-function specificationRows(pricing: PricingData): [string, string][] {
-  const labels = (options: { label: string }[]) =>
-    options.map((option) => option.label).join(", ");
-  const minimum = Math.min(...pricing.quantity.map((option) => option.value));
-  const rows: [string, string][] = [
-    ["Size", `${PAGE_SIZE_LABEL} (${PAGE_W_MM} x ${PAGE_H_MM}mm)`],
-    ["Page counts", labels(pricing.pages)],
-    ["Paper", labels(pricing.paper)],
-    ["Minimum order", `${minimum} copies`],
-    [
-      "Delivery",
-      pricing.delivery
-        .map(
-          (option) =>
-            `${option.label} (${option.pricePence === 0 ? "free" : formatPence(option.pricePence)})`,
-        )
-        .join(", "),
-    ],
-  ];
-  return rows.filter(([, detail]) => detail.length > 0);
+function priceTable(pricing: PricingData) {
+  const base = defaultSelection(pricing);
+  return {
+    paper: pricing.paper[0],
+    columns: pricing.pages,
+    rows: pricing.quantity.map((quantity) => ({
+      quantity,
+      prices: pricing.pages.map(
+        (pages) =>
+          getQuote(pricing, { ...base, quantity: quantity.id, pages: pages.id }).printCostPence,
+      ),
+    })),
+  };
 }
 
-export default async function ProductPage({ params }: PageProps<"/products/[slug]">) {
-  const { slug } = await params;
+export default async function ProductPage({
+  params,
+  searchParams,
+}: PageProps<"/products/[slug]">) {
+  const [{ slug }, { category: categoryParam }] = await Promise.all([params, searchParams]);
   // Only sellable products have a page: an active product still missing
   // templates or a pricing table 404s here exactly as it is absent from the
-  // home page and the shop menu.
+  // shop and the header menu.
   const product = await getSellableProduct(slug);
   if (!product) notFound();
 
@@ -95,128 +78,149 @@ export default async function ProductPage({ params }: PageProps<"/products/[slug
     getCategories(),
   ]);
   const productTemplates = templates.filter((template) => template.productId === product.id);
-  const themeIds = new Set(productTemplates.flatMap((template) => template.categories));
-  const themes = categories.filter((category) => themeIds.has(category.id));
+  const usedCategoryIds = new Set(productTemplates.flatMap((template) => template.categories));
+  const productCategories = categories.filter((category) => usedCategoryIds.has(category.id));
+  // A stale or unknown ?category= shows every design rather than 404ing.
+  const initialCategoryId =
+    productCategories.find((category) => category.id === categoryParam)?.id ?? null;
+
+  const table = priceTable(pricing);
+  const facts: { term: string; value: string; detail?: string }[] = [
+    {
+      term: "Prices from",
+      value: formatPence(product.fromPence),
+      detail: `/ ${product.fromCopies} copies`,
+    },
+    ...pricing.delivery.map((option) => ({
+      term: option.label,
+      value: priceOrFree(option.pricePence),
+    })),
+    { term: "Order by", value: ORDER_CUTOFF, detail: "weekdays" },
+  ];
 
   return (
     <>
       <Header />
-      <main className="flex-1">
-        <section className="px-margin-mobile md:px-gutter pt-8 pb-section-gap md:pt-10 bg-surface">
-          <div className="max-w-[1200px] mx-auto">
-            <nav
-              aria-label="Breadcrumb"
-              className="flex items-center gap-2 font-body text-sm text-on-surface-variant mb-4"
-            >
-              <Link href="/" className="hover:text-primary transition-colors">
-                Home
-              </Link>
-              <ChevronRight size={14} aria-hidden />
-              <span className="text-on-surface">{product.label}</span>
-            </nav>
-
-            <h1 className="font-display text-3xl md:text-4xl font-semibold text-primary leading-tight mb-2">
-              {product.label}
-            </h1>
-            <p className="font-body text-lg text-on-surface-variant mb-6">
-              From{" "}
-              <span className="font-semibold text-secondary">
-                {formatPence(product.fromPence)}
-              </span>{" "}
-              for {product.fromCopies} copies
-            </p>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 lg:gap-x-16 gap-y-6 items-start">
-              <div className="order-2 lg:order-1 lg:sticky lg:top-28">
-                <ProductPreviewGallery
-                  productLabel={product.label}
-                  templates={productTemplates
-                    .slice(0, 5)
-                    .map(({ id, name, image }) => ({ id, name, image }))}
-                />
-
-                {themes.length > 0 && (
-                  <>
-                    <p className="font-body text-sm uppercase tracking-[0.18em] text-secondary mt-8 mb-4">
-                      Available themes
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {themes.map((theme) => (
-                        <Link
-                          key={theme.id}
-                          href={`/templates?product=${product.id}&category=${theme.id}`}
-                          className="rounded-full bg-soft-sage px-5 py-2 font-body text-sm font-medium tracking-wide text-secondary transition-colors hover:bg-secondary-container"
-                        >
-                          {theme.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="order-1 lg:order-2 lg:-mt-[69px]">
-                <ProductConfigurator productId={product.id} pricing={pricing} />
-              </div>
+      <main className="type-body flex-1">
+        <section className="bg-paper">
+          <div className="site-container grid grid-cols-[repeat(auto-fit,minmax(min(460px,100%),1fr))] items-end gap-x-16 gap-y-8 pb-8 pt-10 md:pt-14">
+            <div className="flex flex-col gap-5">
+              <Breadcrumb
+                items={[
+                  { label: "Home", href: "/" },
+                  { label: "Shop", href: "/shop" },
+                  { label: product.label },
+                ]}
+              />
+              <h1 className="type-page">{product.label}</h1>
+              <p className="max-w-[34em] text-xl text-ink-2">
+                Choose a design, then add their photographs and words online. Printed on
+                heavyweight paper at exact {PAGE_SIZE_LABEL} ({PAGE_W_MM} × {PAGE_H_MM} mm).
+              </p>
             </div>
-          </div>
-        </section>
-
-        <section className="px-margin-mobile md:px-gutter py-section-gap bg-surface-container-low">
-          <div className="max-w-[1200px] mx-auto">
-            <h2 className="font-display text-3xl md:text-4xl font-semibold text-primary mb-4 text-center">
-              What Every Order Includes
-            </h2>
-            <p className="font-body text-lg text-on-surface-variant max-w-2xl mx-auto text-center mb-16">
-              The price you see covers everything from your first draft to the
-              box arriving at your door.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {INCLUDED.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-xl border border-soft-sage bg-surface-container-lowest p-8 ambient-shadow"
-                >
-                  <item.icon className="text-primary mb-5" size={32} aria-hidden />
-                  <h3 className="font-display text-xl text-on-surface mb-3">
-                    {item.title}
-                  </h3>
-                  <p className="font-body text-on-surface-variant">
-                    {item.description}
-                  </p>
+            <dl className="grid grid-cols-2 gap-4">
+              {facts.map((fact) => (
+                <div key={fact.term} className="rounded-xl border border-line bg-surface px-5 py-[18px]">
+                  <dt className="text-sm text-ink-3">{fact.term}</dt>
+                  <dd className="font-semibold">
+                    {fact.value}
+                    {fact.detail && (
+                      <span className="text-[15px] font-normal text-ink-3"> {fact.detail}</span>
+                    )}
+                  </dd>
                 </div>
               ))}
-            </div>
+            </dl>
+          </div>
+        </section>
 
-            <div className="mt-16 rounded-xl bg-surface-container-lowest border border-outline-variant/30 p-8 md:p-10">
-              <h3 className="font-display text-2xl text-primary mb-8">
-                Specification
-              </h3>
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-6">
-                {specificationRows(pricing).map(([term, detail]) => (
-                  <div key={term} className="flex items-start gap-4">
-                    <Check
-                      size={20}
-                      aria-hidden
-                      className="text-secondary shrink-0 mt-1"
-                    />
-                    <div>
-                      <dt className="font-body font-medium text-on-surface">
-                        {term}
-                      </dt>
-                      <dd className="font-body text-on-surface-variant">
-                        {detail}
-                      </dd>
-                    </div>
-                  </div>
-                ))}
-              </dl>
+        <section className="bg-paper">
+          <ProductDesigns
+            productId={product.id}
+            templates={productTemplates}
+            categories={productCategories}
+            initialCategoryId={initialCategoryId}
+            priceLine={`from ${formatPence(product.fromPence)}`}
+          />
+        </section>
+
+        <section id="prices" className="scroll-mt-4 border-y border-line bg-surface">
+          <div className="site-container flex flex-col gap-10 py-20">
+            <div className="flex max-w-[640px] flex-col gap-4">
+              <h2 className="type-sub">Prices at a glance</h2>
+              <p className="text-ink-2">
+                Every design costs the same. The price depends on how many copies
+                {table.columns.length > 1 ? " and pages" : ""} you need
+                {table.paper ? `, shown here on ${table.paper.label.toLowerCase()} paper` : ""}.
+                Delivery is added at the basket:{" "}
+                {pricing.delivery
+                  .map(
+                    (option) =>
+                      `${option.label.toLowerCase()} ${
+                        option.pricePence === 0 ? "is free" : `is ${formatPence(option.pricePence)}`
+                      }`,
+                  )
+                  .join(", ")}
+                .
+              </p>
+              <p className="text-ink-2">
+                Choose any design above to work out your exact price, with your paper and delivery.
+              </p>
+            </div>
+            <div
+              className="overflow-x-auto rounded-xl border border-line"
+              role="region"
+              aria-label="Price table"
+              tabIndex={0}
+            >
+              <table className="w-full min-w-[380px] border-collapse text-[17px]">
+                <thead>
+                  <tr className="bg-mist-2 text-left">
+                    <th scope="col" className="px-5 py-3.5 font-semibold">
+                      Copies
+                    </th>
+                    {table.columns.map((column) => (
+                      <th key={column.id} scope="col" className="whitespace-nowrap px-5 py-3.5 font-semibold">
+                        {table.columns.length > 1 ? column.label : "Price"}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {table.rows.map((row) => (
+                    <tr key={row.quantity.id} className="border-t border-line">
+                      <th scope="row" className="px-5 py-3.5 text-left font-medium">
+                        {row.quantity.value}
+                      </th>
+                      {row.prices.map((price, index) => (
+                        <td key={table.columns[index].id} className="whitespace-nowrap px-5 py-3.5">
+                          {formatPence(price)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
 
-        <HowItWorks />
+        <section className="bg-paper">
+          <div className="site-container flex flex-col gap-8 pb-24 pt-20">
+            <h2 className="type-sub">Can’t find the right design?</h2>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(380px,100%),1fr))] gap-6">
+              <DesignForYouCard />
+              <UploadDesignCard />
+            </div>
+            <p className="text-base text-ink-2">
+              Looking for something else?{" "}
+              <Link href="/shop" className="link font-medium">
+                See everything in the shop
+              </Link>
+              .
+            </p>
+          </div>
+        </section>
       </main>
       <Footer />
     </>

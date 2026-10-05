@@ -22,13 +22,56 @@ interface SeedOption {
   note?: string;
 }
 
-export const PRODUCTS = [
-  { id: "order-of-service", label: "Order of Service Booklets" },
-  { id: "memorial-cards", label: "Memorial Cards" },
-  { id: "bookmarks", label: "Bookmarks" },
-  { id: "thank-you-cards", label: "Thank You Cards" },
-  { id: "attendance-cards", label: "Attendance Cards" },
-  { id: "pet-sympathy", label: "Pet Sympathy Cards" },
+/**
+ * `description` is the card blurb on the shop and home pages (draft copy from
+ * the redesign handoff — the owner still has to approve it); `occasion` is
+ * which shop group the product sits in.
+ */
+export const PRODUCTS: {
+  id: string;
+  label: string;
+  description: string;
+  occasion: "service" | "after";
+}[] = [
+  {
+    id: "order-of-service",
+    label: "Order of Service Booklets",
+    description:
+      "Personalise online with their photographs and words. Printed at exact A5, 148 × 210 mm.",
+    occasion: "service",
+  },
+  {
+    id: "memorial-cards",
+    label: "Memorial Cards",
+    description: "Wallet-sized cards with their photo and dates, for family and friends to keep.",
+    occasion: "service",
+  },
+  {
+    id: "bookmarks",
+    label: "Bookmarks",
+    description:
+      "A small keepsake with their photo and a favourite verse, to give out on the day.",
+    occasion: "service",
+  },
+  {
+    id: "thank-you-cards",
+    label: "Thank You Cards",
+    description: "Thank everyone who sent flowers, cards or kind words, in your own words.",
+    occasion: "after",
+  },
+  {
+    id: "attendance-cards",
+    label: "Attendance Cards",
+    description:
+      "Cards for guests to fill in at the service, so the family has a record of who came.",
+    occasion: "service",
+  },
+  {
+    id: "pet-sympathy",
+    label: "Pet Sympathy Cards",
+    description: "For a much-loved companion, or to send to someone who has lost theirs.",
+    occasion: "after",
+  },
 ];
 
 export const DEFAULT_PRODUCT = PRODUCTS[0].id;

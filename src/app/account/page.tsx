@@ -75,7 +75,7 @@ export default async function AccountPage({
     <>
       <Header />
       <main className="flex-1">
-        <section className="bg-surface px-margin-mobile pt-8 pb-section-gap md:px-gutter">
+        <section className="bg-paper px-margin-mobile pt-8 pb-section-gap md:px-gutter">
           <div className="mx-auto max-w-[1200px]">
             {user ? (
               <SignedIn email={user.email} designs={designs} orders={orders} />
@@ -126,7 +126,7 @@ function SignedIn({
           <CircleUserRound size={18} aria-hidden className="text-secondary" />
           Signed in as <span className="font-medium text-on-surface">{email}</span>
         </p>
-        <SignOutButton className="rounded-lg border border-outline-variant px-4 py-2 hover:border-primary-container" />
+        <SignOutButton className="rounded-lg border border-outline-variant px-4 py-2 text-sm hover:border-primary-container" />
       </div>
 
       <section aria-labelledby="account-designs" className="mb-14">
@@ -165,7 +165,7 @@ function Guest({
       <Breadcrumb label="Sign in" />
       <h1 className={titleClass}>{openingOrder ? "Sign in to see your order" : "Sign in"}</h1>
 
-      <div className="mb-14 max-w-2xl rounded-2xl border border-soft-sage bg-surface-container-lowest p-8 ambient-shadow">
+      <div className="mb-14 max-w-2xl rounded-2xl border border-line bg-surface-container-lowest p-8 ambient-shadow">
         <p className="mb-6 font-body text-on-surface-variant">
           {openingOrder
             ? "Enter the email address the order was placed with and we will send you a link that opens it on this device."

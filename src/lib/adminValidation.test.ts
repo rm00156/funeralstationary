@@ -8,6 +8,8 @@ import {
   parseOptionPatch,
   parsePageCount,
   parsePence,
+  parseProductDescription,
+  parseProductOccasion,
   parseSlug,
 } from "@/lib/adminValidation";
 
@@ -207,5 +209,28 @@ describe("parseLayoutAction", () => {
     expect(parseLayoutAction("")).toBeNull();
     expect(parseLayoutAction(undefined)).toBeNull();
     expect(parseLayoutAction({ action: "publish" })).toBeNull();
+  });
+});
+
+describe("parseProductDescription", () => {
+  it("trims, and turns an empty blurb into null", () => {
+    expect(parseProductDescription("  A small keepsake.  ")).toBe("A small keepsake.");
+    expect(parseProductDescription("   ")).toBeNull();
+    expect(parseProductDescription(null)).toBeNull();
+  });
+
+  it("rejects non-strings and anything longer than the column", () => {
+    expect(parseProductDescription(42)).toBeUndefined();
+    expect(parseProductDescription("a".repeat(301))).toBeUndefined();
+    expect(parseProductDescription("a".repeat(300))).toHaveLength(300);
+  });
+});
+
+describe("parseProductOccasion", () => {
+  it("accepts only the two shop groups", () => {
+    expect(parseProductOccasion("service")).toBe("service");
+    expect(parseProductOccasion("after")).toBe("after");
+    expect(parseProductOccasion("other")).toBeNull();
+    expect(parseProductOccasion(undefined)).toBeNull();
   });
 });

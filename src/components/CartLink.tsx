@@ -42,15 +42,12 @@ export default function CartLink({
       href="/cart"
       onClick={onClick}
       aria-label={count ? `Basket, ${count} ${count === 1 ? "item" : "items"}` : "Basket"}
-      className={`items-center justify-center gap-2 rounded-lg border-2 border-primary-container px-5 py-2 text-sm font-medium tracking-wide text-primary-container transition-colors duration-300 hover:bg-surface-container ${className}`}
+      className={`btn btn-outline min-h-11 gap-2 px-3 text-base sm:px-4 ${className}`}
     >
-      <ShoppingBag size={18} aria-hidden />
-      Basket
-      {!!count && (
-        <span className="ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full bg-primary-container px-1.5 text-xs text-white">
-          {count}
-        </span>
-      )}
+      <ShoppingBag size={18} strokeWidth={1.8} aria-hidden />
+      {/* The word gives way to the icon on the narrowest phones; the label above still says it. */}
+      <span className="max-[420px]:sr-only">Basket</span>
+      {count !== null && `(${count})`}
     </Link>
   );
 }

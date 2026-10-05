@@ -93,7 +93,7 @@ export default function AdminTemplateDeleteButton({
           }}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-surface p-6 ambient-shadow"
+            className="w-full max-w-md rounded-xl bg-paper p-6 ambient-shadow"
             onClick={(event) => event.stopPropagation()}
           >
             <h2

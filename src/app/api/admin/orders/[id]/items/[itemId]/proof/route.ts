@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { generateOrderItemProof } from "@/lib/orderFulfilment.server";
 import { isStorageConfigured } from "@/lib/storage";
 
@@ -23,7 +24,7 @@ export async function POST(
   const { id, itemId } = await ctx.params;
 
   try {
-    const proof = await generateOrderItemProof(id, itemId, new URL(request.url).origin, "admin");
+    const proof = await generateOrderItemProof(id, itemId, renderOrigin(request), "admin");
     return Response.json({ proof }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message.endsWith("not found")) {

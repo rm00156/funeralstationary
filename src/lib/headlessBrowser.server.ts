@@ -4,6 +4,22 @@
  * PageCanvas via /proof-render.
  */
 
+/**
+ * The origin headless Chromium loads /proof-render from — this server
+ * calling itself, so never the public origin a link should carry.
+ *
+ * Off Vercel it is always loopback on the port Next is listening on.
+ * `request.url` can't be trusted for this: Next builds it from the bound
+ * `localhost:<port>` but takes the scheme from `x-forwarded-proto`, so a
+ * request through a cloudflared/ngrok tunnel yields `https://localhost:3000`,
+ * which nothing serves. On Vercel there is no loopback to call, and
+ * `request.url` is the deployment's real https origin.
+ */
+export function renderOrigin(request: Request): string {
+  if (process.env.VERCEL) return new URL(request.url).origin;
+  return `http://localhost:${process.env.PORT ?? 3000}`;
+}
+
 /** Vercel's serverless functions run Linux, which @sparticuz/chromium's
  * binary targets; a Mac/Windows dev machine needs a real local Chromium
  * instead, which the full `puppeteer` package downloads on install. */

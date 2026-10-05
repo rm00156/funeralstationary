@@ -77,6 +77,8 @@ async function main() {
 
   const productBySlug = await upsertAndMapBySlug(products, buildProductsSeed(), [
     "label",
+    "description",
+    "occasion",
     "sortOrder",
     "isActive",
   ]);

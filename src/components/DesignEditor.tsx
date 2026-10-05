@@ -534,7 +534,7 @@ export default function DesignEditor({
    * template and product, and both can change from inside the editor. A
    * lingering ?template=/?product= would start lying the moment a different
    * template was applied, so they're dropped here (they only ever seed a new
-   * design, from /templates) — and so are ?pages=/?paper=, which the row now
+   * design, from its design page) — and so are ?pages=/?paper=, which the row now
    * owns. ?quantity=/?delivery= stay: they're basket choices, not properties
    * of the design, so a refresh must still add the line on what was priced.
    */
@@ -1485,7 +1485,7 @@ export default function DesignEditor({
             mobilePanelOpen
               ? "absolute inset-x-0 bottom-0 z-30 flex max-h-[60dvh] rounded-t-2xl border-t shadow-[0_-8px_30px_rgba(31,26,30,0.18)]"
               : "hidden"
-          } shrink-0 flex-col overflow-y-auto border-outline-variant/40 bg-surface p-4 md:static md:inset-auto md:z-auto md:flex md:max-h-none md:w-[300px] md:rounded-none md:border-r md:border-t-0 md:shadow-none`}
+          } shrink-0 flex-col overflow-y-auto border-outline-variant/40 bg-paper p-4 md:static md:inset-auto md:z-auto md:flex md:max-h-none md:w-[300px] md:rounded-none md:border-r md:border-t-0 md:shadow-none`}
         >
           <div className="mb-3 flex items-center justify-between md:hidden">
             <span className="font-body text-sm font-medium capitalize text-on-surface">
@@ -1603,7 +1603,7 @@ export default function DesignEditor({
               )}
 
               {!authoring && (
-              <div className="rounded-xl border border-soft-sage bg-surface-container-lowest p-4 ambient-shadow">
+              <div className="rounded-xl border border-line bg-surface-container-lowest p-4 ambient-shadow">
                 <p className="font-body text-sm text-on-surface-variant">
                   {quote.quantity.value} copies for{" "}
                   <span className="font-semibold text-secondary">
@@ -2423,7 +2423,7 @@ export default function DesignEditor({
           onClick={() => setPreview(false)}
         >
           <div
-            className={`mx-auto flex max-h-full w-full flex-col rounded-xl bg-surface p-6 ${
+            className={`mx-auto flex max-h-full w-full flex-col rounded-xl bg-paper p-6 ${
               previewMode === "booklet" ? "h-full max-w-6xl" : "max-w-5xl"
             }`}
             onClick={(event) => event.stopPropagation()}

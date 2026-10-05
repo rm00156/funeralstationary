@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
+import SignInForm from "@/components/SignInForm";
 import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
 import { formatPence } from "@/lib/orderOfServicePricing";
 import { getOrder } from "@/lib/orders.server";
@@ -62,7 +63,7 @@ export default async function OrderPage({
     <>
       <Header />
       <main className="flex-1">
-        <section className="bg-surface px-margin-mobile pt-8 pb-section-gap md:px-gutter">
+        <section className="bg-paper px-margin-mobile pt-8 pb-section-gap md:px-gutter">
           <div className="mx-auto max-w-[1200px]">
             <nav
               aria-label="Breadcrumb"
@@ -85,7 +86,7 @@ export default async function OrderPage({
             </nav>
 
             {placed === "1" && (
-              <div className="mb-8 flex items-start gap-3 rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow">
+              <div className="mb-8 flex items-start gap-3 rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow">
                 <CheckCircle2 size={24} aria-hidden className="mt-0.5 shrink-0 text-secondary" />
                 <div>
                   <h2 className="font-display text-2xl text-primary">
@@ -152,7 +153,7 @@ export default async function OrderPage({
               </div>
 
               <aside className="flex h-fit flex-col gap-6">
-                <section className="rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow">
+                <section className="rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow">
                   <h2 className="mb-4 font-display text-2xl text-primary">Total</h2>
                   <dl className="space-y-2 font-body text-sm text-on-surface-variant">
                     <div className="flex justify-between gap-4">
@@ -178,6 +179,24 @@ export default async function OrderPage({
                     Includes VAT of {formatPence(order.totals.vatPence)}
                   </p>
                 </section>
+
+                {/* Offered after payment, never before it: checkout stays guest-first.
+                    The link signs them in and claimOwnership picks up this order (and
+                    everything this browser saved) by the email they just paid with. */}
+                {!owner?.userId && authConfigured() && (
+                  <section className="rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow">
+                    <h2 className="mb-2 font-display text-xl text-primary">Keep this order to hand</h2>
+                    <p className="mb-5 font-body text-sm text-on-surface-variant">
+                      To see this order and your designs from another device, we can email you a
+                      sign-in link. There&apos;s no password to set up.
+                    </p>
+                    <SignInForm
+                      next={`/orders/${order.id}`}
+                      initialEmail={order.contact.email ?? ""}
+                      submitLabel="Email me a link"
+                    />
+                  </section>
+                )}
 
                 <section className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6">
                   <h2 className="mb-3 font-display text-xl text-primary">Delivering to</h2>

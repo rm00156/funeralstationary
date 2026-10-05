@@ -24,7 +24,7 @@ export default async function AdminLayout({
   await requireAdmin();
 
   return (
-    <div className="flex min-h-dvh flex-col bg-surface">
+    <div className="flex min-h-dvh flex-col bg-paper">
       <header className="border-b border-outline-variant/40 bg-surface-container-lowest">
         <div className="mx-auto flex max-w-[1200px] items-center gap-6 px-margin-mobile py-3 md:px-gutter">
           <Link href="/admin" className="font-display text-lg text-primary">

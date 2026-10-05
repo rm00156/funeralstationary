@@ -34,7 +34,7 @@ export default async function DesignPage({
   // ?design=<id> is the canonical address for an existing design and is
   // authoritative on its own: the row owns its template and product, and both
   // can change from inside the editor. ?template=/?product= only seed a *new*
-  // design (the link /templates builds); the editor strips them from the URL
+  // design (the link a design's page builds); the editor strips them from the URL
   // as soon as a design id exists.
   const owner = designParam ? await readOwner() : null;
   const saved = owner && designParam ? await getDesign(owner, designParam) : null;

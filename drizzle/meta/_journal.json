@@ -71,6 +71,13 @@
       "when": 1789398192438,
       "tag": "0009_login_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1791025391521,
+      "tag": "0010_product_description_occasion",
+      "breakpoints": true
     }
   ]
 }

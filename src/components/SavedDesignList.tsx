@@ -134,10 +134,10 @@ export default function SavedDesignList({
           You have not saved a design yet.
         </p>
         <Link
-          href="/templates"
-          className="inline-flex items-center rounded-lg bg-primary px-5 py-3 font-body text-sm font-medium text-on-primary transition-colors hover:bg-on-primary-container"
+          href="/shop"
+          className="inline-flex items-center rounded-lg bg-plum px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-plum-hover"
         >
-          Browse templates
+          Browse designs
         </Link>
       </div>
     );

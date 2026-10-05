@@ -57,8 +57,8 @@ export interface Selection {
 export const SELECTION_AXES = ["quantity", "pages", "paper", "delivery"] as const;
 
 /**
- * The product page's selection as query params, so it survives the hops
- * /products/[slug] → /templates → /design → basket. Axis names double as the
+ * The design page's selection as query params, so it survives the hops
+ * /products/[slug]/[template] → /design → basket. Axis names double as the
  * param names.
  */
 export function selectionSearchParams(selection: Partial<Selection>): URLSearchParams {

@@ -13,7 +13,7 @@ export default async function AdminLoginPage() {
   if (await isAdmin()) redirect("/admin");
 
   return (
-    <main className="flex min-h-dvh flex-1 items-center justify-center bg-surface px-margin-mobile md:px-gutter">
+    <main className="flex min-h-dvh flex-1 items-center justify-center bg-paper px-margin-mobile md:px-gutter">
       <div className="w-full max-w-sm">
         <h1 className="mb-2 text-center font-display text-3xl font-semibold text-primary">
           Admin

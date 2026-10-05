@@ -33,7 +33,7 @@ export default async function CartPage() {
     <>
       <Header />
       <main className="flex-1">
-        <section className="bg-surface px-margin-mobile pt-8 pb-section-gap md:px-gutter">
+        <section className="bg-paper px-margin-mobile pt-8 pb-section-gap md:px-gutter">
           <div className="mx-auto max-w-[1200px]">
             <nav
               aria-label="Breadcrumb"

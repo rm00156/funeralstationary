@@ -1,48 +1,123 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens — source of truth: funeral-stationery-handoff/HANDOFF.md
+ * ("Design tokens"). Token names follow the handoff, except its --text-2 /
+ * --text-3 / --text-label, which are ink-2 / ink-3 / ink-label here so the
+ * utilities read `text-ink-2` rather than `text-text-2`.
+ */
 :root {
-  --color-surface: #fff7fa;
-  --color-surface-dim: #e2d7dd;
-  --color-surface-bright: #fff7fa;
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #fcf0f7;
-  --color-surface-container: #f7ebf1;
-  --color-surface-container-high: #f1e5eb;
-  --color-surface-container-highest: #ebdfe5;
-  --color-on-surface: #1f1a1e;
-  --color-on-surface-variant: #4f434c;
-  --color-inverse-surface: #352f33;
-  --color-inverse-on-surface: #faeef4;
-  --color-outline: #81737d;
-  --color-outline-variant: #d3c2cd;
-  --color-primary: #511552;
+  /* Brand */
+  --color-plum: #5a2760;
+  --color-plum-hover: #45204b;
+  --color-plum-deep: #3e1a43;
+  --color-plum-night: #2e1631;
+
+  /* Text */
+  --color-ink: #2b2230;
+  --color-ink-2: #4e4552;
+  --color-ink-3: #5e5560;
+  --color-ink-label: #6a5f6c;
+  --color-on-plum: #efe3ee;
+  --color-on-plum-muted: #e9dce8;
+
+  /* Surfaces */
+  --color-paper: #fbf8f5;
+  --color-surface: #ffffff;
+  --color-mist: #f3ecf2;
+  --color-mist-2: #f5eff4;
+  --color-mist-3: #f1e8f0;
+  --color-sheet: #fffdfb;
+
+  /* Lines */
+  --color-line: #ece3ea;
+  --color-line-2: #d9ccd7;
+  --color-field-border: #cfc0cc;
+  --color-focus-ring: #d9c2d8;
+
+  /* Status */
+  --color-star: #1f6b45;
+  --color-success-bg: #eef5f0;
+  --color-success-border: #bfd9c8;
+  --color-success-text: #1f4d33;
+
+  /*
+   * Legacy "Serene Legacy" names, kept as aliases of the palette above so the
+   * pages the handoff doesn't cover (basket, checkout, account, the editor
+   * and /admin) follow the new colours without being rewritten. New code
+   * should use the tokens above.
+   */
+  --color-surface-dim: var(--color-line-2);
+  --color-surface-bright: var(--color-paper);
+  --color-surface-container-lowest: var(--color-surface);
+  --color-surface-container-low: var(--color-mist-2);
+  --color-surface-container: var(--color-mist);
+  --color-surface-container-high: var(--color-mist-3);
+  --color-surface-container-highest: var(--color-line);
+  --color-on-surface: var(--color-ink);
+  --color-on-surface-variant: var(--color-ink-2);
+  --color-inverse-surface: var(--color-plum-night);
+  --color-inverse-on-surface: var(--color-on-plum-muted);
+  --color-outline: var(--color-ink-label);
+  --color-outline-variant: var(--color-line-2);
+  --color-primary: var(--color-plum-hover);
   --color-on-primary: #ffffff;
-  --color-primary-container: #6b2d6a;
-  --color-on-primary-container: #e69adf;
-  --color-primary-fixed: #ffd6f7;
-  --color-secondary: #226b3d;
+  --color-primary-container: var(--color-plum);
+  --color-on-primary-container: var(--color-on-plum);
+  --color-primary-fixed: var(--color-on-plum-muted);
+  --color-secondary: var(--color-star);
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #a9f4b9;
-  --color-on-secondary-container: #297143;
-  --color-background: #fff7fa;
-  --color-on-background: #1f1a1e;
+  --color-secondary-container: var(--color-success-border);
+  --color-on-secondary-container: var(--color-success-text);
+  --color-background: var(--color-paper);
+  --color-on-background: var(--color-ink);
   --color-canvas-cream: #f4f1ee;
-  --color-soft-sage: #e8f0ea;
+  --color-soft-sage: var(--color-success-bg);
   --color-mourning-gray: #4a4a4a;
 
-  --font-display: "Source Serif 4", serif;
-  --font-body: "Work Sans", sans-serif;
+  /* next/font puts the loaded faces on <html> as --font-newsreader / --font-work-sans. */
+  --font-display: var(--font-newsreader), Georgia, serif;
+  --font-body: var(--font-work-sans), "Helvetica Neue", sans-serif;
 
   --spacing-margin-mobile: 16px;
-  --spacing-gutter: 24px;
+  --spacing-gutter: 32px;
   --spacing-element-gap: 24px;
-  --spacing-section-gap: 80px;
+  --spacing-section-gap: 96px;
 
   --container-max-width: 1200px;
+
+  --shadow-cover: 0 8px 22px rgba(62, 26, 67, 0.12);
+  --shadow-cover-hover: 0 18px 40px rgba(62, 26, 67, 0.16);
+  --shadow-cover-lg: 0 24px 50px rgba(62, 26, 67, 0.18);
+  --shadow-menu: 0 20px 48px rgba(62, 26, 67, 0.14);
 }
 
 @theme inline {
+  --color-plum: var(--color-plum);
+  --color-plum-hover: var(--color-plum-hover);
+  --color-plum-deep: var(--color-plum-deep);
+  --color-plum-night: var(--color-plum-night);
+  --color-ink: var(--color-ink);
+  --color-ink-2: var(--color-ink-2);
+  --color-ink-3: var(--color-ink-3);
+  --color-ink-label: var(--color-ink-label);
+  --color-on-plum: var(--color-on-plum);
+  --color-on-plum-muted: var(--color-on-plum-muted);
+  --color-paper: var(--color-paper);
   --color-surface: var(--color-surface);
+  --color-mist: var(--color-mist);
+  --color-mist-2: var(--color-mist-2);
+  --color-mist-3: var(--color-mist-3);
+  --color-sheet: var(--color-sheet);
+  --color-line: var(--color-line);
+  --color-line-2: var(--color-line-2);
+  --color-field-border: var(--color-field-border);
+  --color-focus-ring: var(--color-focus-ring);
+  --color-star: var(--color-star);
+  --color-success-bg: var(--color-success-bg);
+  --color-success-border: var(--color-success-border);
+  --color-success-text: var(--color-success-text);
+
   --color-surface-dim: var(--color-surface-dim);
   --color-surface-bright: var(--color-surface-bright);
   --color-surface-container-lowest: var(--color-surface-container-lowest);
@@ -78,6 +153,11 @@
   --spacing-gutter: var(--spacing-gutter);
   --spacing-element-gap: var(--spacing-element-gap);
   --spacing-section-gap: var(--spacing-section-gap);
+
+  --shadow-cover: var(--shadow-cover);
+  --shadow-cover-hover: var(--shadow-cover-hover);
+  --shadow-cover-lg: var(--shadow-cover-lg);
+  --shadow-menu: var(--shadow-menu);
 }
 
 body {
@@ -91,5 +171,232 @@ body {
 }
 
 .ambient-shadow {
-  box-shadow: 0 4px 20px rgba(107, 45, 106, 0.04);
+  box-shadow: 0 4px 20px rgba(62, 26, 67, 0.05);
+}
+
+/*
+ * The handoff's shared pieces. They live in the components layer so a
+ * utility on the same element still wins (`btn btn-primary min-h-14`).
+ *
+ * None of these are element selectors on purpose: the print canvas
+ * (PageCanvas, /proof-render) renders inside the same stylesheet, and a bare
+ * `p { text-wrap: pretty }` would re-break lines on the press PDF.
+ */
+@layer components {
+  /* 18px / 1.6 body copy — deliberately large; many customers are older. */
+  .type-body {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--color-ink);
+  }
+  .type-body p {
+    text-wrap: pretty;
+  }
+
+  .type-hero,
+  .type-page,
+  .type-section,
+  .type-sub {
+    font-family: var(--font-display);
+    font-weight: 400;
+    color: var(--color-ink);
+    text-wrap: balance;
+  }
+  .type-hero {
+    font-size: clamp(42px, 5vw, 66px);
+    line-height: 1.06;
+    letter-spacing: -0.01em;
+  }
+  .type-page {
+    font-size: clamp(40px, 4.4vw, 58px);
+    line-height: 1.08;
+  }
+  .type-section {
+    font-size: clamp(34px, 3.6vw, 46px);
+    line-height: 1.1;
+  }
+  .type-sub {
+    font-size: clamp(30px, 3vw, 38px);
+    line-height: 1.15;
+  }
+
+  .eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-ink-label);
+  }
+
+  .link {
+    color: var(--color-plum);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .link:hover {
+    color: var(--color-plum-deep);
+  }
+
+  /* 1200px of content plus the side gutters, so it lines up with the
+     `max-w-[1200px]` inside a padded section that the older pages use. */
+  .site-container {
+    width: 100%;
+    max-width: calc(var(--container-max-width) + 2 * var(--spacing-gutter));
+    margin-inline: auto;
+    padding-inline: var(--spacing-margin-mobile);
+  }
+  @media (min-width: 640px) {
+    .site-container {
+      padding-inline: var(--spacing-gutter);
+    }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 0 26px;
+    border: 1.5px solid transparent;
+    border-radius: 8px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
+  }
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-plum);
+    color: #ffffff;
+  }
+  .btn-primary:hover {
+    background: var(--color-plum-hover);
+  }
+  .btn-outline {
+    background: var(--color-surface);
+    border-color: var(--color-plum);
+    color: var(--color-plum);
+  }
+  .btn-outline:hover {
+    background: var(--color-mist);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-ink);
+  }
+  .btn-ghost:hover {
+    background: var(--color-mist);
+  }
+  .btn-on-dark {
+    background: #ffffff;
+    color: var(--color-plum-deep);
+  }
+  .btn-on-dark:hover {
+    background: var(--color-mist);
+  }
+  .btn-on-dark-outline {
+    border-color: rgba(255, 255, 255, 0.7);
+    color: #ffffff;
+  }
+  .btn-on-dark-outline:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Filter chip: a toggle button, on/off carried by aria-pressed. */
+  .chip {
+    min-height: 44px;
+    padding: 0 20px;
+    border: 1.5px solid var(--color-line-2);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
+  }
+  .chip:hover {
+    border-color: var(--color-plum);
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--color-plum);
+    border-color: var(--color-plum);
+    color: #ffffff;
+  }
+
+  /* Option button on the buy box (pages, copies, paper, delivery). */
+  .opt {
+    min-height: 52px;
+    padding: 6px 10px;
+    border: 1.5px solid var(--color-line-2);
+    border-radius: 8px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+  }
+  .opt:hover {
+    border-color: var(--color-plum);
+  }
+  .opt[aria-pressed="true"] {
+    background: var(--color-mist-2);
+    border: 2px solid var(--color-plum);
+    color: var(--color-plum-deep);
+    font-weight: 600;
+  }
+
+  .field {
+    width: 100%;
+    min-height: 52px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--color-field-border);
+    border-radius: 8px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 17px;
+  }
+  .field:focus {
+    outline: 3px solid var(--color-focus-ring);
+    outline-offset: 1px;
+    border-color: var(--color-plum);
+  }
+
+  /* A printed piece inside a card: lifts 4px when its card is hovered. */
+  .cover {
+    box-shadow: var(--shadow-cover);
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .card-link:hover .cover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-cover-hover);
+  }
+}
+
+/* Keyboard focus, visible on every interactive element of the redesigned pages. */
+.type-body :focus-visible,
+.site-chrome :focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover,
+  .card-link:hover .cover {
+    transition: none;
+    transform: none;
+  }
 }

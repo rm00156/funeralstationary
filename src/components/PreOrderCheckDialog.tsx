@@ -56,7 +56,7 @@ export default function PreOrderCheckDialog({
       onClick={onClose}
     >
       <div
-        className="max-h-full w-full max-w-lg overflow-y-auto rounded-2xl bg-surface-container-lowest p-8 ambient-shadow"
+        className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface-container-lowest p-8 ambient-shadow"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-3">
@@ -81,7 +81,7 @@ export default function PreOrderCheckDialog({
           {issues.map((issue, index) => (
             <li
               key={`${issue.kind}-${issue.page}-${index}`}
-              className="rounded-xl border border-outline-variant/60 bg-surface p-4"
+              className="rounded-xl border border-outline-variant/60 bg-paper p-4"
             >
               <p className="font-body text-on-surface">
                 {issue.kind === "empty-photo" ? "Empty photo window" : quoted(issue.text ?? "")}

@@ -13,6 +13,15 @@ export interface Product {
   label: string;
 }
 
+/** When a product is needed — the shop's grouping (products.occasion). */
+export const PRODUCT_OCCASIONS = ["service", "after"] as const;
+export type ProductOccasion = (typeof PRODUCT_OCCASIONS)[number];
+
+export const OCCASION_LABELS: Record<ProductOccasion, string> = {
+  service: "For the service",
+  after: "After the service",
+};
+
 export interface TemplateCategory {
   id: string;
   label: string;
@@ -59,6 +68,9 @@ export function filterTemplates(
  * appears as an empty shelf.
  */
 export interface ProductShowcase extends Product {
+  /** The card blurb (products.description); null when the admin hasn't written one. */
+  description: string | null;
+  occasion: ProductOccasion;
   /** Preview image of the product's first published template. */
   image: string;
   templateCount: number;

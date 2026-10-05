@@ -164,7 +164,7 @@ export default function CheckoutForm({
         </p>
       </form>
 
-      <aside className="h-fit rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow lg:sticky lg:top-28">
+      <aside className="h-fit rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow lg:sticky lg:top-28">
         <h2 className="mb-5 font-display text-2xl text-primary">Your order</h2>
         <ul className="divide-y divide-outline-variant/40 font-body text-sm">
           {cart.items.map((item) => (

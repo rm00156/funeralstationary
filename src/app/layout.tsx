@@ -31,6 +31,7 @@ import {
   Merriweather,
   Mrs_Saint_Delafield,
   Mulish,
+  Newsreader,
   Nunito_Sans,
   PT_Serif,
   Parisienne,
@@ -53,16 +54,30 @@ import {
 } from "next/font/google";
 import "./globals.css";
 
-const sourceSerif = Source_Serif_4({
-  variable: "--font-display",
+// The site's two faces (see the handoff's "Type" section): Newsreader for
+// headings, prices and quotes, Work Sans for body and UI. globals.css builds
+// --font-display / --font-body from these two variables.
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500"],
+  style: ["normal", "italic"],
 });
 
 const workSans = Work_Sans({
-  variable: "--font-body",
+  variable: "--font-work-sans",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
+});
+
+// Source Serif 4 was the site's heading face before the redesign and is still
+// the editor's "Source Serif" option (FONT_OPTIONS' `display`), so designs
+// already saved in it must keep printing in it — it stays loaded under its
+// own variable rather than following --font-display to Newsreader.
+const sourceSerif = Source_Serif_4({
+  variable: "--font-source-serif",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 // Script face used by the design editor canvas (e.g. "Celebrating") — loaded
@@ -186,9 +201,9 @@ const editorFonts = [
 ];
 
 export const metadata: Metadata = {
-  title: "The Funeral Stationery | You design the tribute. We print the memories.",
+  title: "The Funeral Stationery | Order of Service booklets, printed and delivered",
   description:
-    "Personalise a tribute booklet in minutes, delivered next day. Fast turnaround for your most precious tributes, delivered with compassionate professionalism.",
+    "Choose a design, add their photographs and words online, and we print on heavyweight paper and deliver anywhere in the UK. Order of Service booklets, memorial cards and more.",
   // favicon.ico comes from src/app/favicon.ico (file convention, wired automatically).
   icons: {
     icon: [
@@ -200,12 +215,12 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
-  const fontVariables = [sourceSerif, workSans, greatVibes, ...editorFonts]
+  const fontVariables = [newsreader, workSans, sourceSerif, greatVibes, ...editorFonts]
     .map((font) => font.variable)
     .join(" ");
 
   return (
-    <html lang="en" className={`${fontVariables} h-full antialiased`}>
+    <html lang="en-GB" className={`${fontVariables} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
         {children}
       </body>
