@@ -53,7 +53,7 @@ export default async function AdminProductPricingPage({
         <span className="text-on-surface">{product.label}</span>
       </nav>
 
-      <h1 className="mb-2 font-display text-3xl font-semibold text-primary">
+      <h1 className="mb-2 font-display text-3xl font-medium text-primary">
         {product.label}
       </h1>
       <p className="mb-8 max-w-2xl font-body text-on-surface-variant">

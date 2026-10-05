@@ -200,7 +200,7 @@ export default function CheckoutForm({
         </dl>
         <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-4">
           <span className="font-display text-xl text-on-surface">Total</span>
-          <span className="font-display text-3xl font-semibold text-primary">
+          <span className="font-display text-3xl font-medium text-primary">
             {formatPence(cart.totals.totalPence)}
           </span>
         </div>

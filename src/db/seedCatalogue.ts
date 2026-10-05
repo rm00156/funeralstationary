@@ -15,6 +15,8 @@
  * images already used elsewhere on the site.
  */
 
+import type { ProductOccasion } from "@/lib/templates";
+
 interface SeedOption {
   id: string;
   label: string;
@@ -31,7 +33,7 @@ export const PRODUCTS: {
   id: string;
   label: string;
   description: string;
-  occasion: "service" | "after";
+  occasion: ProductOccasion;
 }[] = [
   {
     id: "order-of-service",

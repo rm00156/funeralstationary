@@ -156,7 +156,7 @@ export default function SavedDesignList({
             key={design.id}
             className="flex flex-col rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5"
           >
-            <h3 className="font-display text-xl font-semibold text-on-surface mb-1">
+            <h3 className="font-display text-xl font-medium text-on-surface mb-1">
               {design.name}
             </h3>
             <p className="font-body text-sm text-on-surface-variant">

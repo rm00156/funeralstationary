@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { contactEmail, formatServiceDate, validateContactMessage } from "@/lib/contact";
+import {
+  CONTACT_TOPICS,
+  contactEmail,
+  contactTopics,
+  formatServiceDate,
+  validateContactMessage,
+} from "@/lib/contact";
 
 const topics = new Map([
   ["order-of-service", "Order of Service Booklets"],
@@ -53,6 +59,15 @@ describe("validateContactMessage", () => {
     expect(Object.keys(result.errors).sort()).toEqual(["email", "serviceDate", "topic"]);
   });
 
+  it("rejects an address that would become a reply-to list", () => {
+    for (const email of ["jean@example.com,x@evil.test", "jean@example.com; x", "Jean <jean@example.com>"]) {
+      const result = validateContactMessage({ ...valid, email }, topics);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(Object.keys(result.errors)).toEqual(["email"]);
+    }
+  });
+
   it("rejects non-string and oversized input rather than passing it on", () => {
     const result = validateContactMessage(
       { ...valid, name: 42, message: "a".repeat(5001) },
@@ -98,5 +113,22 @@ describe("contactEmail", () => {
 describe("formatServiceDate", () => {
   it("formats in UTC so the day never shifts with the server's timezone", () => {
     expect(formatServiceDate("2026-01-01")).toMatch(/^Thursday,? 1 January 2026$/);
+  });
+});
+
+describe("contactTopics", () => {
+  it("lists the products first, then the fixed topics", () => {
+    const topics = contactTopics([{ id: "bookmarks", label: "Bookmarks" }]);
+    expect(topics.map((topic) => topic.id)).toEqual([
+      "bookmarks",
+      ...CONTACT_TOPICS.map((topic) => topic.id),
+    ]);
+  });
+
+  it("never lets a product shadow a fixed topic", () => {
+    const topics = contactTopics([{ id: "upload", label: "Upload Cards" }]);
+    expect(topics.filter((topic) => topic.id === "upload")).toEqual([
+      { id: "upload", label: "Uploading my own design" },
+    ]);
   });
 });

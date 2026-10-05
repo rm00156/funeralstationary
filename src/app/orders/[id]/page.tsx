@@ -6,7 +6,6 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
-import SignInForm from "@/components/SignInForm";
 import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
 import { formatPence } from "@/lib/orderOfServicePricing";
 import { getOrder } from "@/lib/orders.server";
@@ -102,7 +101,7 @@ export default async function OrderPage({
 
             <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="font-display text-4xl font-semibold leading-tight text-primary md:text-5xl">
+                <h1 className="font-display text-4xl font-medium leading-tight text-primary md:text-5xl">
                   {order.orderNumber}
                 </h1>
                 <p className="mt-2 font-body text-on-surface-variant">
@@ -126,7 +125,7 @@ export default async function OrderPage({
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h2 className="font-display text-xl font-semibold text-on-surface">
+                        <h2 className="font-display text-xl font-medium text-on-surface">
                           {item.designName}
                         </h2>
                         <p className="font-body text-sm text-on-surface-variant">
@@ -171,7 +170,7 @@ export default async function OrderPage({
                   </dl>
                   <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-4">
                     <span className="font-display text-xl text-on-surface">Paid</span>
-                    <span className="font-display text-3xl font-semibold text-primary">
+                    <span className="font-display text-3xl font-medium text-primary">
                       {formatPence(order.totals.totalPence)}
                     </span>
                   </div>
@@ -179,24 +178,6 @@ export default async function OrderPage({
                     Includes VAT of {formatPence(order.totals.vatPence)}
                   </p>
                 </section>
-
-                {/* Offered after payment, never before it: checkout stays guest-first.
-                    The link signs them in and claimOwnership picks up this order (and
-                    everything this browser saved) by the email they just paid with. */}
-                {!owner?.userId && authConfigured() && (
-                  <section className="rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow">
-                    <h2 className="mb-2 font-display text-xl text-primary">Keep this order to hand</h2>
-                    <p className="mb-5 font-body text-sm text-on-surface-variant">
-                      To see this order and your designs from another device, we can email you a
-                      sign-in link. There&apos;s no password to set up.
-                    </p>
-                    <SignInForm
-                      next={`/orders/${order.id}`}
-                      initialEmail={order.contact.email ?? ""}
-                      submitLabel="Email me a link"
-                    />
-                  </section>
-                )}
 
                 <section className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6">
                   <h2 className="mb-3 font-display text-xl text-primary">Delivering to</h2>

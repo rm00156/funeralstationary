@@ -32,8 +32,8 @@ const LINK_ERRORS: Record<string, string> = {
 
 const breadcrumbClass = "mb-10 flex items-center gap-2 font-body text-sm text-on-surface-variant";
 const titleClass =
-  "mb-8 font-display text-4xl font-semibold leading-tight text-primary md:text-5xl";
-const sectionTitleClass = "font-display text-3xl font-semibold text-primary";
+  "mb-8 font-display text-4xl font-medium leading-tight text-primary md:text-5xl";
+const sectionTitleClass = "font-display text-3xl font-medium text-primary";
 
 type DesignSummaries = Parameters<typeof SavedDesignList>[0]["initialDesigns"];
 

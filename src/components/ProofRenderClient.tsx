@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { PageCanvas } from "@/components/DesignEditor";
+import { PageCanvas } from "@/components/PageCanvas";
 import {
   ARTBOARD_H_MM,
   ARTBOARD_W_MM,

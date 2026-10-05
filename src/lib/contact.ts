@@ -19,6 +19,26 @@ export const CONTACT_TOPICS = [
 
 export const DEFAULT_CONTACT_TOPIC = "something-else";
 
+export interface ContactTopic {
+  id: string;
+  label: string;
+}
+
+/**
+ * The form's topic list: every sellable product (by slug), then the fixed
+ * topics. Both the page that renders the select and the route that validates
+ * it build the list here, so the server never rejects a topic the page showed.
+ * A product whose slug collides with a fixed topic id is left out rather than
+ * shadowing it.
+ */
+export function contactTopics(products: readonly ContactTopic[]): ContactTopic[] {
+  const fixed = new Set<string>(CONTACT_TOPICS.map((topic) => topic.id));
+  return [
+    ...products.filter(({ id }) => !fixed.has(id)).map(({ id, label }) => ({ id, label })),
+    ...CONTACT_TOPICS.map(({ id, label }) => ({ id, label })),
+  ];
+}
+
 export interface ContactMessage {
   name: string;
   email: string;
@@ -36,7 +56,9 @@ export type ContactResult =
   | { ok: true; message: ContactMessage }
   | { ok: false; errors: Partial<Record<ContactField, string>> };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// One plain address, nothing else: the customer's email becomes the Resend
+// reply-to, which reads `,`/`;` as a list and `<>` as a display-name wrapper.
+const EMAIL_RE = /^[^\s@,;:<>()[\]"\\]+@[^\s@,;:<>()[\]"\\]+\.[^\s@,;:<>()[\]"\\]+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");

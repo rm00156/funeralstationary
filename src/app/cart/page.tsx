@@ -46,7 +46,7 @@ export default async function CartPage() {
               <span className="text-on-surface">Basket</span>
             </nav>
 
-            <h1 className="mb-6 font-display text-4xl font-semibold leading-tight text-primary md:text-5xl">
+            <h1 className="mb-6 font-display text-4xl font-medium leading-tight text-primary md:text-5xl">
               Your Basket
             </h1>
             <p className="mb-10 max-w-3xl font-body text-lg text-on-surface-variant">

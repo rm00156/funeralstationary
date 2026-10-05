@@ -111,7 +111,7 @@ export default function CartView({
         </dl>
         <div className="mt-5 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-5">
           <span className="font-display text-xl text-on-surface">Total</span>
-          <span aria-live="polite" className="font-display text-3xl font-semibold text-primary">
+          <span aria-live="polite" className="font-display text-3xl font-medium text-primary">
             {formatPence(totals.totalPence)}
           </span>
         </div>
@@ -182,7 +182,7 @@ function CartLine({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="truncate font-display text-xl font-semibold text-on-surface">
+              <h2 className="truncate font-display text-xl font-medium text-on-surface">
                 {item.designName}
               </h2>
               <p className="font-body text-sm text-on-surface-variant">

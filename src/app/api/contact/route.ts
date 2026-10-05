@@ -1,13 +1,27 @@
 import type { NextRequest } from "next/server";
 
 import { getSellableProducts } from "@/lib/catalogue.server";
-import { CONTACT_TOPICS, contactEmail, validateContactMessage } from "@/lib/contact";
+import { contactEmail, contactTopics, validateContactMessage } from "@/lib/contact";
 import { isEmailConfigured, sendEmail } from "@/lib/email.server";
+import { clientKey, createRateLimiter } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
 /** Where enquiries go. Never a customer-supplied address — only the reply-to is. */
 const recipient = () => process.env.CONTACT_EMAIL || process.env.ORDER_NOTIFY_EMAIL || null;
+
+/** Submissions per IP, checked before the catalogue query — generous enough
+ * for a person correcting highlighted fields. */
+const attempts = createRateLimiter({ limit: 20, windowMs: 10 * 60_000 });
+/** Emails per IP. Order confirmations share the Resend quota, so a script
+ * that gets past validation can't spend it. */
+const sends = createRateLimiter({ limit: 5, windowMs: 60 * 60_000 });
+
+const tooMany = () =>
+  Response.json(
+    { error: "You've sent us several messages already. Please try again later." },
+    { status: 429 },
+  );
 
 /**
  * POST /api/contact — the /contact form. Validates the message
@@ -34,11 +48,12 @@ export async function POST(request: NextRequest) {
     return Response.json({ ok: true });
   }
 
-  const products = await getSellableProducts();
-  const topics = new Map<string, string>([
-    ...products.map((product) => [product.id, product.label] as const),
-    ...CONTACT_TOPICS.map((topic) => [topic.id, topic.label] as const),
-  ]);
+  const ip = clientKey(request.headers);
+  if (!attempts.hit(ip)) return tooMany();
+
+  const topics = new Map(
+    contactTopics(await getSellableProducts()).map(({ id, label }) => [id, label]),
+  );
   const result = validateContactMessage(body, topics);
   if (!result.ok) {
     return Response.json(
@@ -55,6 +70,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!sends.hit(ip)) return tooMany();
   try {
     await sendEmail({ to, replyTo: result.message.email, ...contactEmail(result.message) });
   } catch (error) {

@@ -6,7 +6,7 @@ import ContactForm from "@/components/ContactForm";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { getSellableProducts } from "@/lib/catalogue.server";
-import { CONTACT_TOPICS, DEFAULT_CONTACT_TOPIC } from "@/lib/contact";
+import { DEFAULT_CONTACT_TOPIC, contactTopics } from "@/lib/contact";
 import {
   ADDRESS_LINES,
   COMPANY_NAME,
@@ -35,10 +35,7 @@ export default async function ContactPage({ searchParams }: PageProps<"/contact"
     searchParams,
     getSellableProducts(),
   ]);
-  const topics = [
-    ...products.map(({ id, label }) => ({ id, label })),
-    ...CONTACT_TOPICS.map(({ id, label }) => ({ id, label })),
-  ];
+  const topics = contactTopics(products);
   // ?topic= comes from the "design it for me" / "upload" / "ask for a price"
   // links; anything the select doesn't offer falls back to the default.
   const initialTopic =

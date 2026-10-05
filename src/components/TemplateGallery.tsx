@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { PageCanvas } from "@/components/DesignEditor";
+import { PageCanvas } from "@/components/PageCanvas";
 import { ARTBOARD_W, type DesignPage } from "@/lib/designEditor";
 
 /** The cover at the handoff's 340px, as a fraction of the artboard. */

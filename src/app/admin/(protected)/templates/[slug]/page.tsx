@@ -39,7 +39,7 @@ export default async function AdminTemplatePage({
 
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-primary">
+          <h1 className="font-display text-3xl font-medium text-primary">
             {template.name}
           </h1>
           {template.hasDraftLayout && (

@@ -55,7 +55,7 @@ export default async function AdminOrderPage({
 
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-primary">{order.orderNumber}</h1>
+          <h1 className="font-display text-3xl font-medium text-primary">{order.orderNumber}</h1>
           <p className="mt-1 font-body text-sm text-on-surface-variant">
             Placed {formatDateTime(order.placedAt)} · paid {formatDateTime(order.paidAt)}
           </p>

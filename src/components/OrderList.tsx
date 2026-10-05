@@ -32,7 +32,7 @@ export default function OrderList({ orders }: { orders: OrderSummary[] }) {
             className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5 transition-colors hover:border-primary-container/60"
           >
             <div>
-              <h3 className="font-display text-xl font-semibold text-on-surface">
+              <h3 className="font-display text-xl font-medium text-on-surface">
                 {order.orderNumber}
               </h3>
               <p className="font-body text-sm text-on-surface-variant">

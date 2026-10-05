@@ -15,7 +15,7 @@ export default async function AdminLoginPage() {
   return (
     <main className="flex min-h-dvh flex-1 items-center justify-center bg-paper px-margin-mobile md:px-gutter">
       <div className="w-full max-w-sm">
-        <h1 className="mb-2 text-center font-display text-3xl font-semibold text-primary">
+        <h1 className="mb-2 text-center font-display text-3xl font-medium text-primary">
           Admin
         </h1>
         <p className="mb-8 text-center font-body text-on-surface-variant">

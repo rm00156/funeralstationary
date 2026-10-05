@@ -29,7 +29,7 @@ export default async function AdminOrdersPage({
 
   return (
     <>
-      <h1 className="mb-2 font-display text-3xl font-semibold text-primary">Orders</h1>
+      <h1 className="mb-2 font-display text-3xl font-medium text-primary">Orders</h1>
       <p className="mb-6 max-w-2xl font-body text-on-surface-variant">
         Paid orders, newest first. Open one to send its proof, move it through
         production and see its history. Baskets that were never paid for are
