@@ -51,7 +51,7 @@ export function rewriteValue(value: unknown, from: string, to: string): unknown 
   return value;
 }
 
-function connect(url: string) {
+export function connect(url: string) {
   // TiDB Cloud refuses plaintext; local MySQL has no certificate.
   const ssl = new URL(url).hostname.endsWith(".tidbcloud.com")
     ? { minVersion: "TLSv1.2" as const }
