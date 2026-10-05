@@ -19,7 +19,7 @@ import {
   templateCategoryLinks,
   templates,
 } from "@/db/schema";
-import type { DesignPage } from "@/lib/designEditor";
+import { toProductFormat, type DesignPage, type ProductFormat } from "@/lib/designEditor";
 import { cheapestQuote } from "@/lib/orderOfServicePricing";
 import { getPricingData } from "@/lib/pricing.server";
 import type {
@@ -29,13 +29,37 @@ import type {
   TemplateCategory,
 } from "@/lib/templates";
 
+/** The products row's format columns, for toProductFormat. */
+export const productFormatColumns = {
+  sizeLabel: products.sizeLabel,
+  trimWidthMm: products.trimWidthMm,
+  trimHeightMm: products.trimHeightMm,
+  templatePages: products.templatePages,
+  sizedByOption: products.sizedByOption,
+  paperLabel: products.paperLabel,
+};
+
 export const getProducts = cache(async (): Promise<Product[]> => {
   const rows = await db
-    .select({ slug: products.slug, label: products.label })
+    .select({ slug: products.slug, label: products.label, ...productFormatColumns })
     .from(products)
     .where(eq(products.isActive, true))
     .orderBy(asc(products.sortOrder), asc(products.id));
-  return rows.map((row) => ({ id: row.slug, label: row.label }));
+  return rows.map(({ slug, label, ...format }) => ({
+    id: slug,
+    label,
+    format: toProductFormat(format),
+  }));
+});
+
+/**
+ * Every product's format, active or not, by slug — for showing an order's
+ * lines, whose product may since have been retired (products are never
+ * deleted, and a format is fixed once a template exists).
+ */
+export const getProductFormats = cache(async (): Promise<Map<string, ProductFormat>> => {
+  const rows = await db.select({ slug: products.slug, ...productFormatColumns }).from(products);
+  return new Map(rows.map(({ slug, ...format }) => [slug, toProductFormat(format)]));
 });
 
 export const getCategories = cache(async (): Promise<TemplateCategory[]> => {
@@ -65,6 +89,7 @@ export const getSellableProducts = cache(async (): Promise<ProductShowcase[]> =>
       description: products.description,
       occasion: products.occasion,
       image: templates.previewImageUrl,
+      ...productFormatColumns,
     })
     .from(products)
     .innerJoin(templates, eq(templates.productId, products.id))
@@ -79,12 +104,19 @@ export const getSellableProducts = cache(async (): Promise<ProductShowcase[]> =>
   // Rows arrive product-ordered then template-ordered, so the first row of
   // each group is both the card's image and the start of its count.
   const byProduct = new Map<string, Omit<ProductShowcase, "id" | "fromPence" | "fromCopies">>();
-  for (const { slug, ...row } of rows) {
+  for (const { slug, label, description, occasion, image, ...format } of rows) {
     const existing = byProduct.get(slug);
     if (existing) {
       existing.templateCount += 1;
     } else {
-      byProduct.set(slug, { ...row, templateCount: 1 });
+      byProduct.set(slug, {
+        label,
+        description,
+        occasion,
+        image,
+        format: toProductFormat(format),
+        templateCount: 1,
+      });
     }
   }
 
@@ -197,20 +229,18 @@ export const getTemplateBySlug = cache(
   },
 );
 
-export const templateExists = cache(async (slug: string): Promise<boolean> => {
+/**
+ * The product a template belongs to, whatever the template's status (a
+ * design keeps saving after its template is archived), or null for an
+ * unknown slug.
+ */
+export const templateProductSlug = cache(async (slug: string): Promise<string | null> => {
   const [row] = await db
-    .select({ id: templates.id })
+    .select({ productSlug: products.slug })
     .from(templates)
+    .innerJoin(products, eq(templates.productId, products.id))
     .where(eq(templates.slug, slug))
     .limit(1);
-  return !!row;
+  return row?.productSlug ?? null;
 });
 
-export const productExists = cache(async (slug: string): Promise<boolean> => {
-  const [row] = await db
-    .select({ id: products.id })
-    .from(products)
-    .where(eq(products.slug, slug))
-    .limit(1);
-  return !!row;
-});

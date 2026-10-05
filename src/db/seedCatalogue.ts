@@ -7,15 +7,27 @@
  * can populate an empty database. Rates are in pounds here (matching the
  * original placeholder price list) and converted to pence by seedData.ts.
  *
- * PLACEHOLDER RATES — calibrated so the known real-world quote (15 copies /
- * A5 / 4 page / Silk = £33.00) comes out exact,
- * then extrapolated linearly.
+ * PLACEHOLDER RATES — the order of service is calibrated so the known
+ * real-world quote (15 copies / A5 / 4 page / Silk = £33.00) comes out exact,
+ * then extrapolated linearly. The cards, bookmarks and memory board are
+ * guesses for the owner to replace in /admin.
  *
  * PLACEHOLDER ARTWORK — every template points at one of the Stitch export
  * images already used elsewhere on the site.
  */
 
+import type { ProductFormatRow } from "@/lib/designEditor";
 import type { ProductOccasion } from "@/lib/templates";
+
+/** A flat A6 card printed on both sides — memorial and thank-you cards. */
+const CARD_A6: ProductFormatRow = {
+  sizeLabel: "A6",
+  trimWidthMm: 105,
+  trimHeightMm: 148,
+  templatePages: 2,
+  sizedByOption: false,
+  paperLabel: "Paper",
+};
 
 interface SeedOption {
   id: string;
@@ -27,13 +39,15 @@ interface SeedOption {
 /**
  * `description` is the card blurb on the shop and home pages (draft copy from
  * the redesign handoff — the owner still has to approve it); `occasion` is
- * which shop group the product sits in.
+ * which shop group the product sits in; `format` is its size and page
+ * structure (ProductFormat), absent for the A5 booklet's defaults.
  */
 export const PRODUCTS: {
   id: string;
   label: string;
   description: string;
   occasion: ProductOccasion;
+  format?: ProductFormatRow;
 }[] = [
   {
     id: "order-of-service",
@@ -45,8 +59,10 @@ export const PRODUCTS: {
   {
     id: "memorial-cards",
     label: "Memorial Cards",
-    description: "Wallet-sized cards with their photo and dates, for family and friends to keep.",
+    description:
+      "A6 cards with their photo and dates on the front and a verse on the back, for family and friends to keep.",
     occasion: "service",
+    format: CARD_A6,
   },
   {
     id: "bookmarks",
@@ -54,19 +70,38 @@ export const PRODUCTS: {
     description:
       "A small keepsake with their photo and a favourite verse, to give out on the day.",
     occasion: "service",
+    format: {
+      sizeLabel: "50 × 200 mm",
+      trimWidthMm: 50,
+      trimHeightMm: 200,
+      templatePages: 2,
+      sizedByOption: false,
+      paperLabel: "Paper",
+    },
+  },
+  {
+    id: "memory-board",
+    label: "Memory Board",
+    description:
+      "A picture board of their life for the entrance or the wake, from A4 up to A0, mounted with an easel if you need one.",
+    occasion: "service",
+    // One A-series design, printed at whichever size is chosen (the
+    // page-count options below are the sizes). Drawn at A4.
+    format: {
+      sizeLabel: "A4 to A0",
+      trimWidthMm: 210,
+      trimHeightMm: 297,
+      templatePages: 1,
+      sizedByOption: true,
+      paperLabel: "Finish",
+    },
   },
   {
     id: "thank-you-cards",
     label: "Thank You Cards",
     description: "Thank everyone who sent flowers, cards or kind words, in your own words.",
     occasion: "after",
-  },
-  {
-    id: "attendance-cards",
-    label: "Attendance Cards",
-    description:
-      "Cards for guests to fill in at the service, so the family has a record of who came.",
-    occasion: "service",
+    format: CARD_A6,
   },
   {
     id: "pet-sympathy",
@@ -233,58 +268,17 @@ export const TEMPLATES = [
   },
 ];
 
-/** Quantity breaks — larger runs reduce the per-copy rate. */
-export const QUANTITY_OPTIONS: (SeedOption & { value: number })[] = [
-  { id: "15", label: "15", value: 15, multiplier: 1 },
-  { id: "25", label: "25", value: 25, multiplier: 0.95 },
-  { id: "50", label: "50", value: 50, multiplier: 0.9 },
-  { id: "75", label: "75", value: 75, multiplier: 0.87 },
-  { id: "100", label: "100", value: 100, multiplier: 0.84 },
-  { id: "150", label: "150", value: 150, multiplier: 0.81 },
-  { id: "200", label: "200", value: 200, multiplier: 0.78 },
-  { id: "250", label: "250", value: 250, multiplier: 0.76 },
-  { id: "300", label: "300", value: 300, multiplier: 0.74 },
-];
+export interface ProductPricingSeed {
+  /** Quantity breaks — larger runs reduce the per-copy rate. */
+  quantity: (SeedOption & { value: number })[];
+  /** Base per-copy `rate` in pounds, on the first paper option. */
+  pages: { id: string; label: string; pages: number; rate: number; note?: string }[];
+  paper: SeedOption[];
+  /** `price` in pounds. */
+  delivery: { id: string; label: string; price: number; note: string }[];
+}
 
-/** Base per-copy `rate` in pounds (A5, silk). */
-export const PAGE_OPTIONS = [
-  { id: "4", label: "4 page", pages: 4, rate: 2.2, note: "A single folded sheet" },
-  { id: "8", label: "8 page", pages: 8, rate: 3.0 },
-  { id: "12", label: "12 page", pages: 12, rate: 3.8 },
-  { id: "16", label: "16 page", pages: 16, rate: 4.6 },
-  { id: "20", label: "20 page", pages: 20, rate: 5.4 },
-  { id: "24", label: "24 page", pages: 24, rate: 6.2, note: "Stapled on the spine" },
-];
-
-export const PAPER_OPTIONS: SeedOption[] = [
-  {
-    id: "silk",
-    label: "Silk",
-    multiplier: 1,
-    note: "150gsm silk — a soft sheen that keeps photographs true",
-  },
-  {
-    id: "gloss",
-    label: "Gloss",
-    multiplier: 1,
-    note: "150gsm gloss — bright, high-contrast images",
-  },
-  {
-    id: "uncoated",
-    label: "Uncoated",
-    multiplier: 1.05,
-    note: "150gsm uncoated — natural, tactile finish, easy to write on",
-  },
-  {
-    id: "premium-silk",
-    label: "Premium Silk",
-    multiplier: 1.2,
-    note: "200gsm silk — our heaviest, most substantial stock",
-  },
-];
-
-/** `price` in pounds. */
-export const DELIVERY_OPTIONS = [
+const DELIVERY: ProductPricingSeed["delivery"] = [
   {
     id: "standard",
     label: "Standard delivery",
@@ -298,3 +292,161 @@ export const DELIVERY_OPTIONS = [
     note: "Order before 11am for next working day",
   },
 ];
+
+/** Card and bookmark runs are smaller than booklet runs, and start lower. */
+const CARD_QUANTITIES: ProductPricingSeed["quantity"] = [
+  { id: "10", label: "10", value: 10, multiplier: 1 },
+  { id: "25", label: "25", value: 25, multiplier: 0.9 },
+  { id: "50", label: "50", value: 50, multiplier: 0.8 },
+  { id: "75", label: "75", value: 75, multiplier: 0.75 },
+  { id: "100", label: "100", value: 100, multiplier: 0.7 },
+  { id: "150", label: "150", value: 150, multiplier: 0.65 },
+  { id: "200", label: "200", value: 200, multiplier: 0.6 },
+];
+
+const CARD_PAPER: SeedOption[] = [
+  {
+    id: "silk-card",
+    label: "Silk card",
+    multiplier: 1,
+    note: "350gsm silk card — sturdy, with a soft sheen",
+  },
+  {
+    id: "gloss-card",
+    label: "Gloss card",
+    multiplier: 1,
+    note: "350gsm gloss card — bright, high-contrast photographs",
+  },
+  {
+    id: "uncoated-card",
+    label: "Uncoated card",
+    multiplier: 1.05,
+    note: "350gsm uncoated card — natural, and easy to write on",
+  },
+];
+
+const BOTH_SIDES = (rate: number) => [
+  {
+    id: "both-sides",
+    label: "Printed both sides",
+    pages: 2,
+    rate,
+    note: "Full colour on the front and the back",
+  },
+];
+
+/** Every product's pricing tables, keyed by product slug. */
+export const PRICING: Record<string, ProductPricingSeed> = {
+  "order-of-service": {
+    quantity: [
+      { id: "15", label: "15", value: 15, multiplier: 1 },
+      { id: "25", label: "25", value: 25, multiplier: 0.95 },
+      { id: "50", label: "50", value: 50, multiplier: 0.9 },
+      { id: "75", label: "75", value: 75, multiplier: 0.87 },
+      { id: "100", label: "100", value: 100, multiplier: 0.84 },
+      { id: "150", label: "150", value: 150, multiplier: 0.81 },
+      { id: "200", label: "200", value: 200, multiplier: 0.78 },
+      { id: "250", label: "250", value: 250, multiplier: 0.76 },
+      { id: "300", label: "300", value: 300, multiplier: 0.74 },
+    ],
+    // Base per-copy rate (A5, silk).
+    pages: [
+      { id: "4", label: "4 page", pages: 4, rate: 2.2, note: "A single folded sheet" },
+      { id: "8", label: "8 page", pages: 8, rate: 3.0 },
+      { id: "12", label: "12 page", pages: 12, rate: 3.8 },
+      { id: "16", label: "16 page", pages: 16, rate: 4.6 },
+      { id: "20", label: "20 page", pages: 20, rate: 5.4 },
+      { id: "24", label: "24 page", pages: 24, rate: 6.2, note: "Stapled on the spine" },
+    ],
+    paper: [
+      {
+        id: "silk",
+        label: "Silk",
+        multiplier: 1,
+        note: "150gsm silk — a soft sheen that keeps photographs true",
+      },
+      {
+        id: "gloss",
+        label: "Gloss",
+        multiplier: 1,
+        note: "150gsm gloss — bright, high-contrast images",
+      },
+      {
+        id: "uncoated",
+        label: "Uncoated",
+        multiplier: 1.05,
+        note: "150gsm uncoated — natural, tactile finish, easy to write on",
+      },
+      {
+        id: "premium-silk",
+        label: "Premium Silk",
+        multiplier: 1.2,
+        note: "200gsm silk — our heaviest, most substantial stock",
+      },
+    ],
+    delivery: DELIVERY,
+  },
+  "memorial-cards": {
+    quantity: CARD_QUANTITIES,
+    pages: BOTH_SIDES(1.1),
+    paper: CARD_PAPER,
+    delivery: DELIVERY,
+  },
+  bookmarks: {
+    quantity: CARD_QUANTITIES,
+    pages: BOTH_SIDES(1.2),
+    paper: [
+      ...CARD_PAPER,
+      {
+        id: "laminated",
+        label: "Laminated silk card",
+        multiplier: 1.25,
+        note: "350gsm silk card, laminated both sides — wipe-clean and hard-wearing",
+      },
+    ],
+    delivery: DELIVERY,
+  },
+  "thank-you-cards": {
+    quantity: CARD_QUANTITIES,
+    pages: BOTH_SIDES(0.95),
+    paper: CARD_PAPER,
+    delivery: DELIVERY,
+  },
+  // The page-count options are the board's print sizes (sizedByOption) —
+  // each one page, of the same A-series design.
+  "memory-board": {
+    quantity: [
+      { id: "1", label: "1", value: 1, multiplier: 1 },
+      { id: "2", label: "2", value: 2, multiplier: 1 },
+      { id: "3", label: "3", value: 3, multiplier: 1 },
+    ],
+    pages: [
+      { id: "a4", label: "A4", pages: 1, rate: 12, note: "210 × 297 mm — for a table or a frame" },
+      { id: "a3", label: "A3", pages: 1, rate: 18, note: "297 × 420 mm" },
+      { id: "a2", label: "A2", pages: 1, rate: 28, note: "420 × 594 mm" },
+      { id: "a1", label: "A1", pages: 1, rate: 40, note: "594 × 841 mm — the usual size for an easel" },
+      { id: "a0", label: "A0", pages: 1, rate: 60, note: "841 × 1189 mm" },
+    ],
+    paper: [
+      {
+        id: "print-only",
+        label: "Print only",
+        multiplier: 1,
+        note: "Printed on 200gsm satin poster paper, to frame or pin up",
+      },
+      {
+        id: "mounted",
+        label: "Mounted on 5mm board",
+        multiplier: 1.6,
+        note: "Mounted on rigid 5mm foam board, ready to stand on an easel or a table",
+      },
+      {
+        id: "mounted-easel",
+        label: "Mounted on 5mm board, with easel",
+        multiplier: 2,
+        note: "Mounted on 5mm foam board and sent with a display easel",
+      },
+    ],
+    delivery: DELIVERY,
+  },
+};

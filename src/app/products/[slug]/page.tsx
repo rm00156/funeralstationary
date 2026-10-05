@@ -12,8 +12,9 @@ import {
   getSellableProduct,
   getTemplates,
 } from "@/lib/catalogue.server";
-import { PAGE_H_MM, PAGE_SIZE_LABEL, PAGE_W_MM } from "@/lib/designEditor";
+import { sizeText } from "@/lib/designEditor";
 import {
+  copiesText,
   defaultSelection,
   formatPence,
   getQuote,
@@ -34,7 +35,7 @@ export async function generateMetadata({
   if (!product) return { title: "Not found | The Funeral Stationery" };
   return {
     title: `${product.label} | The Funeral Stationery`,
-    description: `${product.templateCount} ${product.label.toLowerCase()} designs to personalise online, from ${formatPence(product.fromPence)} for ${product.fromCopies} copies. Printed on heavyweight paper and delivered anywhere in the UK.`,
+    description: `${product.templateCount} ${product.label.toLowerCase()} designs to personalise online, from ${formatPence(product.fromPence)} for ${copiesText(product.fromCopies)}. Printed on heavyweight paper and delivered anywhere in the UK.`,
   };
 }
 
@@ -89,7 +90,7 @@ export default async function ProductPage({
     {
       term: "Prices from",
       value: formatPence(product.fromPence),
-      detail: `/ ${product.fromCopies} copies`,
+      detail: `/ ${copiesText(product.fromCopies)}`,
     },
     ...pricing.delivery.map((option) => ({
       term: option.label,
@@ -114,8 +115,10 @@ export default async function ProductPage({
               />
               <h1 className="type-page">{product.label}</h1>
               <p className="max-w-[34em] text-xl text-ink-2">
-                Choose a design, then add their photographs and words online. Printed on
-                heavyweight paper at exact {PAGE_SIZE_LABEL} ({PAGE_W_MM} × {PAGE_H_MM} mm).
+                Choose a design, then add their photographs and words online.{" "}
+                {product.format.sizedByOption
+                  ? `Printed at the size you choose, from ${product.format.sizeLabel.replace(" to ", " up to ")}.`
+                  : `Printed at exact ${sizeText(product.format)}.`}
               </p>
             </div>
             <dl className="grid grid-cols-2 gap-4">
@@ -138,6 +141,7 @@ export default async function ProductPage({
           <ProductDesigns
             productId={product.id}
             templates={productTemplates}
+            trim={product.format.trim}
             categories={productCategories}
             initialCategoryId={initialCategoryId}
             priceLine={`from ${formatPence(product.fromPence)}`}
@@ -150,8 +154,18 @@ export default async function ProductPage({
               <h2 className="type-sub">Prices at a glance</h2>
               <p className="text-ink-2">
                 Every design costs the same. The price depends on how many copies
-                {table.columns.length > 1 ? " and pages" : ""} you need
-                {table.paper ? `, shown here on ${table.paper.label.toLowerCase()} paper` : ""}.
+                {table.columns.length > 1
+                  ? product.format.sizedByOption
+                    ? " and the size"
+                    : " and pages"
+                  : ""}{" "}
+                you need
+                {table.paper
+                  ? product.format.paperLabel === "Paper"
+                    ? `, shown here on ${table.paper.label.toLowerCase()} paper`
+                    : `, shown here as ${table.paper.label.toLowerCase()}`
+                  : ""}
+                .
                 Delivery is added at the basket:{" "}
                 {pricing.delivery
                   .map(
@@ -164,7 +178,8 @@ export default async function ProductPage({
                 .
               </p>
               <p className="text-ink-2">
-                Choose any design above to work out your exact price, with your paper and delivery.
+                Choose any design above to work out your exact price, with your{" "}
+                {product.format.paperLabel.toLowerCase()} and delivery.
               </p>
             </div>
             <div

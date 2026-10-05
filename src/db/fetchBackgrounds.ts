@@ -30,6 +30,9 @@ import {
   DEFAULT_SPRAY_MIN_ENCLOSED,
   DEFAULT_TINT,
   DEFAULT_WASH,
+  backgroundFormats,
+  backgroundLayout,
+  type BackgroundFormat,
   type BackgroundSourceRef,
   type BackgroundSpec,
 } from "@/lib/backgroundArtwork";
@@ -67,8 +70,23 @@ interface ResolvedSource {
   sourceUrl: string;
 }
 
+/**
+ * fetch, waiting and retrying when the source rate-limits (Commons answers a
+ * run of lookups with 429s). Honours Retry-After, else backs off 5s, 10s, ...
+ */
+async function fetchPolitely(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    const response = await fetch(url, init);
+    if (response.status !== 429 || attempt === 6) return response;
+    const retryAfter = Number(response.headers.get("retry-after"));
+    await new Promise((resolve) =>
+      setTimeout(resolve, (retryAfter > 0 ? retryAfter : 5 * attempt) * 1000),
+    );
+  }
+}
+
 async function fetchJson<T>(url: string, headers: Record<string, string> = {}): Promise<T> {
-  const response = await fetch(url, { headers: { "User-Agent": USER_AGENT, ...headers } });
+  const response = await fetchPolitely(url, { headers: { "User-Agent": USER_AGENT, ...headers } });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${url}`);
   return (await response.json()) as T;
 }
@@ -162,7 +180,7 @@ async function download(
   } catch {
     // no cache yet
   }
-  const response = await fetch(source.url, {
+  const response = await fetchPolitely(source.url, {
     headers: { "User-Agent": USER_AGENT, ...source.headers },
   });
   if (!response.ok) {
@@ -180,15 +198,19 @@ async function download(
 
 async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
   const palettes = spec.palettes.filter((p) => !paletteFilter || paletteFilter.includes(p));
-  const pending: PaletteId[] = [];
+  const pending: Array<{ palette: PaletteId; format: BackgroundFormat }> = [];
   for (const palette of palettes) {
-    if (force || !(await backgroundAssetExists(spec.id, palette))) pending.push(palette);
+    for (const format of backgroundFormats(spec)) {
+      if (force || !(await backgroundAssetExists(spec.id, palette, format))) {
+        pending.push({ palette, format });
+      }
+    }
   }
   const needsSpray = !!spec.spray && (force || !(await sprayAssetExists(spec.id)));
 
   const source = await resolveSource(spec.source);
   if (pending.length === 0 && !needsSpray) {
-    console.log(`  - ${spec.id} (all ${palettes.length} variants exist — pass --force to re-render)`);
+    console.log(`  - ${spec.id} (all variants exist — pass --force to re-render)`);
     return { spec, sourceUrl: source.sourceUrl, rendered: 0 };
   }
 
@@ -223,23 +245,26 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
     }
   }
 
-  for (const palette of pending) {
+  for (const { palette, format } of pending) {
     const colours = TEMPLATE_PALETTES[palette];
+    const layout = backgroundLayout(spec, format);
     const jpeg = await renderer.render(image, {
+      format,
       paper: colours.paper,
       accent: colours.accent,
-      focus: spec.focus ?? { x: 0.5, y: 0.5 },
+      focus: layout.focus ?? { x: 0.5, y: 0.5 },
       inset: spec.inset ?? DEFAULT_INSET,
-      placement: spec.placement ?? { x: 0, y: 0, w: 100, h: 100 },
+      placement: layout.placement ?? { x: 0, y: 0, w: 100, h: 100 },
       feather: spec.feather ?? 0,
-      fade: spec.fade ?? null,
-      radialFade: spec.radialFade ?? null,
+      fade: layout.fade ?? null,
+      radialFade: layout.radialFade ?? null,
       wash: spec.wash ?? DEFAULT_WASH,
       tint: spec.tint ?? DEFAULT_TINT,
-      glow: spec.glow ?? null,
+      glow: layout.glow ?? null,
+      shade: layout.shade ?? null,
     });
-    const url = await saveBackgroundAsset(spec.id, palette, jpeg);
-    console.log(`  ✓ ${spec.id}/${palette} → ${url} (${Math.round(jpeg.length / 1024)} KB)`);
+    const url = await saveBackgroundAsset(spec.id, palette, jpeg, format);
+    console.log(`  ✓ ${spec.id}/${palette}/${format} → ${url} (${Math.round(jpeg.length / 1024)} KB)`);
   }
   return { spec, sourceUrl: source.sourceUrl, rendered: pending.length };
 }

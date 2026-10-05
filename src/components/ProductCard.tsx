@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { formatPence } from "@/lib/orderOfServicePricing";
+import { trimAspect } from "@/lib/designEditor";
+import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { OCCASION_LABELS, type ProductShowcase } from "@/lib/templates";
 
 /**
@@ -18,6 +19,8 @@ export default function ProductCard({
   compact?: boolean;
 }) {
   const href = `/products/${product.id}`;
+  // The boxes below are a fixed height, so the trim's shape sets the width.
+  const aspectRatio = trimAspect(product.format.trim);
 
   if (compact) {
     return (
@@ -26,7 +29,10 @@ export default function ProductCard({
         className="card-link group flex items-center gap-5 rounded-xl border border-line bg-surface p-5 no-underline"
       >
         <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg bg-mist-2">
-          <div className="cover relative aspect-[148/210] h-[74px] overflow-hidden rounded-[3px] bg-sheet">
+          <div
+            className="cover relative h-[74px] overflow-hidden rounded-[3px] bg-sheet"
+            style={{ aspectRatio }}
+          >
             <Image src={product.image} alt="" fill sizes="52px" className="object-cover" />
           </div>
         </div>
@@ -48,7 +54,10 @@ export default function ProductCard({
       className="card-link group flex flex-col overflow-hidden rounded-xl border border-line bg-surface no-underline"
     >
       <div className="flex h-[220px] items-center justify-center bg-mist-2">
-        <div className="cover relative aspect-[148/210] h-[164px] overflow-hidden rounded-[3px] bg-sheet">
+        <div
+          className="cover relative h-[164px] overflow-hidden rounded-[3px] bg-sheet"
+          style={{ aspectRatio }}
+        >
           <Image
             src={product.image}
             alt={`${product.label} design`}
@@ -68,7 +77,7 @@ export default function ProductCard({
         )}
         <p className="mt-2 text-base text-ink">
           <strong className="font-semibold">From {formatPence(product.fromPence)}</strong>{" "}
-          <span className="text-ink-3">for {product.fromCopies} copies</span>
+          <span className="text-ink-3">for {copiesText(product.fromCopies)}</span>
         </p>
       </div>
     </Link>

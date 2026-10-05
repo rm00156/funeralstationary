@@ -3,8 +3,8 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
 import Stars from "@/components/Stars";
-import { PAGE_H_MM, PAGE_SIZE_LABEL, PAGE_W_MM } from "@/lib/designEditor";
-import { formatPence } from "@/lib/orderOfServicePricing";
+import { coverWidthFactor, sizeText, trimAspect } from "@/lib/designEditor";
+import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { ORDER_CUTOFF, TRUSTPILOT, UPLOAD_DESIGN_HREF } from "@/lib/site";
 import type { ProductShowcase, Template } from "@/lib/templates";
 
@@ -22,6 +22,9 @@ export default function Hero({
   covers: Template[];
 }) {
   const [front, back] = covers;
+  const trim = lead?.format.trim;
+  const aspectRatio = trim ? trimAspect(trim) : undefined;
+  const narrow = trim ? coverWidthFactor(trim) : 1;
 
   return (
     <section className="bg-paper">
@@ -38,13 +41,13 @@ export default function Hero({
           </h1>
           <p className="max-w-[34em] text-xl leading-[1.6] text-ink-2">
             {lead
-              ? `Choose one of ${lead.templateCount} designs, add their photographs and words online, and we’ll print on heavyweight ${PAGE_SIZE_LABEL} paper and deliver anywhere in the UK.`
+              ? `Choose one of ${lead.templateCount} designs, add their photographs and words online, and we’ll print and deliver anywhere in the UK.`
               : "Choose a design, add their photographs and words online, and we’ll print on heavyweight paper and deliver anywhere in the UK."}
           </p>
           <ul className="flex flex-col gap-3 text-[17px]">
             {[
               `Order by ${ORDER_CUTOFF} for next-working-day delivery`,
-              lead && `From ${formatPence(lead.fromPence)} for ${lead.fromCopies} copies`,
+              lead && `From ${formatPence(lead.fromPence)} for ${copiesText(lead.fromCopies)}`,
               "Made something in Canva? Send it to us and we’ll print it",
             ]
               .filter((item): item is string => !!item)
@@ -79,7 +82,10 @@ export default function Hero({
               aria-hidden
               className="absolute inset-x-[6%] bottom-0 top-[8%] rounded-b-3xl rounded-t-[280px] bg-mist-3"
             />
-            <div className="relative z-[1] aspect-[148/210] w-[min(270px,52%)] rotate-[-4deg] overflow-hidden rounded-[3px] bg-sheet shadow-cover-lg">
+            <div
+              className="relative z-[1] rotate-[-4deg] overflow-hidden rounded-[3px] bg-sheet shadow-cover-lg"
+              style={{ aspectRatio, width: `calc(min(270px, 52%) * ${narrow})` }}
+            >
               <Image
                 src={front.image}
                 alt={`${front.name} design, front cover`}
@@ -90,7 +96,10 @@ export default function Hero({
               />
             </div>
             {back && (
-              <div className="relative z-[2] -mb-5 -ml-[70px] aspect-[148/210] w-[min(240px,46%)] rotate-[5deg] overflow-hidden rounded-[3px] bg-sheet shadow-cover-lg">
+              <div
+                className="relative z-[2] -mb-5 -ml-[70px] rotate-[5deg] overflow-hidden rounded-[3px] bg-sheet shadow-cover-lg"
+                style={{ aspectRatio, width: `calc(min(240px, 46%) * ${narrow})` }}
+              >
                 <Image
                   src={back.image}
                   alt={`${back.name} design, front cover`}
@@ -102,7 +111,7 @@ export default function Hero({
               </div>
             )}
             <p className="absolute bottom-0 right-[4%] z-[3] rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink-2 shadow-cover">
-              {PAGE_SIZE_LABEL} · {PAGE_W_MM} × {PAGE_H_MM} mm · heavyweight paper
+              {lead && `${sizeText(lead.format)} · `}heavyweight paper
             </p>
           </div>
         )}

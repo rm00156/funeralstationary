@@ -63,6 +63,10 @@ describe("parsePageCount", () => {
     expect(parsePageCount(24)).toBe(24);
   });
 
+  it("accepts a single side, for a board", () => {
+    expect(parsePageCount(1)).toBe(1);
+  });
+
   it("rejects odd, zero and oversized counts", () => {
     expect(parsePageCount(3)).toBeNull();
     expect(parsePageCount(0)).toBeNull();

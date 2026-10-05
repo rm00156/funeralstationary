@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 import { PageCanvas } from "@/components/PageCanvas";
-import { ARTBOARD_W, type DesignPage } from "@/lib/designEditor";
+import { A5_TRIM, pageMetrics, type DesignPage, type PageTrim } from "@/lib/designEditor";
 
-/** The cover at the handoff's 340px, as a fraction of the artboard. */
-const MAX_ZOOM = 340 / ARTBOARD_W;
+/**
+ * The handoff's cover is 340px wide; every format fits the box an A5 cover
+ * that size would fill, so a bookmark is as tall as a booklet, not 4x taller.
+ */
+const MAX_W = 340;
+const MAX_H = (MAX_W * pageMetrics(A5_TRIM).artboardH) / pageMetrics(A5_TRIM).artboardW;
 const PANEL_PADDING = 48;
 
 const noop = () => {};
@@ -23,25 +27,30 @@ const noop = () => {};
 export default function TemplateGallery({
   name,
   views,
+  trim = A5_TRIM,
 }: {
   name: string;
   views: { label: string; page: DesignPage }[];
+  /** The product's trim — the template's pages are drawn on it. */
+  trim?: PageTrim;
 }) {
+  const { artboardW, artboardH } = pageMetrics(trim);
+  const maxZoom = Math.min(MAX_W / artboardW, MAX_H / artboardH);
   const [active, setActive] = useState(0);
-  const [zoom, setZoom] = useState(MAX_ZOOM);
+  const [zoom, setZoom] = useState(maxZoom);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Shrink the page to fit a narrow panel (phones); never grow past 340px.
+  // Shrink the page to fit a narrow panel (phones); never grow past the cover box.
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
     const observer = new ResizeObserver(([entry]) => {
       const available = entry.contentRect.width - PANEL_PADDING;
-      setZoom(Math.max(0.3, Math.min(MAX_ZOOM, available / ARTBOARD_W)));
+      setZoom(Math.max(0.1, Math.min(maxZoom, available / artboardW)));
     });
     observer.observe(panel);
     return () => observer.disconnect();
-  }, []);
+  }, [maxZoom, artboardW]);
 
   const view = views[active] ?? views[0];
   if (!view) return null;
@@ -59,6 +68,7 @@ export default function TemplateGallery({
         >
           <PageCanvas
             page={view.page}
+            trim={trim}
             zoom={zoom}
             showCut={false}
             showSafe={false}

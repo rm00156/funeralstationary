@@ -26,7 +26,8 @@ import {
   templates,
 } from "@/db/schema";
 import type { TemplateStatus } from "@/lib/adminValidation";
-import type { DesignPage } from "@/lib/designEditor";
+import { productFormatColumns } from "@/lib/catalogue.server";
+import { toProductFormat, type DesignPage, type ProductFormat } from "@/lib/designEditor";
 import type { ProductOccasion } from "@/lib/templates";
 
 // Re-exported for the admin routes; the helpers themselves live in
@@ -56,7 +57,22 @@ export interface AdminProduct {
   occasion: ProductOccasion;
   sortOrder: number;
   isActive: boolean;
+  /** The format columns, flat as they're edited (ProductFormatRow). */
+  sizeLabel: string;
+  trimWidthMm: number;
+  trimHeightMm: number;
+  templatePages: number;
+  sizedByOption: boolean;
+  paperLabel: string;
+  /**
+   * Templates of any status. Once there is one, the trim and template pages
+   * are fixed — its layout is percentages of them.
+   */
+  templateCount: number;
 }
+
+/** The format columns an admin may only change while a product has no templates. */
+export type LockedFormatField = "trimWidthMm" | "trimHeightMm" | "templatePages";
 
 const productSelection = {
   slug: products.slug,
@@ -65,13 +81,22 @@ const productSelection = {
   occasion: products.occasion,
   sortOrder: products.sortOrder,
   isActive: products.isActive,
+  ...productFormatColumns,
+  templateCount: sql<number>`(select count(*) from ${templates} where ${templates.productId} = ${products.id})`,
 };
 
+/** count(*) arrives as a string from mysql2. */
+const withCount = <T extends { templateCount: number | string }>(row: T) => ({
+  ...row,
+  templateCount: Number(row.templateCount),
+});
+
 export async function adminListProducts(): Promise<AdminProduct[]> {
-  return db
+  const rows = await db
     .select(productSelection)
     .from(products)
     .orderBy(asc(products.sortOrder), asc(products.id));
+  return rows.map(withCount);
 }
 
 export async function adminGetProduct(slug: string): Promise<AdminProduct | null> {
@@ -80,7 +105,7 @@ export async function adminGetProduct(slug: string): Promise<AdminProduct | null
     .from(products)
     .where(eq(products.slug, slug))
     .limit(1);
-  return row ?? null;
+  return row ? withCount(row) : null;
 }
 
 export async function adminCreateProduct(input: {
@@ -100,10 +125,22 @@ export async function adminUpdateProduct(
     occasion?: ProductOccasion;
     sortOrder?: number;
     isActive?: boolean;
+    sizeLabel?: string;
+    trimWidthMm?: number;
+    trimHeightMm?: number;
+    templatePages?: number;
+    sizedByOption?: boolean;
+    paperLabel?: string;
   },
-): Promise<AdminProduct | null> {
+): Promise<AdminProduct | { locked: LockedFormatField[] } | null> {
   const existing = await adminGetProduct(slug);
   if (!existing) return null;
+  // Changing the trim or the page structure under existing templates would
+  // stretch or orphan every layout. A same-value write is not a change.
+  const locked = (["trimWidthMm", "trimHeightMm", "templatePages"] as const).filter(
+    (field) => patch[field] !== undefined && patch[field] !== existing[field],
+  );
+  if (locked.length > 0 && existing.templateCount > 0) return { locked };
   await db.update(products).set(patch).where(eq(products.slug, slug));
   return adminGetProduct(slug);
 }
@@ -411,6 +448,8 @@ export interface AdminTemplate {
   slug: string;
   name: string;
   productSlug: string;
+  /** The product's format — the trim and page structure its layout is drawn on. */
+  productFormat: ProductFormat;
   previewImageUrl: string;
   status: TemplateStatus;
   sortOrder: number;
@@ -447,6 +486,7 @@ const templateSelection = {
   slug: templates.slug,
   name: templates.name,
   productSlug: products.slug,
+  ...productFormatColumns,
   previewImageUrl: templates.previewImageUrl,
   status: templates.status,
   sortOrder: templates.sortOrder,
@@ -455,6 +495,54 @@ const templateSelection = {
   hasDraftLayout: sql<number>`(${templates.draftLayout} is not null)`,
   updatedAt: templates.updatedAt,
 };
+
+type TemplateRow = {
+  id: number;
+  slug: string;
+  name: string;
+  productSlug: string;
+  sizeLabel: string;
+  trimWidthMm: number;
+  trimHeightMm: number;
+  templatePages: number;
+  sizedByOption: boolean;
+  paperLabel: string;
+  previewImageUrl: string;
+  status: TemplateStatus;
+  sortOrder: number;
+  hasDraftLayout: number;
+  updatedAt: Date;
+};
+
+function toAdminTemplate(
+  row: TemplateRow,
+  categoriesByTemplate: Map<number, string[]>,
+): AdminTemplate {
+  const {
+    id,
+    hasDraftLayout,
+    sizeLabel,
+    trimWidthMm,
+    trimHeightMm,
+    templatePages,
+    sizedByOption,
+    paperLabel,
+    ...rest
+  } = row;
+  return {
+    ...rest,
+    productFormat: toProductFormat({
+      sizeLabel,
+      trimWidthMm,
+      trimHeightMm,
+      templatePages,
+      sizedByOption,
+      paperLabel,
+    }),
+    hasDraftLayout: !!hasDraftLayout,
+    categories: categoriesByTemplate.get(id) ?? [],
+  };
+}
 
 export async function adminListTemplates(): Promise<AdminTemplate[]> {
   const [rows, categoriesByTemplate] = await Promise.all([
@@ -465,11 +553,7 @@ export async function adminListTemplates(): Promise<AdminTemplate[]> {
       .orderBy(asc(templates.sortOrder), asc(templates.id)),
     loadTemplateCategories(),
   ]);
-  return rows.map(({ id, hasDraftLayout, ...row }) => ({
-    ...row,
-    hasDraftLayout: !!hasDraftLayout,
-    categories: categoriesByTemplate.get(id) ?? [],
-  }));
+  return rows.map((row) => toAdminTemplate(row, categoriesByTemplate));
 }
 
 export async function adminGetTemplate(slug: string): Promise<
@@ -493,13 +577,11 @@ export async function adminGetTemplate(slug: string): Promise<
     .limit(1);
   if (!row) return null;
   const categoriesByTemplate = await loadTemplateCategories();
-  const { id, hasDraftLayout, ...rest } = row;
+  const { layout, draftLayout, ...rest } = row;
   return {
-    ...rest,
-    hasDraftLayout: !!hasDraftLayout,
-    categories: categoriesByTemplate.get(id) ?? [],
-    layout: row.layout ?? null,
-    draftLayout: row.draftLayout ?? null,
+    ...toAdminTemplate(rest, categoriesByTemplate),
+    layout: layout ?? null,
+    draftLayout: draftLayout ?? null,
   };
 }
 

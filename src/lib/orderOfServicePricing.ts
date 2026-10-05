@@ -174,3 +174,8 @@ const GBP = new Intl.NumberFormat("en-GB", {
 });
 
 export const formatPence = (pence: number) => GBP.format(pence / 100);
+
+/** "1 copy", "15 copies" — a memory board is often ordered singly. */
+export function copiesText(count: number): string {
+  return `${count} ${count === 1 ? "copy" : "copies"}`;
+}

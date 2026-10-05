@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { productExists, templateExists } from "@/lib/catalogue.server";
+import { getProductFormats, templateProductSlug } from "@/lib/catalogue.server";
 import {
   createDesign,
   listDesigns,
@@ -44,11 +44,14 @@ export async function POST(request: NextRequest) {
     paperId,
   } = (body ?? {}) as Record<string, unknown>;
 
-  if (typeof templateId !== "string" || !(await templateExists(templateId))) {
-    return Response.json({ error: "Unknown templateId" }, { status: 400 });
-  }
-  if (typeof productId !== "string" || !(await productExists(productId))) {
+  const format = typeof productId === "string" ? (await getProductFormats()).get(productId) : null;
+  if (typeof productId !== "string" || !format) {
     return Response.json({ error: "Unknown productId" }, { status: 400 });
+  }
+  // A template is drawn on its own product's trim, so it can't seed a design
+  // of another product.
+  if (typeof templateId !== "string" || (await templateProductSlug(templateId)) !== productId) {
+    return Response.json({ error: "Unknown templateId" }, { status: 400 });
   }
 
   const spec = {
@@ -59,7 +62,7 @@ export async function POST(request: NextRequest) {
   if (!pageOption) {
     return Response.json({ error: "Unknown page count option" }, { status: 400 });
   }
-  const validated = validateDesignPayload(doc, pageOption.pageCount);
+  const validated = validateDesignPayload(doc, pageOption.pageCount, format.trim);
   if (!validated.ok) {
     return Response.json({ error: validated.error }, { status: 400 });
   }

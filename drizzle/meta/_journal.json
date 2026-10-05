@@ -85,6 +85,27 @@
       "when": 1791171210843,
       "tag": "0011_backfill_product_copy",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1791182289746,
+      "tag": "0012_product_formats",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1791182295914,
+      "tag": "0013_new_products",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1791184323134,
+      "tag": "0014_remove_attendance_cards",
+      "breakpoints": true
     }
   ]
 }

@@ -15,14 +15,27 @@
  * The canvas is fed a data: URL so it never taints.
  */
 
-import { ARTBOARD_H_MM, ARTBOARD_W_MM } from "@/lib/designEditor";
+import { ARTBOARD_H_MM, ARTBOARD_W_MM, pageMetrics } from "@/lib/designEditor";
 import { launchHeadlessBrowser } from "@/lib/headlessBrowser.server";
-import type { BackgroundSpec } from "@/lib/backgroundArtwork";
+import {
+  BACKGROUND_FORMAT_TRIMS,
+  type BackgroundFormat,
+  type BackgroundSpec,
+} from "@/lib/backgroundArtwork";
 
 /** Output resolution: the full artboard at 300dpi. */
 const OUTPUT_DPI = 300;
 export const BACKGROUND_W = Math.round((ARTBOARD_W_MM / 25.4) * OUTPUT_DPI);
 export const BACKGROUND_H = Math.round((ARTBOARD_H_MM / 25.4) * OUTPUT_DPI);
+
+/** A format's artboard (bleed included) in pixels at OUTPUT_DPI. */
+function formatSize(format: BackgroundFormat): { width: number; height: number } {
+  const metrics = pageMetrics(BACKGROUND_FORMAT_TRIMS[format]);
+  return {
+    width: Math.round((metrics.artboardWMm / 25.4) * OUTPUT_DPI),
+    height: Math.round((metrics.artboardHMm / 25.4) * OUTPUT_DPI),
+  };
+}
 
 const JPEG_QUALITY = 0.92;
 
@@ -47,10 +60,13 @@ export interface BackgroundRenderOptions {
   wash: number;
   tint: number;
   glow: BackgroundSpec["glow"] | null;
+  shade: BackgroundSpec["shade"] | null;
+  /** Which artboard to render: the A5 page (default) or the bookmark. */
+  format?: BackgroundFormat;
 }
 
 /** Everything the browser-side draw needs, all plain data. */
-interface DrawInput extends BackgroundRenderOptions {
+interface DrawInput extends Omit<BackgroundRenderOptions, "format"> {
   dataUrl: string;
   width: number;
   height: number;
@@ -177,6 +193,25 @@ async function drawInBrowser(input: DrawInput): Promise<string> {
     const gradient = ctx.createLinearGradient(0, 0, 0, (input.glow.end / 100) * H);
     gradient.addColorStop(0, input.glow.color);
     gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Darken toward the top and bottom edges, easing out by the middle, so
+  // light type holds on a photograph's pale sky or bright field.
+  if (input.shade) {
+    const hex = input.shade.color.replace("#", "");
+    const [sr, sg, sb] = [0, 2, 4].map((at) => parseInt(hex.slice(at, at + 2), 16));
+    const gradient = ctx.createLinearGradient(0, 0, 0, H);
+    const steps = 8;
+    for (let step = 0; step <= steps; step++) {
+      const t = step / steps;
+      // 1 at either edge, 0 across the middle fifth, smoothstepped between.
+      const edge = t < 0.5 ? input.shade.top : input.shade.bottom;
+      const distance = Math.min(1, Math.max(0, (Math.abs(t - 0.5) - 0.1) / 0.4));
+      const alpha = edge * distance * distance * (3 - 2 * distance);
+      gradient.addColorStop(t, `rgba(${sr},${sg},${sb},${alpha})`);
+    }
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, W, H);
   }
@@ -587,15 +622,14 @@ export async function createBackgroundRenderer(): Promise<BackgroundRenderer> {
   };
 
   return {
-    async render(source, options) {
+    async render(source, { format = "a5", ...options }) {
       const page = await blankPage();
       try {
         const dataUrl = `data:${source.contentType};base64,${source.bytes.toString("base64")}`;
         const out = await page.evaluate(drawInBrowser, {
           ...options,
+          ...formatSize(format),
           dataUrl,
-          width: BACKGROUND_W,
-          height: BACKGROUND_H,
           quality: JPEG_QUALITY,
         });
         const comma = out.indexOf(",");

@@ -26,7 +26,8 @@ import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
 import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders } from "@/db/schema";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
-import { PAGE_SIZE_LABEL, type DesignDoc } from "@/lib/designEditor";
+import { getProductFormats } from "@/lib/catalogue.server";
+import { BOOKLET_FORMAT, type DesignDoc, type ProductFormat } from "@/lib/designEditor";
 import { getDesign } from "@/lib/designs.server";
 import {
   describeIssue,
@@ -38,6 +39,7 @@ import type { OrderEmailSummary } from "@/lib/orderEmails";
 import {
   DEFAULT_VAT_RATE,
   computeOrderTotals,
+  lineSpec,
   makeOrderNumber,
   resolveSelectionStrict,
   vatRateToDecimalString,
@@ -46,6 +48,7 @@ import {
   type SelectionAxis,
 } from "@/lib/orders";
 import {
+  copiesText,
   defaultSelection,
   type DeliveryOption,
   type PricingData,
@@ -97,6 +100,8 @@ export interface CartItem {
   designMissing: boolean;
   productId: string;
   productLabel: string;
+  /** The product's size and axis names, for the line's spec (lineSpec). */
+  format: ProductFormat;
   templateId: string;
   templateName: string;
   templateImage: string | null;
@@ -156,6 +161,7 @@ export interface OrderDetailItem {
   designId: string | null;
   designName: string;
   productId: string;
+  format: ProductFormat;
   templateId: string;
   pageCount: number;
   quote: Quote;
@@ -364,7 +370,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     if (item.designId) liveDesigns.set(item.designId, await getDesign(owner, item.designId));
   }
 
-  const pricings = await pricingByProduct(rows);
+  const [pricings, formats] = await Promise.all([pricingByProduct(rows), getProductFormats()]);
 
   const items: CartItem[] = rows.map((item) => {
     const design = item.designId ? liveDesigns.get(item.designId) ?? null : null;
@@ -384,6 +390,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
       designMissing: !design,
       productId: item.productId,
       productLabel: design?.productLabel ?? item.productId,
+      format: formats.get(item.productId) ?? BOOKLET_FORMAT,
       templateId: design?.templateId ?? item.templateId,
       templateName: design?.templateName ?? item.templateId,
       templateImage: design?.templateImage ?? null,
@@ -868,7 +875,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
   if (!order) return null;
 
   // Soft-deleted designs are joined on purpose: the order outlives the design.
-  const [itemRows, proofRows, eventRows] = await Promise.all([
+  const [itemRows, proofRows, eventRows, formats] = await Promise.all([
     db
       .select({ item: orderItems, designName: designs.name })
       .from(orderItems)
@@ -890,6 +897,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       .from(orderEvents)
       .where(eq(orderEvents.orderId, order.id))
       .orderBy(desc(orderEvents.createdAt), desc(orderEvents.id)),
+    getProductFormats(),
   ]);
 
   // Only worth a round trip once there is something to page through.
@@ -952,6 +960,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       designId: item.designId,
       designName: designName ?? "Design",
       productId: item.productId,
+      format: formats.get(item.productId) ?? BOOKLET_FORMAT,
       templateId: item.templateId,
       pageCount: item.docSnapshot.pages.length,
       quote: item.quoteSnapshot,
@@ -999,12 +1008,7 @@ export async function getOrderEmailSummary(orderId: string): Promise<OrderEmailS
     contactEmail: order.contact.email,
     items: order.items.map((item) => ({
       name: item.designName,
-      spec: [
-        `${item.quantityCopies} copies`,
-        PAGE_SIZE_LABEL,
-        item.quote.pages.label,
-        item.quote.paper.label,
-      ].join(" · "),
+      spec: `${copiesText(item.quantityCopies)} · ${lineSpec(item.format, item.quote)}`,
       copies: item.quantityCopies,
       lineTotalPence: item.lineTotalPence,
       deliveryLabel: item.delivery.label,

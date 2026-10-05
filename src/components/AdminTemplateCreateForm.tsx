@@ -12,13 +12,16 @@ const fieldInput =
 
 export default function AdminTemplateCreateForm({
   products,
+  defaultProduct,
 }: {
   products: AdminProduct[];
+  /** The product whose templates are on screen, preselected. */
+  defaultProduct?: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [productId, setProductId] = useState(products[0]?.slug ?? "");
+  const [productId, setProductId] = useState(defaultProduct ?? products[0]?.slug ?? "");
   const [previewImageUrl, setPreviewImageUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

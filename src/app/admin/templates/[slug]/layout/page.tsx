@@ -53,6 +53,7 @@ export default async function AdminTemplateLayoutPage({
       template={editorTemplate}
       productId={template.productSlug}
       productLabel={product.label}
+      format={template.productFormat}
       templates={[]}
       pricing={pricing}
       templateAuthoring={{

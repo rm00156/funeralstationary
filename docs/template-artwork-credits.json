@@ -138,5 +138,152 @@
     "licence": "CC0 (Rijksmuseum)",
     "credit": "Takje wilde rozen, RP-T-1943-81. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Takje_wilde_rozen,_RP-T-1943-81.jpg"
+  },
+  {
+    "id": "lake-sunset",
+    "name": "Lake at Sunset",
+    "licence": "CC0",
+    "credit": "Gander Bay lake sunset, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gander_Bay_lake_sunset._(Unsplash).jpg"
+  },
+  {
+    "id": "twilight-lake",
+    "name": "Twilight Lake",
+    "licence": "CC0",
+    "credit": "Twilight lake sunset, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Twilight_lake_sunset._(Unsplash).jpg"
+  },
+  {
+    "id": "lake-jetty",
+    "name": "Lakeside Jetty",
+    "licence": "CC0",
+    "credit": "Peaceful lake sunset, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Peaceful_lake_sunset._(Unsplash).jpg"
+  },
+  {
+    "id": "countryside-sunset",
+    "name": "Countryside Sunset",
+    "licence": "CC0",
+    "credit": "Countryside sunset, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Countryside_sunset_(Unsplash).jpg"
+  },
+  {
+    "id": "country-dawn",
+    "name": "Dawn in the Country",
+    "licence": "CC0",
+    "credit": "Dawn In The Country, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Dawn_In_The_Country_(Unsplash).jpg"
+  },
+  {
+    "id": "hay-bales",
+    "name": "Harvest Evening",
+    "licence": "CC0",
+    "credit": "Bourdeilles pastures sunset, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bourdeilles_pastures_sunset_(Unsplash).jpg"
+  },
+  {
+    "id": "wheat-sunset",
+    "name": "Wheat at Sunset",
+    "licence": "CC0",
+    "credit": "Wheat field sunset, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Wheat_field_sunset_(Unsplash).jpg"
+  },
+  {
+    "id": "rainbow-meadow",
+    "name": "Rainbow Meadow",
+    "licence": "CC0",
+    "credit": "Desna meadows rainbow, by Аимаина хикари. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Desna_meadows_rainbow.JPG"
+  },
+  {
+    "id": "steam-viaduct",
+    "name": "Steam Railway",
+    "licence": "CC0",
+    "credit": "Talyllyn Railway No. 6 on the Dolgoch Viaduct, by William Davies. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Talyllyn_Railway_No._6_%22Douglas%22_on_the_Dolgoch_Viaduct_-_April_2019.jpg"
+  },
+  {
+    "id": "beach-sunset",
+    "name": "Beach at Sunset",
+    "licence": "CC0",
+    "credit": "Sunset over the beach, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sunset_over_the_beach_(Unsplash).jpg"
+  },
+  {
+    "id": "sunflower-band",
+    "name": "Sunflower Band",
+    "licence": "CC0",
+    "credit": "Impressive sunflowers, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Impressive_sunflowers_(Unsplash).jpg"
+  },
+  {
+    "id": "poppy-band",
+    "name": "Poppy Band",
+    "licence": "CC0",
+    "credit": "Poppies, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Poppies_(Unsplash).jpg"
+  },
+  {
+    "id": "redoute-daffodil",
+    "name": "Daffodil",
+    "licence": "Public domain",
+    "credit": "Pierre-Joseph Redouté, Narcissus pseudonarcissus, from Les Liliacées. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Narcissus_pseudonarcissus_-_Les_liliac%C3%A9es_-_vol._3_-_t._158_-_clean.jpg"
+  },
+  {
+    "id": "flora-batava-bluebell",
+    "name": "Bluebell",
+    "licence": "Public domain",
+    "credit": "Jan Kops, Hyacinthus non-scriptus, from Flora Batava. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hyacinthus_non-scriptus_%E2%80%94_Flora_Batava_%E2%80%94_Volume_v1.jpg"
+  },
+  {
+    "id": "thome-thistle",
+    "name": "Thistle",
+    "licence": "Public domain",
+    "credit": "Otto Wilhelm Thomé, Carduus nutans, from Flora von Deutschland, Österreich und der Schweiz. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Illustration_Carduus_nutans0_white.jpg"
+  },
+  {
+    "id": "rijks-blue-butterfly",
+    "name": "Blue Butterfly",
+    "licence": "CC0 (Rijksmuseum)",
+    "credit": "Boven- en onderaanzicht van een vlinder, RP-T-FM-105. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Boven-_en_onderaanzicht_van_een_vlinder,_RP-T-FM-105.jpg"
+  },
+  {
+    "id": "sydney-robin",
+    "name": "Scarlet Robin",
+    "licence": "Public domain",
+    "credit": "Sydney Bird Painter, Scarlet Robin. State Library of New South Wales. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:SLNSW_823075_f24_Scarlet_Robin_Petroica_multicolor.jpg"
+  },
+  {
+    "id": "rijks-quince-branch",
+    "name": "Flowering Branch",
+    "licence": "CC0 (Rijksmuseum)",
+    "credit": "Bloeiende tak Japanse kers, RP-T-1954-262. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bloeiende_tak_Japanse_kers,_RP-T-1954-262.jpg"
+  },
+  {
+    "id": "american-flora-poppy",
+    "name": "Corn Poppy",
+    "licence": "Public domain",
+    "credit": "Papaver rhoeas, plate 17 of The American Flora, vol. 1 (1855). Biodiversity Heritage Library. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:The_American_Flora._Vol._1,_1855_-_pl._17_Papaver_rhoeas_(6022329916).jpg"
+  },
+  {
+    "id": "ishizaki-sunflower",
+    "name": "Sunflower Study",
+    "licence": "Public domain",
+    "credit": "Ishizaki Yūshi, Helianthus annuus. Naturalis Biodiversity Center. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Naturalis_Biodiversity_Center_-_RMNH.ART.746_-_Helianthus_annuus_-_Y%C5%ABshi_Ishizaki_-_Cock_Blomhoff_Collection_-_pencil_drawing_-_water_colour.jpg"
+  },
+  {
+    "id": "rijks-lily-butterflies",
+    "name": "Lily and Butterflies",
+    "licence": "CC0 (Rijksmuseum)",
+    "credit": "Twee vlinders bij een lelie, RP-T-1957-339. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Twee_vlinders_bij_een_lelie,_RP-T-1957-339.jpg"
   }
 ]

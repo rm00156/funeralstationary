@@ -153,21 +153,21 @@ export const TEMPLATE_TYPE_SETS = {
 export type TypeSetId = keyof typeof TEMPLATE_TYPE_SETS;
 
 /** Placeholder copy — an admin or customer replaces these on their own document. */
-const PLACEHOLDER_NAME = "Robert Bayne";
-const PLACEHOLDER_DATES = "1971 – 2024";
+export const PLACEHOLDER_NAME = "Robert Bayne";
+export const PLACEHOLDER_DATES = "1971 – 2024";
 /**
  * The interior page's placeholder. Matches the seeded catalogue's convention
  * (`YOUR TEXT HERE`): the page that repeats must be generic, so it carries
  * decoration and an invitation to type, never specific content.
  */
 const PLACEHOLDER_INTERIOR = "YOUR TEXT HERE";
-const FAREWELL = "Forever in our hearts";
+export const FAREWELL = "Forever in our hearts";
 /**
  * Where and when the service is. Every competitor cover carries this under
  * the dates — it's the practical reason a mourner keeps the card in a pocket
  * — so no cover should ship without a slot for it.
  */
-const PLACEHOLDER_SERVICE = "Reading Crematorium\nTuesday 16th June 2026, 11am";
+export const PLACEHOLDER_SERVICE = "Reading Crematorium\nTuesday 16th June 2026, 11am";
 /** The flanking pair under a "Sunrise / Sunset" cover — the long form families use there. */
 const PLACEHOLDER_BORN = "1st May 1936";
 const PLACEHOLDER_DIED = "12th June 2024";

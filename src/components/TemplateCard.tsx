@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { A5_TRIM, coverWidthFactor, trimAspect, type PageTrim } from "@/lib/designEditor";
+
 /**
  * One design in a grid: its cover on a tinted panel, name and a meta line.
  * The whole card is a single link to the design's own page.
@@ -11,23 +13,30 @@ export default function TemplateCard({
   image,
   meta,
   priority = false,
+  trim = A5_TRIM,
 }: {
   href: string;
   name: string;
   image: string;
   meta: string;
   priority?: boolean;
+  /** The product's trim, so a bookmark's cover is bookmark-shaped. */
+  trim?: PageTrim;
 }) {
+  const narrow = coverWidthFactor(trim);
   return (
     <Link href={href} className="card-link group flex flex-col gap-4 no-underline">
       <div className="flex justify-center rounded-xl bg-mist-3 p-7">
-        <div className="cover relative aspect-[148/210] w-full max-w-[190px] overflow-hidden rounded-[3px] bg-sheet">
+        <div
+          className="cover relative overflow-hidden rounded-[3px] bg-sheet"
+          style={{ aspectRatio: trimAspect(trim), width: `${narrow * 100}%`, maxWidth: 190 * narrow }}
+        >
           <Image
             src={image}
             alt={`${name} design, front cover`}
             fill
             priority={priority}
-            sizes="190px"
+            sizes={`${Math.round(190 * narrow)}px`}
             className="object-cover"
           />
         </div>

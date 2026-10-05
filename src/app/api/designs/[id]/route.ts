@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
-import { templateExists } from "@/lib/catalogue.server";
+import { getProductFormats, templateProductSlug } from "@/lib/catalogue.server";
+import { BOOKLET_FORMAT } from "@/lib/designEditor";
 import {
   deleteDesign,
   getDesign,
@@ -50,7 +51,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/design
   // can change after creation — otherwise the row would keep pointing at
   // whichever template the editor happened to open with.
   if (templateId !== undefined) {
-    if (typeof templateId !== "string" || !(await templateExists(templateId))) {
+    // …but only to another of its own product's, which share its trim.
+    if (
+      typeof templateId !== "string" ||
+      (await templateProductSlug(templateId)) !== existing.productId
+    ) {
       return Response.json({ error: "Unknown templateId" }, { status: 400 });
     }
   }
@@ -68,7 +73,8 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/design
   // consistent with the spec it is being saved alongside.
   let nextDoc = undefined;
   if (doc !== undefined) {
-    const validated = validateDesignPayload(doc, pageOption.pageCount);
+    const format = (await getProductFormats()).get(existing.productId) ?? BOOKLET_FORMAT;
+    const validated = validateDesignPayload(doc, pageOption.pageCount, format.trim);
     if (!validated.ok) return Response.json({ error: validated.error }, { status: 400 });
     nextDoc = validated.doc;
   }

@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  PAGE_H,
-  PAGE_W,
   RESIZE_HANDLES,
   TEMPLATE_PAGE_COUNT,
   imageShape,
@@ -12,16 +10,27 @@ import {
   frameDepth,
   frameRings,
   photoBorderRadius,
+  pageMetrics,
   photoInnerBorderRadius,
   resizeBox,
   templateAccent,
   templatePageLabel,
   toTemplateLayout,
   withPageCount,
+  BOOKLET_FORMAT,
+  PRINT_ZOOM,
+  coverWidthFactor,
+  docTrim,
+  sizeText,
+  toProductFormat,
   type ImageElement,
+  type ProductFormat,
   type ResizeHandle,
 } from "@/lib/designEditor";
 import type { Template } from "@/lib/templates";
+
+/** The A5 booklet page in base px — what these geometry tests are written against. */
+const { pageW: PAGE_W, pageH: PAGE_H } = pageMetrics();
 
 function makeTemplate(categories: string[]): Template {
   return {
@@ -384,3 +393,108 @@ function screenCorner(
     y: cy + dx * Math.sin(rad) + dy * Math.cos(rad),
   };
 }
+
+describe("product formats", () => {
+  const a6Card: ProductFormat = {
+    sizeLabel: "A6",
+    trim: { widthMm: 105, heightMm: 148 },
+    templatePages: 2,
+    sizedByOption: false,
+    paperLabel: "Paper",
+  };
+  const bookmark: ProductFormat = {
+    ...a6Card,
+    sizeLabel: "50 × 200 mm",
+    trim: { widthMm: 50, heightMm: 200 },
+  };
+
+  it("draws every format at the same px per mm", () => {
+    expect(pageMetrics()).toMatchObject({ pageW: 444, pageH: 630, artboardWMm: 154, artboardHMm: 216 });
+    expect(pageMetrics(bookmark.trim)).toMatchObject({ pageW: 150, pageH: 600, artboardWMm: 56 });
+    // One physical millimetre per 3 canvas px, whatever the trim.
+    expect(PRINT_ZOOM * 3).toBeCloseTo(96 / 25.4, 10);
+  });
+
+  it("treats a document without a trim as A5", () => {
+    expect(docTrim({})).toEqual({ widthMm: 148, heightMm: 210 });
+    expect(docTrim({ trim: bookmark.trim })).toEqual(bookmark.trim);
+  });
+
+  it("stamps the trim on a starter document", () => {
+    expect(makeStarterDoc(makeTemplate(["classic"]), 4).trim).toEqual(BOOKLET_FORMAT.trim);
+    expect(makeStarterDoc(makeTemplate(["classic"]), 2, a6Card).trim).toEqual(a6Card.trim);
+  });
+
+  it("gives a flat product a front and a back, not a booklet cover", () => {
+    const doc = makeStarterDoc(makeTemplate(["classic"]), 2, bookmark);
+    expect(doc.pages).toHaveLength(2);
+    const front = doc.pages[0].elements;
+    expect(front.some((el) => el.type === "text" && el.text === "In loving memory")).toBe(true);
+    // The round portrait stays round on a page four times taller than wide.
+    const window = front.find((el) => el.type === "image")!;
+    const { pageW, pageH } = pageMetrics(bookmark.trim);
+    expect((window.w / 100) * pageW).toBeCloseTo((window.h / 100) * pageH, 5);
+  });
+
+  it("scales starter type to the trim, leaving A5 untouched", () => {
+    const fontSizes = (format: ProductFormat) =>
+      makeStarterDoc(makeTemplate(["classic"]), 3, format).pages[0].elements.flatMap((el) =>
+        el.type === "text" ? [el.fontSize] : [],
+      );
+    const a5 = fontSizes(BOOKLET_FORMAT);
+    expect(a5).toContain(46);
+    const a6 = fontSizes({ ...a6Card, templatePages: 3 });
+    a6.forEach((size, index) => expect(size).toBeLessThan(a5[index]));
+  });
+
+  it("authors a product's own number of template pages", () => {
+    expect(makeTemplateLayout(makeTemplate(["classic"]), a6Card)).toHaveLength(2);
+    expect(
+      makeTemplateLayout(makeTemplate(["classic"]), { ...a6Card, templatePages: 1 }),
+    ).toHaveLength(1);
+    expect(templatePageLabel(0, 2)).toBe("Front");
+    expect(templatePageLabel(1, 2)).toBe("Back");
+    expect(templatePageLabel(1, 3)).toBe("Middle");
+  });
+
+  it("normalises a stored layout to a flat product's pages", () => {
+    const [a, b, c] = [makeBlankPage(), makeBlankPage(), makeBlankPage()];
+    expect(toTemplateLayout([a, b, c], 2)).toEqual([a, c]);
+    expect(toTemplateLayout([a, b, c], 1)).toEqual([a]);
+    expect(toTemplateLayout([a], 2)?.[0]).toBe(a);
+    expect(toTemplateLayout([a], 2)).toHaveLength(2);
+  });
+
+  it("resolves a products row, falling back to a booklet for an unknown page count", () => {
+    const row = {
+      sizeLabel: "A6",
+      trimWidthMm: 105,
+      trimHeightMm: 148,
+      templatePages: 2,
+      sizedByOption: false,
+      paperLabel: "Paper",
+    };
+    expect(toProductFormat(row)).toEqual(a6Card);
+    expect(toProductFormat({ ...row, templatePages: 7 }).templatePages).toBe(3);
+  });
+
+  it("describes a size for customers", () => {
+    expect(sizeText(BOOKLET_FORMAT)).toBe("A5 (148 × 210 mm)");
+    expect(sizeText(bookmark)).toBe("50 × 200 mm");
+    expect(sizeText({ ...a6Card, sizeLabel: "A4 to A0", sizedByOption: true })).toBe("A4 to A0");
+  });
+
+  it("narrows only covers slimmer than an A page", () => {
+    expect(coverWidthFactor(BOOKLET_FORMAT.trim)).toBe(1);
+    expect(coverWidthFactor(a6Card.trim)).toBe(1);
+    expect(coverWidthFactor({ widthMm: 210, heightMm: 297 })).toBe(1);
+    expect(coverWidthFactor(bookmark.trim)).toBeCloseTo(0.25 / (148 / 210), 5);
+  });
+
+  it("resizes a rotated box against its own page's proportions", () => {
+    const origin = { x: 40, y: 40, w: 20, h: 5 };
+    const a5 = resizeBox(origin, "se", 10, 0, { rotation: 30 });
+    const tall = resizeBox(origin, "se", 10, 0, { rotation: 30, trim: bookmark.trim });
+    expect(tall).not.toEqual(a5);
+  });
+});

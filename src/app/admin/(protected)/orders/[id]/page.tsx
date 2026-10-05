@@ -7,9 +7,9 @@ import AdminPrintPdfButton from "@/components/AdminPrintPdfButton";
 import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { adminGetOrder } from "@/lib/adminOrders.server";
-import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
-import { formatPence } from "@/lib/orderOfServicePricing";
-import { ORDER_STATUS_LABELS } from "@/lib/orders";
+import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
+import { trimText } from "@/lib/designEditor";
+import { ORDER_STATUS_LABELS, lineSpec } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 
@@ -73,8 +73,9 @@ export default async function AdminOrderPage({
                     <div>
                       <p className="font-body font-medium text-on-surface">{item.designName}</p>
                       <p className="font-body text-sm text-on-surface-variant">
-                        {item.quantityCopies} copies · {PAGE_SIZE_LABEL} ·{" "}
-                        {item.quote.pages.label} · {item.quote.paper.label}
+                        {copiesText(item.quantityCopies)} · {lineSpec(item.format, item.quote)}
+                        {item.format.sizedByOption &&
+                          ` — artwork drawn at ${trimText(item.format.trim)}; scale to the size ordered`}
                       </p>
                       <p className="font-body text-xs text-on-surface-variant">
                         {formatPence(item.unitPricePence)} each · {item.delivery.label} (

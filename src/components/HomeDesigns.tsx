@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import TemplateCard from "@/components/TemplateCard";
-import { formatPence } from "@/lib/orderOfServicePricing";
+import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import type { ProductShowcase, Template } from "@/lib/templates";
 
 /**
@@ -18,7 +18,7 @@ export default function HomeDesigns({
   templates: Template[];
 }) {
   const productHref = `/products/${product.id}`;
-  const from = `From ${formatPence(product.fromPence)} · ${product.fromCopies} copies`;
+  const from = `From ${formatPence(product.fromPence)} · ${copiesText(product.fromCopies)}`;
 
   return (
     <section id="designs" className="scroll-mt-4 border-y border-line bg-surface">
@@ -28,7 +28,7 @@ export default function HomeDesigns({
             <h2 className="type-section">Choose a design to begin</h2>
             <p className="text-ink-2">
               Every design is personalised online with your own photographs and words. Prices
-              start at {formatPence(product.fromPence)} for {product.fromCopies} copies – check
+              start at {formatPence(product.fromPence)} for {copiesText(product.fromCopies)} – check
               yours with our{" "}
               <Link href={`${productHref}#prices`} className="link">
                 price calculator
@@ -44,6 +44,7 @@ export default function HomeDesigns({
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-8">
           {templates.map((template) => (
             <TemplateCard
+              trim={product.format.trim}
               key={template.id}
               href={`${productHref}/${template.id}`}
               name={template.name}

@@ -64,7 +64,11 @@ export async function PUT(
   const body = await readJson(request);
   if (!body) return Response.json({ error: "Invalid JSON body" }, { status: 400 });
 
-  const parsed = parseLayoutPages(body.pages ?? null);
+  // The page structure is the product's (cover/middle/back, front/back, or
+  // a front alone), so the template has to be known before the pages are.
+  const template = await adminGetTemplate(slug);
+  if (!template) return notFound();
+  const parsed = parseLayoutPages(body.pages ?? null, template.productFormat.templatePages);
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
   if (!parsed.pages) {
     return Response.json(
@@ -113,7 +117,13 @@ export async function POST(
     const coverPage = result.pages[0];
     if (isStorageConfigured() && coverPage) {
       try {
-        const png = await renderTemplateThumbnail(renderOrigin(request), coverPage, slug);
+        const template = await adminGetTemplate(slug);
+        const png = await renderTemplateThumbnail(
+          renderOrigin(request),
+          coverPage,
+          slug,
+          template?.productFormat.trim,
+        );
         const url = await uploadObject(
           `template-previews/${slug}-${Date.now()}.png`,
           png,

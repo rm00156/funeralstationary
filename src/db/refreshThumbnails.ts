@@ -62,7 +62,12 @@ async function main() {
         console.log(`  - ${entry.slug} (no authored layout — nothing to screenshot)`);
         continue;
       }
-      const png = await renderTemplateThumbnail(origin, template.layout[0], entry.slug);
+      const png = await renderTemplateThumbnail(
+        origin,
+        template.layout[0],
+        entry.slug,
+        template.productFormat.trim,
+      );
       const url = await saveTemplateThumbnail(entry.slug, png);
       await adminUpdateTemplate(entry.slug, { previewImageUrl: url });
       done += 1;

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import TemplateCard from "@/components/TemplateCard";
+import type { PageTrim } from "@/lib/designEditor";
 import type { Template, TemplateCategory } from "@/lib/templates";
 
 /** Designs shown before "Show more designs" — three rows of four at full width. */
@@ -17,6 +18,7 @@ const PAGE_SIZE = 12;
 export default function ProductDesigns({
   productId,
   templates,
+  trim,
   categories,
   initialCategoryId = null,
   priceLine,
@@ -24,6 +26,8 @@ export default function ProductDesigns({
   productId: string;
   /** This product's published designs, in sort order. */
   templates: Template[];
+  /** The product's trim — what shape its covers are. */
+  trim: PageTrim;
   /** The categories those designs use, in sort order. */
   categories: TemplateCategory[];
   /** ?category= from the URL, already validated server-side. */
@@ -94,6 +98,7 @@ export default function ProductDesigns({
         {shown.map((template, index) => (
           <TemplateCard
             key={template.id}
+            trim={trim}
             href={`/products/${productId}/${template.id}`}
             name={template.name}
             image={template.image}

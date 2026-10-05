@@ -6,8 +6,8 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
-import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
-import { formatPence } from "@/lib/orderOfServicePricing";
+import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
+import { lineSpec } from "@/lib/orders";
 import { getOrder } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
 import { authConfigured } from "@/lib/userSession";
@@ -129,9 +129,7 @@ export default async function OrderPage({
                           {item.designName}
                         </h2>
                         <p className="font-body text-sm text-on-surface-variant">
-                          {item.quantityCopies} copies · {PAGE_SIZE_LABEL} ·{" "}
-                          {item.quote.pages.label} ·{" "}
-                          {item.quote.paper.label}
+                          {copiesText(item.quantityCopies)} · {lineSpec(item.format, item.quote)}
                         </p>
                         <p className="font-body text-sm text-on-surface-variant">
                           {formatPence(item.unitPricePence)} each

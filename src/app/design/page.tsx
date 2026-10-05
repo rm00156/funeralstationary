@@ -43,8 +43,12 @@ export default async function DesignPage({
   const template =
     templates.find((item) => item.id === (saved ? saved.templateId : templateParam)) ??
     templates[0];
+  // A template belongs to exactly one product, and its layout is drawn on
+  // that product's trim — so a new design's product is its template's, never
+  // a ?product= that disagrees with it.
   const product =
-    products.find((item) => item.id === (saved ? saved.productId : productParam)) ??
+    products.find((item) => item.id === (saved ? saved.productId : template?.productId)) ??
+    products.find((item) => item.id === productParam) ??
     products[0];
   if (!template || !product) {
     throw new Error("The catalogue is empty — run `npm run db:seed` first.");
@@ -69,7 +73,8 @@ export default async function DesignPage({
       template={template}
       productId={product.id}
       productLabel={product.label}
-      templates={templates}
+      format={product.format}
+      templates={templates.filter((item) => item.productId === product.id)}
       pricing={pricing}
       initialLayout={templateWithLayout?.layout ?? null}
       initialSelection={initialSelection}

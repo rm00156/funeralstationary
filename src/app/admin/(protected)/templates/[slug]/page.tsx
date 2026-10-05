@@ -34,6 +34,14 @@ export default async function AdminTemplatePage({
           Templates
         </Link>
         <ChevronRight size={14} aria-hidden />
+        <Link
+          href={`/admin/templates?product=${template.productSlug}`}
+          className="transition-colors hover:text-primary"
+        >
+          {products.find((product) => product.slug === template.productSlug)?.label ??
+            template.productSlug}
+        </Link>
+        <ChevronRight size={14} aria-hidden />
         <span className="text-on-surface">{template.name}</span>
       </nav>
 

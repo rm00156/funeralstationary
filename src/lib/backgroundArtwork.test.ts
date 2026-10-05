@@ -3,10 +3,12 @@ import {
   BACKGROUND_SPECS,
   backgroundAssetKey,
   backgroundElement,
+  backgroundFormats,
+  backgroundLayout,
   getBackgroundSpec,
   mergeCredits,
 } from "./backgroundArtwork";
-import { FULL_BLEED_BOX } from "./designEditor";
+import { FULL_BLEED_BOX, fullBleedBox } from "./designEditor";
 import { TEMPLATE_PALETTES } from "./templateGenerator";
 
 describe("BACKGROUND_SPECS", () => {
@@ -18,7 +20,8 @@ describe("BACKGROUND_SPECS", () => {
 
   it("only references palettes the generator knows", () => {
     for (const spec of BACKGROUND_SPECS) {
-      expect(spec.palettes.length).toBeGreaterThan(0);
+      // A plate used only as a cutout renders no palette variants at all.
+      if (!spec.spray) expect(spec.palettes.length, spec.id).toBeGreaterThan(0);
       for (const palette of spec.palettes) expect(TEMPLATE_PALETTES).toHaveProperty(palette);
     }
   });
@@ -30,14 +33,24 @@ describe("BACKGROUND_SPECS", () => {
     }
   });
 
-  it("fades run from artwork toward the edge the text sits on", () => {
+  it("fades run from artwork toward the edge the text sits on, in every format", () => {
     for (const spec of BACKGROUND_SPECS) {
-      if (!spec.fade) continue;
-      expect(spec.fade.edge).toBe(spec.textZone);
-      if (spec.fade.edge === "bottom") expect(spec.fade.start).toBeLessThan(spec.fade.end);
-      else expect(spec.fade.start).toBeGreaterThan(spec.fade.end);
-      expect(spec.fade.start).toBeGreaterThanOrEqual(0);
-      expect(spec.fade.end).toBeLessThanOrEqual(100);
+      for (const format of backgroundFormats(spec)) {
+        const { fade } = backgroundLayout(spec, format);
+        if (!fade) continue;
+        expect(fade.edge, `${spec.id}/${format}`).toBe(spec.textZone);
+        if (fade.edge === "bottom") expect(fade.start).toBeLessThan(fade.end);
+        else expect(fade.start).toBeGreaterThan(fade.end);
+        expect(fade.start).toBeGreaterThanOrEqual(0);
+        expect(fade.end).toBeLessThanOrEqual(100);
+      }
+    }
+  });
+
+  it("keeps a bookmark's flower band low enough to leave room for the portrait and name", () => {
+    for (const spec of BACKGROUND_SPECS) {
+      if (!spec.bookmark || !spec.placement) continue;
+      expect(backgroundLayout(spec, "bookmark").placement!.y, spec.id).toBeGreaterThanOrEqual(58);
     }
   });
 
@@ -95,6 +108,24 @@ describe("backgroundAssetKey", () => {
       "templates/backgrounds/redoute-frankfort-rose-plum.jpg",
     );
   });
+
+  it("keeps the A5 key every existing template references, and suffixes other formats", () => {
+    expect(backgroundAssetKey("lake-sunset", "ink", "a5")).toBe("templates/backgrounds/lake-sunset-ink.jpg");
+    expect(backgroundAssetKey("lake-sunset", "ink", "bookmark")).toBe(
+      "templates/backgrounds/lake-sunset-ink-bookmark.jpg",
+    );
+  });
+});
+
+describe("backgroundLayout", () => {
+  it("lets a bookmark render override the layout and inherit the rest", () => {
+    const poppies = getBackgroundSpec("poppy-band")!;
+    expect(backgroundFormats(poppies)).toEqual(["a5", "bookmark"]);
+    expect(backgroundLayout(poppies, "a5").placement).toEqual(poppies.placement);
+    expect(backgroundLayout(poppies, "bookmark").placement).toEqual(poppies.bookmark!.placement);
+    const rose = getBackgroundSpec("redoute-frankfort-rose")!;
+    expect(backgroundFormats(rose)).toEqual(["a5"]);
+  });
 });
 
 describe("backgroundElement", () => {
@@ -109,6 +140,12 @@ describe("backgroundElement", () => {
     expect(element.h).toBe(FULL_BLEED_BOX.h);
     expect(element.x).toBeLessThan(0);
     expect(element.x + element.w).toBeGreaterThan(100);
+  });
+
+  it("covers another trim's bleed when given the trim", () => {
+    const trim = { widthMm: 50, heightMm: 200 };
+    const element = backgroundElement("a", trim);
+    expect({ x: element.x, y: element.y, w: element.w, h: element.h }).toEqual(fullBleedBox(trim));
   });
 
   it("mints a fresh id each time", () => {

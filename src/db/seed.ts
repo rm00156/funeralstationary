@@ -79,6 +79,12 @@ async function main() {
     "label",
     "description",
     "occasion",
+    "sizeLabel",
+    "trimWidthMm",
+    "trimHeightMm",
+    "templatePages",
+    "sizedByOption",
+    "paperLabel",
     "sortOrder",
     "isActive",
   ]);

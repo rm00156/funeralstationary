@@ -184,7 +184,8 @@ function joinList(parts: string[]): string {
 
 /**
  * Where an issue is, in the customer's terms: "the cover", "the cover and the
- * back page", "pages 2 and 3", "every inside page". Always names the pages
+ * back page", "pages 2 and 3", "every inside page" — or, on a flat card,
+ * "the front" and "the back". Always names the pages
  * rather than a bare count, so the customer knows where to look.
  */
 export function issueLocation(issue: ReadinessIssue): string {
@@ -192,7 +193,9 @@ export function issueLocation(issue: ReadinessIssue): string {
   const last = issue.pageCount - 1;
   const inside = pages.filter((page) => page !== 0 && page !== last);
   const parts: string[] = [];
-  if (pages.includes(0)) parts.push("the cover");
+  // A flat card or a board has a front and a back, not a cover and a back page.
+  const flat = issue.pageCount <= 2;
+  if (pages.includes(0)) parts.push(flat ? "the front" : "the cover");
   if (inside.length > 0) {
     const insideCount = issue.pageCount - 2;
     if (inside.length === insideCount && insideCount > 2) parts.push("every inside page");
@@ -200,7 +203,7 @@ export function issueLocation(issue: ReadinessIssue): string {
     else if (inside.length === 1) parts.push(`page ${inside[0] + 1}`);
     else parts.push(`pages ${joinList(inside.map((page) => String(page + 1)))}`);
   }
-  if (last > 0 && pages.includes(last)) parts.push("the back page");
+  if (last > 0 && pages.includes(last)) parts.push(flat ? "the back" : "the back page");
   return joinList(parts);
 }
 

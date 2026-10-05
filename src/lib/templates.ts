@@ -8,9 +8,13 @@
  * src/db (see src/lib/designs.server.ts).
  */
 
+import type { ProductFormat } from "@/lib/designEditor";
+
 export interface Product {
   id: string;
   label: string;
+  /** Its trim, template structure and axis names (products.size_label, …). */
+  format: ProductFormat;
 }
 
 /** When a product is needed — the shop's grouping (products.occasion). */

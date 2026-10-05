@@ -7,6 +7,7 @@ import {
   buildStripeLineItems,
   canTransition,
   computeOrderTotals,
+  lineSpec,
   makeOrderNumber,
   parseOrderStatus,
   resolveSelectionStrict,
@@ -148,5 +149,22 @@ describe("buildStripeLineItems", () => {
     ]);
     expect(lines.map((line) => line.name)).toEqual(["First", "Second", "Delivery — Next day (Second)"]);
     expect(sumLineItems(lines)).toBe(12750 + 999);
+  });
+});
+
+describe("lineSpec", () => {
+  const quote = { pages: { label: "8 page" }, paper: { label: "Silk" } };
+
+  it("leads with the product's size", () => {
+    expect(lineSpec({ sizeLabel: "A5", sizedByOption: false }, quote)).toBe("A5 · 8 page · Silk");
+  });
+
+  it("lets a board's size option speak for itself", () => {
+    expect(
+      lineSpec(
+        { sizeLabel: "A4 to A0", sizedByOption: true },
+        { pages: { label: "A1" }, paper: { label: "Mounted on 5mm board" } },
+      ),
+    ).toBe("A1 · Mounted on 5mm board");
   });
 });
