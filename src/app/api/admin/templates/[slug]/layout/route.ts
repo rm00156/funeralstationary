@@ -8,6 +8,7 @@ import {
   adminUpdateTemplate,
 } from "@/lib/adminCatalogue.server";
 import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { parseLayoutAction, parseLayoutPages } from "@/lib/adminValidation";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";
 import { renderTemplateThumbnail } from "@/lib/templateThumbnail.server";
@@ -112,8 +113,7 @@ export async function POST(
     const coverPage = result.pages[0];
     if (isStorageConfigured() && coverPage) {
       try {
-        const origin = new URL(request.url).origin;
-        const png = await renderTemplateThumbnail(origin, coverPage, slug);
+        const png = await renderTemplateThumbnail(renderOrigin(request), coverPage, slug);
         const url = await uploadObject(
           `template-previews/${slug}-${Date.now()}.png`,
           png,

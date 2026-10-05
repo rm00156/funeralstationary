@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { isAdmin, unauthorised } from "@/lib/adminSession";
 import type { ProofRequest } from "@/lib/designEditor";
+import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { renderProofPdf } from "@/lib/proofPdf.server";
 import { MAX_PROOF_PAGES } from "@/lib/proofRender.server";
 
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const pdf = await renderProofPdf(new URL(request.url).origin, body.doc);
+  const pdf = await renderProofPdf(renderOrigin(request), body.doc);
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

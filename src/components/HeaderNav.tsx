@@ -4,15 +4,36 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, CircleUserRound, LogIn, Menu, X } from "lucide-react";
+import { ChevronDown, CircleUserRound, Menu, Phone, X } from "lucide-react";
 
 import CartLink from "@/components/CartLink";
 import SignOutButton from "@/components/SignOutButton";
-import type { Product } from "@/lib/templates";
+import {
+  DESIGN_FOR_YOU_HREF,
+  OPENING_HOURS,
+  ORDER_CUTOFF,
+  STANDARD_TURNAROUND,
+  PHONE_DISPLAY,
+  PHONE_HREF,
+  UPLOAD_DESIGN_HREF,
+} from "@/lib/site";
+import {
+  OCCASION_LABELS,
+  PRODUCT_OCCASIONS,
+  type Product,
+  type ProductOccasion,
+} from "@/lib/templates";
+
+export type NavProduct = Product & { occasion: ProductOccasion };
 
 const NAV_LINKS = [
-  { label: "How It Works", href: "/#how-it-works" },
-  { label: "Contact", href: "/#contact" },
+  { label: "Reviews", href: "/reviews" },
+  { label: "Contact", href: "/contact" },
+];
+
+const OTHER_WAYS = [
+  { label: "We design it for you", href: DESIGN_FOR_YOU_HREF },
+  { label: "Upload your own design", href: UPLOAD_DESIGN_HREF },
 ];
 
 const productHref = (product: Product) => `/products/${product.id}`;
@@ -36,17 +57,25 @@ function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | null>, clo
   }, [open, ref, close]);
 }
 
+const GROUP_HEADING = "px-3 pb-1.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-label";
+const MENU_ITEM =
+  "block rounded-lg px-3 py-2.5 text-ink no-underline transition-colors hover:bg-mist-2 hover:text-plum";
+
 /**
  * The client half of the header; Header.tsx feeds it the sellable products
- * and the signed-in customer. Signed in: "My Account" opens a menu with the
- * account page and Sign out. Signed out: "Sign in" goes to /account, which
- * is the sign-in form above whatever this browser has saved.
+ * and the signed-in customer. The utility bar and the header scroll away with
+ * the page (nothing here is sticky — the product page's filter bar is).
+ *
+ * The shop menu is grouped by products.occasion, then the two ways to order
+ * that aren't catalogue products. Signed in: "My account" opens a menu with
+ * the account page and Sign out. Signed out: "Sign in" goes to /account,
+ * which is the sign-in form above whatever this browser has saved.
  */
 export default function HeaderNav({
   products,
   user,
 }: {
-  products: Product[];
+  products: NavProduct[];
   user: { email: string } | null;
 }) {
   const [accountOpen, setAccountOpen] = useState(false);
@@ -56,210 +85,251 @@ export default function HeaderNav({
   const [shopOpen, setShopOpen] = useState(false);
   const shopRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  const inShop = pathname.startsWith("/products/") || pathname === "/templates";
+  const inShop = pathname.startsWith("/products/") || pathname === "/shop";
 
   useDismiss(shopOpen, shopRef, () => setShopOpen(false));
 
+  const groups = PRODUCT_OCCASIONS.map((occasion) => ({
+    occasion,
+    products: products.filter((product) => product.occasion === occasion),
+  })).filter((group) => group.products.length > 0);
+
   const linkClass = (active: boolean) =>
-    active
-      ? "text-primary font-bold border-b-2 border-primary pb-1"
-      : "text-on-surface-variant hover:text-primary-container transition-colors duration-300";
+    `flex min-h-11 items-center border-b-2 no-underline transition-colors hover:text-plum ${
+      active ? "border-plum text-plum" : "border-transparent text-ink"
+    }`;
 
   return (
-    <header className="sticky top-0 z-50 bg-background border-b border-outline-variant shadow-sm">
-      <div className="flex justify-between items-center w-full px-margin-mobile md:px-gutter max-w-[1200px] mx-auto h-20">
-        <Link href="/" className="flex items-center gap-2 group">
-          <Image
-            src="/logo.webp"
-            alt="The Funeral Stationery"
-            width={564}
-            height={120}
-            priority
-            className="h-10 md:h-14 w-auto object-contain group-hover:opacity-90 transition-opacity"
-          />
-        </Link>
+    <div className="site-chrome font-body">
+      <div className="bg-plum-deep text-[15px] text-on-plum">
+        <div className="site-container flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-2.5">
+          <span>
+            <strong className="font-semibold text-white">{STANDARD_TURNAROUND}</strong> delivery
+            if ordered before <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong>{" "}
+            on a working day
+          </span>
+          <a
+            href={PHONE_HREF}
+            className="flex min-h-6 items-center gap-2 text-white no-underline hover:underline"
+          >
+            <Phone size={16} strokeWidth={1.8} aria-hidden />
+            {OPENING_HOURS} · {PHONE_DISPLAY}
+          </a>
+        </div>
+      </div>
 
-        <nav className="hidden md:flex items-center gap-6">
-          <div ref={shopRef} className="relative">
+      <header className="relative border-b border-line bg-surface">
+        <div className="site-container flex items-center justify-between gap-x-4 py-4 lg:gap-x-10">
+          <Link href="/" aria-label="The Funeral Stationery – home" className="flex min-w-0">
+            <Image
+              src="/logo.webp"
+              alt="The Funeral Stationery – Bespoke Funeral Stationery"
+              width={564}
+              height={120}
+              priority
+              className="h-9 w-auto sm:h-11 md:h-14"
+            />
+          </Link>
+
+          <nav aria-label="Main" className="hidden items-center gap-9 text-base font-medium lg:flex">
+            <div ref={shopRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setShopOpen((open) => !open)}
+                aria-expanded={shopOpen}
+                aria-controls="shop-menu"
+                className={`cursor-pointer gap-1.5 ${linkClass(inShop)}`}
+              >
+                Shop
+                <ChevronDown
+                  size={16}
+                  aria-hidden
+                  className={`transition-transform ${shopOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {shopOpen && (
+                <div
+                  id="shop-menu"
+                  className="absolute -left-6 top-[calc(100%+12px)] z-20 flex w-80 flex-col rounded-xl border border-line bg-surface p-3 font-normal shadow-menu"
+                >
+                  {groups.map((group, index) => (
+                    <div
+                      key={group.occasion}
+                      className={index > 0 ? "mt-2 border-t border-line pt-3.5" : "pt-2"}
+                    >
+                      <p className={GROUP_HEADING}>{OCCASION_LABELS[group.occasion]}</p>
+                      {group.products.map((product) => (
+                        <Link
+                          key={product.id}
+                          href={productHref(product)}
+                          onClick={() => setShopOpen(false)}
+                          aria-current={pathname === productHref(product) ? "page" : undefined}
+                          className={MENU_ITEM}
+                        >
+                          {product.label}
+                        </Link>
+                      ))}
+                    </div>
+                  ))}
+                  <div className={groups.length > 0 ? "mt-2 border-t border-line pt-3.5" : "pt-2"}>
+                    <p className={GROUP_HEADING}>Other ways to order</p>
+                    {OTHER_WAYS.map((way) => (
+                      <Link
+                        key={way.href}
+                        href={way.href}
+                        onClick={() => setShopOpen(false)}
+                        className={MENU_ITEM}
+                      >
+                        {way.label}
+                      </Link>
+                    ))}
+                  </div>
+                  <Link
+                    href="/shop"
+                    onClick={() => setShopOpen(false)}
+                    className="mt-2 border-t border-line p-3 font-semibold text-plum no-underline hover:text-plum-deep"
+                  >
+                    See everything in the shop →
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
+                className={linkClass(pathname === link.href)}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            {user ? (
+              <div ref={accountRef} className="relative hidden lg:block">
+                <button
+                  type="button"
+                  onClick={() => setAccountOpen((open) => !open)}
+                  aria-expanded={accountOpen}
+                  aria-controls="account-menu"
+                  className="btn btn-ghost min-h-11 gap-2 px-4 text-base"
+                >
+                  <CircleUserRound size={18} strokeWidth={1.8} aria-hidden />
+                  My account
+                  <ChevronDown
+                    size={16}
+                    aria-hidden
+                    className={`transition-transform ${accountOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {accountOpen && (
+                  <div
+                    id="account-menu"
+                    className="absolute right-0 top-[calc(100%+12px)] z-20 w-72 rounded-xl border border-line bg-surface p-3 shadow-menu"
+                  >
+                    <p className="px-3 pb-3 pt-2 text-[13px] text-ink-3">
+                      Signed in as
+                      <span className="block truncate text-base font-medium text-ink">
+                        {user.email}
+                      </span>
+                    </p>
+                    <Link
+                      href="/account"
+                      onClick={() => setAccountOpen(false)}
+                      className={`border-t border-line ${MENU_ITEM}`}
+                    >
+                      My designs &amp; orders
+                    </Link>
+                    <SignOutButton className="min-h-11 w-full rounded-lg px-3 text-base hover:bg-mist-2" />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                href="/account"
+                className="btn btn-ghost hidden min-h-11 gap-2 px-4 text-base lg:inline-flex"
+              >
+                <CircleUserRound size={18} strokeWidth={1.8} aria-hidden />
+                Sign in
+              </Link>
+            )}
+            <CartLink />
             <button
               type="button"
-              onClick={() => setShopOpen((open) => !open)}
-              aria-expanded={shopOpen}
-              aria-haspopup="menu"
-              className={`flex items-center gap-1 cursor-pointer ${linkClass(inShop)}`}
+              className="btn btn-ghost min-h-11 px-2.5 text-plum lg:hidden"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
             >
-              Shop
-              <ChevronDown
-                size={16}
-                aria-hidden
-                className={`transition-transform duration-300 ${shopOpen ? "rotate-180" : ""}`}
-              />
+              {menuOpen ? <X aria-hidden /> : <Menu aria-hidden />}
             </button>
-            {shopOpen && (
-              <div
-                role="menu"
-                className="absolute left-0 top-full mt-3 min-w-56 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-2 ambient-shadow"
-              >
-                {products.map((product) => (
+          </div>
+        </div>
+
+        {menuOpen && (
+          <nav
+            id="mobile-menu"
+            aria-label="Main"
+            className="flex flex-col border-t border-line bg-surface px-margin-mobile py-4 text-[17px] sm:px-gutter lg:hidden"
+          >
+            {groups.map((group) => (
+              <div key={group.occasion} className="border-b border-line py-2">
+                <p className={`pt-2 ${GROUP_HEADING}`}>{OCCASION_LABELS[group.occasion]}</p>
+                {group.products.map((product) => (
                   <Link
                     key={product.id}
-                    role="menuitem"
                     href={productHref(product)}
-                    onClick={() => setShopOpen(false)}
-                    className={`block rounded-lg px-3.5 py-2.5 font-body text-sm transition-colors hover:bg-surface-container-low hover:text-primary ${
-                      pathname === productHref(product)
-                        ? "font-semibold text-primary"
-                        : "text-on-surface-variant"
-                    }`}
+                    onClick={() => setMenuOpen(false)}
+                    aria-current={pathname === productHref(product) ? "page" : undefined}
+                    className={MENU_ITEM}
                   >
                     {product.label}
                   </Link>
                 ))}
+              </div>
+            ))}
+            <div className="border-b border-line py-2">
+              <p className={`pt-2 ${GROUP_HEADING}`}>Other ways to order</p>
+              {OTHER_WAYS.map((way) => (
                 <Link
-                  role="menuitem"
-                  href="/templates"
-                  onClick={() => setShopOpen(false)}
-                  className={`mt-1 block rounded-lg border-t border-outline-variant/40 px-3.5 py-2.5 pt-3 font-body text-sm transition-colors hover:bg-surface-container-low hover:text-primary ${
-                    pathname === "/templates" ? "font-semibold text-primary" : "text-on-surface-variant"
-                  }`}
+                  key={way.href}
+                  href={way.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={MENU_ITEM}
                 >
-                  All templates
+                  {way.label}
                 </Link>
+              ))}
+            </div>
+            <div className="py-2 font-medium">
+              {[{ label: "See everything in the shop", href: "/shop" }, ...NAV_LINKS].map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMenuOpen(false)}
+                  aria-current={pathname === link.href ? "page" : undefined}
+                  className={`${MENU_ITEM} ${pathname === link.href ? "text-plum" : ""}`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+              <Link href="/account" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
+                {user ? "My account" : "Sign in"}
+              </Link>
+            </div>
+            {user && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-3 pt-4">
+                <p className="truncate text-[15px] text-ink-3">Signed in as {user.email}</p>
+                <SignOutButton className="min-h-11 text-base" />
               </div>
             )}
-          </div>
-
-          {NAV_LINKS.map((link) => (
-            <Link key={link.label} href={link.href} className={linkClass(link.href === pathname)}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-4">
-          <CartLink className="hidden md:flex" />
-          {user ? (
-            <div ref={accountRef} className="relative hidden md:block">
-              <button
-                type="button"
-                onClick={() => setAccountOpen((open) => !open)}
-                aria-expanded={accountOpen}
-                aria-haspopup="menu"
-                className="flex items-center gap-2 px-6 py-2.5 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors duration-300 text-sm font-medium tracking-wide"
-              >
-                <CircleUserRound size={18} aria-hidden />
-                My Account
-                <ChevronDown
-                  size={16}
-                  aria-hidden
-                  className={`transition-transform duration-300 ${accountOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-              {accountOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 top-full mt-3 min-w-64 rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-2 ambient-shadow"
-                >
-                  <p className="truncate px-3.5 pt-2 pb-3 font-body text-xs text-on-surface-variant">
-                    Signed in as
-                    <span className="block truncate text-sm font-medium text-on-surface">
-                      {user.email}
-                    </span>
-                  </p>
-                  <Link
-                    role="menuitem"
-                    href="/account"
-                    onClick={() => setAccountOpen(false)}
-                    className="block rounded-lg border-t border-outline-variant/40 px-3.5 py-2.5 font-body text-sm text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary"
-                  >
-                    My designs &amp; orders
-                  </Link>
-                  <SignOutButton className="w-full rounded-lg px-3.5 py-2.5 hover:bg-surface-container-low" />
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link
-              href="/account"
-              className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors duration-300 text-sm font-medium tracking-wide"
-            >
-              <LogIn size={18} aria-hidden />
-              Sign in
-            </Link>
-          )}
-          <button
-            className="md:hidden text-primary p-2"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-label={menuOpen ? "Close menu" : "Open menu"}
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <X /> : <Menu />}
-          </button>
-        </div>
-      </div>
-
-      {menuOpen && (
-        <nav className="md:hidden border-t border-outline-variant bg-background px-margin-mobile py-4 flex flex-col gap-4">
-          <p className="font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
-            Shop
-          </p>
-          {products.map((product) => (
-            <Link
-              key={product.id}
-              href={productHref(product)}
-              onClick={() => setMenuOpen(false)}
-              className={
-                pathname === productHref(product)
-                  ? "text-primary font-bold"
-                  : "text-on-surface-variant hover:text-primary transition-colors"
-              }
-            >
-              {product.label}
-            </Link>
-          ))}
-          <Link
-            href="/templates"
-            onClick={() => setMenuOpen(false)}
-            className={
-              pathname === "/templates"
-                ? "text-primary font-bold"
-                : "text-on-surface-variant hover:text-primary transition-colors"
-            }
-          >
-            All templates
-          </Link>
-          <span className="h-px bg-outline-variant/40" aria-hidden />
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={
-                link.href === pathname
-                  ? "text-primary font-bold"
-                  : "text-on-surface-variant hover:text-primary transition-colors"
-              }
-              onClick={() => setMenuOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
-          <CartLink className="flex" onClick={() => setMenuOpen(false)} />
-          <Link
-            href="/account"
-            onClick={() => setMenuOpen(false)}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors duration-300 text-sm font-medium tracking-wide"
-          >
-            {user ? <CircleUserRound size={18} aria-hidden /> : <LogIn size={18} aria-hidden />}
-            {user ? "My Account" : "Sign in"}
-          </Link>
-          {user && (
-            <div className="flex flex-col items-center gap-1">
-              <p className="font-body text-xs text-on-surface-variant">Signed in as {user.email}</p>
-              <SignOutButton />
-            </div>
-          )}
-        </nav>
-      )}
-    </header>
+          </nav>
+        )}
+      </header>
+    </div>
   );
 }

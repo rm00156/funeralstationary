@@ -62,6 +62,8 @@ export const getSellableProducts = cache(async (): Promise<ProductShowcase[]> =>
     .select({
       slug: products.slug,
       label: products.label,
+      description: products.description,
+      occasion: products.occasion,
       image: templates.previewImageUrl,
     })
     .from(products)
@@ -76,13 +78,13 @@ export const getSellableProducts = cache(async (): Promise<ProductShowcase[]> =>
 
   // Rows arrive product-ordered then template-ordered, so the first row of
   // each group is both the card's image and the start of its count.
-  const byProduct = new Map<string, { label: string; image: string; templateCount: number }>();
-  for (const row of rows) {
-    const existing = byProduct.get(row.slug);
+  const byProduct = new Map<string, Omit<ProductShowcase, "id" | "fromPence" | "fromCopies">>();
+  for (const { slug, ...row } of rows) {
+    const existing = byProduct.get(slug);
     if (existing) {
       existing.templateCount += 1;
     } else {
-      byProduct.set(row.slug, { label: row.label, image: row.image, templateCount: 1 });
+      byProduct.set(slug, { ...row, templateCount: 1 });
     }
   }
 

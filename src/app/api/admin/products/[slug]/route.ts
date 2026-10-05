@@ -1,11 +1,18 @@
 import type { NextRequest } from "next/server";
 import { adminUpdateProduct } from "@/lib/adminCatalogue.server";
 import { isAdmin, unauthorised } from "@/lib/adminSession";
-import { parseBoolean, parseLabel, parseSortOrder } from "@/lib/adminValidation";
+import {
+  parseBoolean,
+  parseLabel,
+  parseProductDescription,
+  parseProductOccasion,
+  parseSortOrder,
+} from "@/lib/adminValidation";
+import type { ProductOccasion } from "@/lib/templates";
 
 export const runtime = "nodejs";
 
-/** PATCH /api/admin/products/:slug — edit label / sort / active. Not slug. */
+/** PATCH /api/admin/products/:slug — edit label / blurb / occasion / sort / active. Not slug. */
 export async function PATCH(
   request: NextRequest,
   ctx: RouteContext<"/api/admin/products/[slug]">,
@@ -19,13 +26,37 @@ export async function PATCH(
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { label, sortOrder, isActive } = (body ?? {}) as Record<string, unknown>;
+  const { label, description, occasion, sortOrder, isActive } = (body ?? {}) as Record<
+    string,
+    unknown
+  >;
 
-  const patch: { label?: string; sortOrder?: number; isActive?: boolean } = {};
+  const patch: {
+    label?: string;
+    description?: string | null;
+    occasion?: ProductOccasion;
+    sortOrder?: number;
+    isActive?: boolean;
+  } = {};
   if (label !== undefined) {
     const parsed = parseLabel(label);
     if (!parsed) return Response.json({ error: "Invalid label" }, { status: 400 });
     patch.label = parsed;
+  }
+  if (description !== undefined) {
+    const parsed = parseProductDescription(description);
+    if (parsed === undefined) {
+      return Response.json(
+        { error: "description must be text of at most 300 characters" },
+        { status: 400 },
+      );
+    }
+    patch.description = parsed;
+  }
+  if (occasion !== undefined) {
+    const parsed = parseProductOccasion(occasion);
+    if (!parsed) return Response.json({ error: "Invalid occasion" }, { status: 400 });
+    patch.occasion = parsed;
   }
   if (sortOrder !== undefined) {
     const parsed = parseSortOrder(sortOrder);

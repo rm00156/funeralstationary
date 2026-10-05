@@ -120,7 +120,9 @@ export interface FontOption {
 /** ~50 Google Fonts grouped serif / sans / script to match the picker's layout. */
 export const FONT_OPTIONS: FontOption[] = [
   // Serif / display
-  { id: "display", label: "Source Serif", css: "var(--font-display)" },
+  // Its own variable, not --font-display: the site's heading face is now
+  // Newsreader, and a saved design must keep printing in Source Serif.
+  { id: "display", label: "Source Serif", css: "var(--font-source-serif), serif" },
   { id: "playfair", label: "Playfair Display", css: "var(--font-playfair), serif" },
   { id: "cormorant", label: "Cormorant Garamond", css: "var(--font-cormorant), serif" },
   { id: "lora", label: "Lora", css: "var(--font-lora), serif" },

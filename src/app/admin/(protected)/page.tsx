@@ -32,7 +32,7 @@ export default async function AdminDashboardPage() {
   const awaitingPrint = await adminCountOrders("awaiting_print");
   return (
     <>
-      <h1 className="mb-8 font-display text-3xl font-semibold text-primary">
+      <h1 className="mb-8 font-display text-3xl font-medium text-primary">
         Dashboard
       </h1>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">

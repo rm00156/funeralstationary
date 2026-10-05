@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { generateOrderItemPrintPdf } from "@/lib/orderFulfilment.server";
 import { isStorageConfigured } from "@/lib/storage";
 
@@ -28,7 +29,7 @@ export async function POST(
   const { id, proofId } = await ctx.params;
 
   try {
-    const pdf = await generateOrderItemPrintPdf(id, proofId, new URL(request.url).origin);
+    const pdf = await generateOrderItemPrintPdf(id, proofId, renderOrigin(request));
     return Response.json({ pdf }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message.endsWith("not found")) {

@@ -8,7 +8,7 @@ export default async function AdminProductsPage() {
 
   return (
     <>
-      <h1 className="mb-2 font-display text-3xl font-semibold text-primary">Products</h1>
+      <h1 className="mb-2 font-display text-3xl font-medium text-primary">Products</h1>
       <p className="mb-8 max-w-2xl font-body text-on-surface-variant">
         The product range customers can browse. Open a product&apos;s pricing to
         edit the options and rates behind its live quote.

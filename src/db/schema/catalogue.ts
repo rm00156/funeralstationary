@@ -11,6 +11,7 @@ import {
   char,
 } from "drizzle-orm/mysql-core";
 import type { DesignPage } from "@/lib/designEditor";
+import { PRODUCT_OCCASIONS } from "@/lib/templates";
 
 /**
  * Catalogue tables use surrogate int PKs (small, fast to join, and these
@@ -26,6 +27,11 @@ export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   slug: varchar("slug", { length: 64 }).notNull().unique(),
   label: varchar("label", { length: 200 }).notNull(),
+  /** One or two sentences for the product's card. Null = the card has no blurb. */
+  description: varchar("description", { length: 300 }),
+  /** When it's needed — the shop's grouping. The values live in templates.ts
+   * (client-safe) so the admin parser and the menus can't drift from the enum. */
+  occasion: mysqlEnum("occasion", PRODUCT_OCCASIONS).notNull().default("service"),
   sortOrder: smallint("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
 });

@@ -22,9 +22,10 @@ function storageHost(): string | null {
 
 const nextConfig: NextConfig = {
   // Lets the dev server (and its client JS/HMR) be requested through an
-  // ngrok tunnel — Next otherwise blocks cross-origin dev asset requests,
-  // which silently breaks hydration (buttons render but clicks do nothing).
-  allowedDevOrigins: ["*.ngrok-free.app", "*.ngrok.io", "*.ngrok.app"],
+  // ngrok or cloudflared quick tunnel — Next otherwise blocks cross-origin dev
+  // asset requests, which silently breaks hydration (buttons render but clicks
+  // do nothing).
+  allowedDevOrigins: ["*.ngrok-free.app", "*.ngrok.io", "*.ngrok.app", "*.trycloudflare.com"],
   // The one-off /order-of-service page became the generic product page.
   async redirects() {
     return [

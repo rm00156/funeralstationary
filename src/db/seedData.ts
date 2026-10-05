@@ -29,6 +29,8 @@ export function buildProductsSeed() {
   return PRODUCTS.map((product, index) => ({
     slug: product.id,
     label: product.label,
+    description: product.description,
+    occasion: product.occasion,
     sortOrder: index,
     isActive: true,
   }));

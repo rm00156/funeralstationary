@@ -25,7 +25,7 @@ export default async function AdminTemplatesPage() {
 
   return (
     <>
-      <h1 className="mb-2 font-display text-3xl font-semibold text-primary">Templates</h1>
+      <h1 className="mb-2 font-display text-3xl font-medium text-primary">Templates</h1>
       <p className="mb-8 max-w-2xl font-body text-on-surface-variant">
         The template catalogue. Draft and archived templates are hidden from
         customers; open a template to edit its details or author its layout.

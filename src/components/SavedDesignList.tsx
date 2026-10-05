@@ -134,10 +134,10 @@ export default function SavedDesignList({
           You have not saved a design yet.
         </p>
         <Link
-          href="/templates"
-          className="inline-flex items-center rounded-lg bg-primary px-5 py-3 font-body text-sm font-medium text-on-primary transition-colors hover:bg-on-primary-container"
+          href="/shop"
+          className="inline-flex items-center rounded-lg bg-plum px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-plum-hover"
         >
-          Browse templates
+          Browse designs
         </Link>
       </div>
     );
@@ -156,7 +156,7 @@ export default function SavedDesignList({
             key={design.id}
             className="flex flex-col rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5"
           >
-            <h3 className="font-display text-xl font-semibold text-on-surface mb-1">
+            <h3 className="font-display text-xl font-medium text-on-surface mb-1">
               {design.name}
             </h3>
             <p className="font-body text-sm text-on-surface-variant">

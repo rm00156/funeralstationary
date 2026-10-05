@@ -22,6 +22,8 @@ export async function sendEmail(message: {
   subject: string;
   text: string;
   html: string;
+  /** Where a reply should go — the customer's address on a contact-form message. */
+  replyTo?: string;
 }): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!isEmailConfigured() || !from) return false;

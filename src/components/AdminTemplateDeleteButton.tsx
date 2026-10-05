@@ -64,7 +64,7 @@ export default function AdminTemplateDeleteButton({
   return (
     <>
       <div className="mt-8 rounded-xl border border-outline-variant/40 bg-surface-container-low p-6">
-        <h2 className="font-display text-lg font-semibold text-on-surface">
+        <h2 className="font-display text-lg font-medium text-on-surface">
           Delete this template
         </h2>
         <p className="mt-2 max-w-2xl font-body text-sm text-on-surface-variant">
@@ -93,12 +93,12 @@ export default function AdminTemplateDeleteButton({
           }}
         >
           <div
-            className="w-full max-w-md rounded-xl bg-surface p-6 ambient-shadow"
+            className="w-full max-w-md rounded-xl bg-paper p-6 ambient-shadow"
             onClick={(event) => event.stopPropagation()}
           >
             <h2
               id="delete-template-heading"
-              className="font-display text-xl font-semibold text-primary"
+              className="font-display text-xl font-medium text-primary"
             >
               Delete “{name}”?
             </h2>

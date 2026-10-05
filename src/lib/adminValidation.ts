@@ -12,6 +12,7 @@ import type {
 } from "@/lib/adminCatalogue.server";
 import { TEMPLATE_PAGE_COUNT, type DesignPage } from "@/lib/designEditor";
 import { MAX_PAGES } from "@/lib/designs.server";
+import { PRODUCT_OCCASIONS, type ProductOccasion } from "@/lib/templates";
 
 /** Slugs are public identifiers and order-history snapshots — locked format. */
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -36,6 +37,21 @@ export function parseNote(value: unknown): string | null | undefined {
   const trimmed = value.trim();
   if (trimmed.length > 500) return undefined;
   return trimmed.length === 0 ? null : trimmed;
+}
+
+/** A product's card blurb: optional, at most 300 characters. Empty becomes null. */
+export function parseProductDescription(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length > 300) return undefined;
+  return trimmed.length === 0 ? null : trimmed;
+}
+
+export function parseProductOccasion(value: unknown): ProductOccasion | null {
+  return (PRODUCT_OCCASIONS as readonly unknown[]).includes(value)
+    ? (value as ProductOccasion)
+    : null;
 }
 
 /** Integer pence, >= 0. */

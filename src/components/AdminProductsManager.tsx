@@ -7,16 +7,18 @@ import { Plus } from "lucide-react";
 
 import type { AdminProduct } from "@/lib/adminCatalogue.server";
 import { adminMutate } from "@/lib/adminClient";
+import { OCCASION_LABELS, PRODUCT_OCCASIONS, type ProductOccasion } from "@/lib/templates";
 
 export default function AdminProductsManager({ products }: { products: AdminProduct[] }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
-        <table className="w-full min-w-[560px] text-left">
+        <table className="w-full min-w-[820px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
               <th className="px-5 py-3">Product</th>
               <th className="px-5 py-3">Slug</th>
+              <th className="px-5 py-3">Shop group</th>
               <th className="px-5 py-3">Sort</th>
               <th className="px-5 py-3">Active</th>
               <th className="px-5 py-3" />
@@ -37,6 +39,8 @@ export default function AdminProductsManager({ products }: { products: AdminProd
 function ProductRow({ product }: { product: AdminProduct }) {
   const router = useRouter();
   const [label, setLabel] = useState(product.label);
+  const [description, setDescription] = useState(product.description ?? "");
+  const [occasion, setOccasion] = useState<ProductOccasion>(product.occasion);
   const [sortOrder, setSortOrder] = useState(String(product.sortOrder));
   const [isActive, setIsActive] = useState(product.isActive);
   const [saving, setSaving] = useState(false);
@@ -44,6 +48,8 @@ function ProductRow({ product }: { product: AdminProduct }) {
 
   const dirty =
     label !== product.label ||
+    description.trim() !== (product.description ?? "") ||
+    occasion !== product.occasion ||
     Number(sortOrder) !== product.sortOrder ||
     isActive !== product.isActive;
 
@@ -52,6 +58,8 @@ function ProductRow({ product }: { product: AdminProduct }) {
     setError(null);
     const message = await adminMutate(`/api/admin/products/${product.slug}`, "PATCH", {
       label,
+      description,
+      occasion,
       sortOrder: Number(sortOrder),
       isActive,
     });
@@ -69,6 +77,15 @@ function ProductRow({ product }: { product: AdminProduct }) {
           onChange={(event) => setLabel(event.target.value)}
           className="w-full min-w-44 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15"
         />
+        <textarea
+          aria-label={`Card description for ${product.slug}`}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          maxLength={300}
+          rows={2}
+          placeholder="One or two sentences for the product's card (optional)"
+          className="mt-2 w-full min-w-44 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 text-on-surface-variant focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15"
+        />
         {error && (
           <p role="alert" className="mt-1 text-xs text-primary">
             {error}
@@ -76,6 +93,20 @@ function ProductRow({ product }: { product: AdminProduct }) {
         )}
       </td>
       <td className="px-5 py-3 text-on-surface-variant">{product.slug}</td>
+      <td className="px-5 py-3">
+        <select
+          aria-label={`Shop group for ${product.slug}`}
+          value={occasion}
+          onChange={(event) => setOccasion(event.target.value as ProductOccasion)}
+          className="rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15"
+        >
+          {PRODUCT_OCCASIONS.map((value) => (
+            <option key={value} value={value}>
+              {OCCASION_LABELS[value]}
+            </option>
+          ))}
+        </select>
+      </td>
       <td className="px-5 py-3">
         <input
           aria-label={`Sort order for ${product.slug}`}

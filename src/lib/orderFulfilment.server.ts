@@ -169,15 +169,22 @@ export async function generateOrderItemPrintPdf(
  * Post-payment side effects, run from after() in the webhook / return
  * routes. Proofs first (skipped entirely without S3), then the customer
  * confirmation and the business notification. Never throws.
+ *
+ * Two origins because they answer different questions: `site` is the public
+ * origin the emailed links must carry; `render` is where this server's own
+ * headless Chromium reaches /proof-render (see renderOrigin).
  */
-export async function runPostPaymentSideEffects(orderId: string, origin: string): Promise<void> {
+export async function runPostPaymentSideEffects(
+  orderId: string,
+  origins: { site: string; render: string },
+): Promise<void> {
   const order = await loadOrderDetail(orderId);
   if (!order) return;
 
   if (isStorageConfigured()) {
     for (const item of order.items) {
       try {
-        await generateOrderItemProof(orderId, item.id, origin);
+        await generateOrderItemProof(orderId, item.id, origins.render);
       } catch (error) {
         console.error(`Proof generation failed for order ${order.orderNumber}, item ${item.id}`, error);
         await addOrderEvent(orderId, {
@@ -196,7 +203,7 @@ export async function runPostPaymentSideEffects(orderId: string, origin: string)
     {
       label: "customer confirmation",
       to: summary.contactEmail,
-      content: orderConfirmationEmail(summary, `${origin}/orders/${orderId}`),
+      content: orderConfirmationEmail(summary, `${origins.site}/orders/${orderId}`),
     },
   ];
   const notify = process.env.ORDER_NOTIFY_EMAIL;
@@ -204,7 +211,7 @@ export async function runPostPaymentSideEffects(orderId: string, origin: string)
     sends.push({
       label: "business notification",
       to: notify,
-      content: orderNotificationEmail(summary, `${origin}/admin/orders/${orderId}`),
+      content: orderNotificationEmail(summary, `${origins.site}/admin/orders/${orderId}`),
     });
   }
 

@@ -33,7 +33,7 @@ export default async function CheckoutPage({
     <>
       <Header />
       <main className="flex-1">
-        <section className="bg-surface px-margin-mobile pt-8 pb-section-gap md:px-gutter">
+        <section className="bg-paper px-margin-mobile pt-8 pb-section-gap md:px-gutter">
           <div className="mx-auto max-w-[1200px]">
             <nav
               aria-label="Breadcrumb"
@@ -50,7 +50,7 @@ export default async function CheckoutPage({
               <span className="text-on-surface">Checkout</span>
             </nav>
 
-            <h1 className="mb-6 font-display text-4xl font-semibold leading-tight text-primary md:text-5xl">
+            <h1 className="mb-6 font-display text-4xl font-medium leading-tight text-primary md:text-5xl">
               Checkout
             </h1>
             <p className="mb-10 max-w-3xl font-body text-lg text-on-surface-variant">

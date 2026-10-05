@@ -27,6 +27,7 @@ import {
 } from "@/db/schema";
 import type { TemplateStatus } from "@/lib/adminValidation";
 import type { DesignPage } from "@/lib/designEditor";
+import type { ProductOccasion } from "@/lib/templates";
 
 // Re-exported for the admin routes; the helpers themselves live in
 // src/db/errors.ts so the orders seam can share them without importing the
@@ -51,6 +52,8 @@ async function resolveProductId(slug: string): Promise<number | null> {
 export interface AdminProduct {
   slug: string;
   label: string;
+  description: string | null;
+  occasion: ProductOccasion;
   sortOrder: number;
   isActive: boolean;
 }
@@ -58,6 +61,8 @@ export interface AdminProduct {
 const productSelection = {
   slug: products.slug,
   label: products.label,
+  description: products.description,
+  occasion: products.occasion,
   sortOrder: products.sortOrder,
   isActive: products.isActive,
 };
@@ -89,7 +94,13 @@ export async function adminCreateProduct(input: {
 
 export async function adminUpdateProduct(
   slug: string,
-  patch: { label?: string; sortOrder?: number; isActive?: boolean },
+  patch: {
+    label?: string;
+    description?: string | null;
+    occasion?: ProductOccasion;
+    sortOrder?: number;
+    isActive?: boolean;
+  },
 ): Promise<AdminProduct | null> {
   const existing = await adminGetProduct(slug);
   if (!existing) return null;

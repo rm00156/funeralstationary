@@ -59,10 +59,10 @@ export default function CartView({
         <ShoppingBag size={28} className="mx-auto mb-4 text-on-surface-variant" aria-hidden />
         <p className="mb-6 font-body text-base text-on-surface-variant">Your basket is empty.</p>
         <Link
-          href="/templates"
-          className="inline-flex items-center rounded-lg bg-primary px-5 py-3 font-body text-sm font-medium text-on-primary transition-colors hover:bg-on-primary-container"
+          href="/shop"
+          className="inline-flex items-center rounded-lg bg-plum px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-plum-hover"
         >
-          Browse templates
+          Browse designs
         </Link>
       </div>
     );
@@ -94,7 +94,7 @@ export default function CartView({
         </ul>
       </div>
 
-      <aside className="h-fit rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow lg:sticky lg:top-28">
+      <aside className="h-fit rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow lg:sticky lg:top-28">
         <h2 className="mb-5 font-display text-2xl text-primary">Summary</h2>
 
         <dl className="space-y-3 font-body text-on-surface-variant">
@@ -111,7 +111,7 @@ export default function CartView({
         </dl>
         <div className="mt-5 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-5">
           <span className="font-display text-xl text-on-surface">Total</span>
-          <span aria-live="polite" className="font-display text-3xl font-semibold text-primary">
+          <span aria-live="polite" className="font-display text-3xl font-medium text-primary">
             {formatPence(totals.totalPence)}
           </span>
         </div>
@@ -182,7 +182,7 @@ function CartLine({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="truncate font-display text-xl font-semibold text-on-surface">
+              <h2 className="truncate font-display text-xl font-medium text-on-surface">
                 {item.designName}
               </h2>
               <p className="font-body text-sm text-on-surface-variant">

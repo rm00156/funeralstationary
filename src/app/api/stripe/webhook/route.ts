@@ -1,9 +1,14 @@
 import { after, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 
+import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { runPostPaymentSideEffects } from "@/lib/orderFulfilment.server";
 import { finaliseOrder } from "@/lib/orders.server";
-import { constructWebhookEvent, summariseSession } from "@/lib/stripe.server";
+import {
+  constructWebhookEvent,
+  resolveRequestOrigin,
+  summariseSession,
+} from "@/lib/stripe.server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,8 +53,8 @@ export async function POST(request: NextRequest) {
   if (result === "not-found") {
     console.error(`Stripe webhook: session ${session.sessionId} names unknown order ${orderId}`);
   } else if (result === "finalised") {
-    const origin = new URL(request.url).origin;
-    after(() => runPostPaymentSideEffects(orderId, origin));
+    const origins = { site: resolveRequestOrigin(request), render: renderOrigin(request) };
+    after(() => runPostPaymentSideEffects(orderId, origins));
   }
   return Response.json({ received: true, result });
 }

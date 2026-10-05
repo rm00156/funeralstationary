@@ -62,7 +62,7 @@ export default async function OrderPage({
     <>
       <Header />
       <main className="flex-1">
-        <section className="bg-surface px-margin-mobile pt-8 pb-section-gap md:px-gutter">
+        <section className="bg-paper px-margin-mobile pt-8 pb-section-gap md:px-gutter">
           <div className="mx-auto max-w-[1200px]">
             <nav
               aria-label="Breadcrumb"
@@ -85,7 +85,7 @@ export default async function OrderPage({
             </nav>
 
             {placed === "1" && (
-              <div className="mb-8 flex items-start gap-3 rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow">
+              <div className="mb-8 flex items-start gap-3 rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow">
                 <CheckCircle2 size={24} aria-hidden className="mt-0.5 shrink-0 text-secondary" />
                 <div>
                   <h2 className="font-display text-2xl text-primary">
@@ -101,7 +101,7 @@ export default async function OrderPage({
 
             <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="font-display text-4xl font-semibold leading-tight text-primary md:text-5xl">
+                <h1 className="font-display text-4xl font-medium leading-tight text-primary md:text-5xl">
                   {order.orderNumber}
                 </h1>
                 <p className="mt-2 font-body text-on-surface-variant">
@@ -125,7 +125,7 @@ export default async function OrderPage({
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h2 className="font-display text-xl font-semibold text-on-surface">
+                        <h2 className="font-display text-xl font-medium text-on-surface">
                           {item.designName}
                         </h2>
                         <p className="font-body text-sm text-on-surface-variant">
@@ -152,7 +152,7 @@ export default async function OrderPage({
               </div>
 
               <aside className="flex h-fit flex-col gap-6">
-                <section className="rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow">
+                <section className="rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow">
                   <h2 className="mb-4 font-display text-2xl text-primary">Total</h2>
                   <dl className="space-y-2 font-body text-sm text-on-surface-variant">
                     <div className="flex justify-between gap-4">
@@ -170,7 +170,7 @@ export default async function OrderPage({
                   </dl>
                   <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-4">
                     <span className="font-display text-xl text-on-surface">Paid</span>
-                    <span className="font-display text-3xl font-semibold text-primary">
+                    <span className="font-display text-3xl font-medium text-primary">
                       {formatPence(order.totals.totalPence)}
                     </span>
                   </div>

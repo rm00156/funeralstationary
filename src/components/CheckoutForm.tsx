@@ -164,7 +164,7 @@ export default function CheckoutForm({
         </p>
       </form>
 
-      <aside className="h-fit rounded-2xl border border-soft-sage bg-surface-container-lowest p-6 ambient-shadow lg:sticky lg:top-28">
+      <aside className="h-fit rounded-2xl border border-line bg-surface-container-lowest p-6 ambient-shadow lg:sticky lg:top-28">
         <h2 className="mb-5 font-display text-2xl text-primary">Your order</h2>
         <ul className="divide-y divide-outline-variant/40 font-body text-sm">
           {cart.items.map((item) => (
@@ -200,7 +200,7 @@ export default function CheckoutForm({
         </dl>
         <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-4">
           <span className="font-display text-xl text-on-surface">Total</span>
-          <span className="font-display text-3xl font-semibold text-primary">
+          <span className="font-display text-3xl font-medium text-primary">
             {formatPence(cart.totals.totalPence)}
           </span>
         </div>
