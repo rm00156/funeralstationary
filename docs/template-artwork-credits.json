@@ -54,5 +54,89 @@
     "licence": "Public domain",
     "credit": "Pierre-Joseph Redouté, Lilium martagon (Lis Martagon), from Les Liliacées. Via Wikimedia Commons.",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lilium_martagon_-_Les_liliac%C3%A9es,_vol._3_-_t._146.jpg"
+  },
+  {
+    "id": "crocus-meadow",
+    "name": "Crocus Meadow",
+    "licence": "CC0",
+    "credit": "Purple crocuses in grass, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Purple_crocuses_in_grass_(Unsplash).jpg"
+  },
+  {
+    "id": "white-blossom",
+    "name": "White Blossom",
+    "licence": "CC0",
+    "credit": "White blossom branches, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:White_blossom_branches_(Unsplash).jpg"
+  },
+  {
+    "id": "pastel-rose-band",
+    "name": "Pastel Rose Band",
+    "licence": "CC0",
+    "credit": "Pastel pink roses, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Pastel_pink_roses_(Unsplash).jpg"
+  },
+  {
+    "id": "pastel-rose-corner",
+    "name": "Pastel Rose Corner",
+    "licence": "CC0",
+    "credit": "Roses in pastel pink, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Roses_in_pastel_pink_(Unsplash).jpg"
+  },
+  {
+    "id": "red-petal-band",
+    "name": "Red Petal Band",
+    "licence": "CC0",
+    "credit": "Flower Power, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Flower_Power_(Unsplash).jpg"
+  },
+  {
+    "id": "rose-bush-band",
+    "name": "Rose Bush Band",
+    "licence": "CC0",
+    "credit": "Spring Rose Bush, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Spring_Rose_Bush_(Unsplash).jpg"
+  },
+  {
+    "id": "white-rose-corner",
+    "name": "White Rose Corner",
+    "licence": "CC0",
+    "credit": "White Rose, via Flickr. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:White_Rose_(18923655755).jpg"
+  },
+  {
+    "id": "sky-blossom",
+    "name": "Blossom and Sky",
+    "licence": "CC0",
+    "credit": "Sky-rose. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sky-rose.jpg"
+  },
+  {
+    "id": "royal-satin",
+    "name": "Royal Blue Satin",
+    "licence": "Own work (generated)",
+    "credit": "Generated satin, The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "rijks-bouquet",
+    "name": "Bouquet with Morning Glory",
+    "licence": "CC0 (Rijksmuseum)",
+    "credit": "Een boeket, RP-T-FM-73. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Een_boeket_Boeket,_RP-T-FM-73.jpg"
+  },
+  {
+    "id": "sebastiana-sprig",
+    "name": "Sebastiana Sprig",
+    "licence": "Public domain (Met Open Access, CC0)",
+    "credit": "Study of a Plant with Red-Purple Flowers (Sebastiana africana purpurea). The Metropolitan Museum of Art. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Study_of_a_Plant_with_Red-Purple_Flowers_(Sebastiana_africana_purpurea)_MET_DP830841.jpg"
+  },
+  {
+    "id": "wild-rose-sprig",
+    "name": "Wild Rose Sprig",
+    "licence": "CC0 (Rijksmuseum)",
+    "credit": "Takje wilde rozen, RP-T-1943-81. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Takje_wilde_rozen,_RP-T-1943-81.jpg"
   }
 ]

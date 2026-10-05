@@ -3,7 +3,8 @@
  *
  * For every entry in BACKGROUND_SPECS (src/lib/backgroundArtwork.ts):
  * resolve its source to an image URL (Met Open Access, Wikimedia Commons,
- * Pexels, or a plain URL), download it once into node_modules/.cache, render
+ * Pexels, or a plain URL) — or paint it, for a generated `satin` source —
+ * download it once into node_modules/.cache, render
  * one cropped/tinted/faded variant per palette through headless Chromium
  * (src/lib/backgroundRender.server.ts), and save each as
  * templates/backgrounds/<id>-<palette>.jpg — in object storage when S3 is
@@ -139,6 +140,9 @@ async function resolveSource(ref: BackgroundSourceRef): Promise<ResolvedSource> 
     }
     case "url":
       return { url: ref.url, sourceUrl: ref.url };
+    case "satin":
+      // Painted by the renderer in process_; there is nothing to fetch.
+      return { url: "", sourceUrl: "" };
   }
 }
 
@@ -188,7 +192,10 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
     return { spec, sourceUrl: source.sourceUrl, rendered: 0 };
   }
 
-  const image = await download(spec, source);
+  const image =
+    spec.source.kind === "satin"
+      ? await renderer.renderSatin(spec.source)
+      : await download(spec, source);
 
   // Cutout spray, if this plate supports one. Not per palette — see
   // sprayAssetKey. Best-effort: a failed cut leaves the backgrounds usable.
@@ -199,6 +206,8 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
         inset: spec.spray.inset ?? spec.inset ?? DEFAULT_INSET,
         cropBottom: spec.spray.cropBottom ?? DEFAULT_SPRAY_CROP_BOTTOM,
         minEnclosedRegion: spec.spray.minEnclosedRegion ?? DEFAULT_SPRAY_MIN_ENCLOSED,
+        minIsland: spec.spray.minIsland ?? 0,
+        monochrome: spec.spray.monochrome ?? null,
       });
       if (png) {
         const url = await saveSprayAsset(spec.id, png);
@@ -224,8 +233,10 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
       placement: spec.placement ?? { x: 0, y: 0, w: 100, h: 100 },
       feather: spec.feather ?? 0,
       fade: spec.fade ?? null,
+      radialFade: spec.radialFade ?? null,
       wash: spec.wash ?? DEFAULT_WASH,
       tint: spec.tint ?? DEFAULT_TINT,
+      glow: spec.glow ?? null,
     });
     const url = await saveBackgroundAsset(spec.id, palette, jpeg);
     console.log(`  ✓ ${spec.id}/${palette} → ${url} (${Math.round(jpeg.length / 1024)} KB)`);

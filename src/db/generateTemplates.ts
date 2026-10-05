@@ -80,7 +80,8 @@ async function generate(spec: TemplateSpec, sortOrder: number) {
       backgroundUrl = backgroundAssetUrl(spec.background, spec.palette);
     }
   }
-  const pages = buildTemplateLayout(spec, { backgroundUrl, sprayUrl });
+  const accentUrl = spec.accent ? sprayAssetUrl(spec.accent) : undefined;
+  const pages = buildTemplateLayout(spec, { backgroundUrl, sprayUrl, accentUrl });
 
   if (existing) {
     await adminUpdateTemplate(spec.slug, {

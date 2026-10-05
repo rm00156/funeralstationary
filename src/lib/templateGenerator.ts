@@ -129,6 +129,13 @@ export const TEMPLATE_PALETTES = {
   bronze: { accent: "#5b4a2f", ink: "#1f1a1e", muted: "#4f434c", paper: "#faf6ef" },
   ink: { accent: "#1f1a1e", ink: "#1f1a1e", muted: "#4f434c", paper: "#ffffff" },
   stone: { accent: "#81737d", ink: "#1f1a1e", muted: "#4f434c", paper: "#f4f1ee" },
+  // Brighter accents on white paper, for the photographic flower-band family:
+  // a band of real flowers reads cleanest on white, and its own colour is
+  // what the type picks up.
+  rose: { accent: "#a3325f", ink: "#1f1a1e", muted: "#4f434c", paper: "#ffffff" },
+  wine: { accent: "#7a1f2e", ink: "#1f1a1e", muted: "#4f434c", paper: "#ffffff" },
+  violet: { accent: "#5e3a8c", ink: "#1f1a1e", muted: "#4f434c", paper: "#ffffff" },
+  blue: { accent: "#2f5597", ink: "#1f1a1e", muted: "#4f434c", paper: "#ffffff" },
 } as const satisfies Record<string, Omit<TemplateStyle, "heading" | "body" | "script" | "icon">>;
 
 export type PaletteId = keyof typeof TEMPLATE_PALETTES;
@@ -161,6 +168,9 @@ const FAREWELL = "Forever in our hearts";
  * — so no cover should ship without a slot for it.
  */
 const PLACEHOLDER_SERVICE = "Reading Crematorium\nTuesday 16th June 2026, 11am";
+/** The flanking pair under a "Sunrise / Sunset" cover — the long form families use there. */
+const PLACEHOLDER_BORN = "1st May 1936";
+const PLACEHOLDER_DIED = "12th June 2024";
 const THANKS =
   "The family would like to thank you\nfor your kindness, support and\npresence here today.";
 /**
@@ -172,6 +182,8 @@ const PLACEHOLDER_TEXTS: ReadonlySet<string> = new Set([
   PLACEHOLDER_DATES,
   PLACEHOLDER_INTERIOR,
   PLACEHOLDER_SERVICE,
+  PLACEHOLDER_BORN,
+  PLACEHOLDER_DIED,
 ]);
 
 /**
@@ -691,6 +703,146 @@ const SPRAY_COVERS: Record<string, (style: TemplateStyle, spray: string) => Canv
     }),
   ],
 
+  /**
+   * A tall bouquet standing in the bottom-right corner and a turned copy
+   * hanging into the top-left, so the flowers frame the page on a diagonal.
+   * For upright bouquets, which a wide corner box would shrink to a stamp.
+   */
+  "bouquet-corners": (s, src) => [
+    sprayElement(src, { x: -6, y: -5, w: 30, h: 26 }, 160),
+    sprayElement(src, { x: 62, y: 58, w: 42, h: 44 }),
+    // Centred a little right of the page so the line clears the hanging copy.
+    text({
+      text: "In Loving Memory of",
+      fontFamily: s.script,
+      fontSize: 25,
+      align: "center",
+      color: s.accent,
+      x: 14,
+      y: 9,
+      w: 84,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 22,
+      align: "center",
+      color: s.accent,
+      x: 14,
+      y: 15.5,
+      w: 84,
+      h: 0,
+    }),
+    photo({ shape: "oval", x: 30, y: 22, w: 42, h: 37, border: "single", borderColor: s.accent }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 11,
+      align: "center",
+      color: s.muted,
+      x: 21,
+      y: 62,
+      w: 60,
+      h: 0,
+    }),
+    // Left of the bouquet, which takes the bottom-right corner.
+    { ...serviceDetails(s, 66, s.ink), x: 10, w: 56 } as CanvasElement,
+  ],
+
+  /**
+   * A one-colour sprig in two opposite corners and a large oval portrait —
+   * quiet and formal. The opening line sits top-left, out of the sprig's way.
+   */
+  "sprig-oval": (s, src) => [
+    sprayElement(src, { x: 64, y: -2, w: 40, h: 28 }),
+    sprayElement(src, { x: -4, y: 75, w: 40, h: 28 }, 180),
+    text({
+      text: "A service of thanksgiving\nfor the life of",
+      fontFamily: s.body,
+      fontSize: 10,
+      align: "left",
+      color: s.muted,
+      x: 8,
+      y: 6,
+      w: 50,
+      h: 0,
+    }),
+    photo({ shape: "oval", x: 22, y: 14, w: 56, h: 42 }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 26,
+      align: "center",
+      color: s.accent,
+      x: 8,
+      y: 59,
+      w: 84,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 11,
+      align: "center",
+      color: s.muted,
+      x: 20,
+      y: 65.5,
+      w: 60,
+      h: 0,
+    }),
+    serviceDetails(s, 69.5, s.ink),
+  ],
+
+  /**
+   * A sprig across the top-right corner and its turned twin bottom-left, with
+   * the type under the first and a framed photograph between them.
+   */
+  "sprig-framed": (s, src) => [
+    sprayElement(src, { x: 58, y: -3, w: 44, h: 25 }),
+    sprayElement(src, { x: -2, y: 78, w: 44, h: 25 }, 180),
+    text({
+      // Starts below the sprig's lowest flower, not beside it.
+      text: "In loving memory of",
+      fontFamily: s.script,
+      fontSize: 26,
+      align: "center",
+      color: s.ink,
+      x: 10,
+      y: 23,
+      w: 80,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 20,
+      align: "center",
+      color: s.ink,
+      uppercase: true,
+      letterSpacing: 1.5,
+      x: 8,
+      y: 29.5,
+      w: 84,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 10,
+      align: "center",
+      color: s.muted,
+      uppercase: true,
+      letterSpacing: 1,
+      x: 20,
+      y: 34.5,
+      w: 60,
+      h: 0,
+    }),
+    photo({ x: 30, y: 39, w: 40, h: 28, border: "double", borderColor: s.accent }),
+    serviceDetails(s, 69.5),
+  ],
+
   /** Arch photo window with the spray tucked into the bottom-left corner. */
   "arch-spray": (s, src) => [
     border({ variant: "single", color: s.accent, x: 5, y: 4, w: 90, h: 92 }),
@@ -773,7 +925,10 @@ function sprayBackPage(style: TemplateStyle, src: string): CanvasElement[] {
  * The wash is knocked well back so it reads as tone behind the person, not as
  * a botanical print with type on it.
  */
-const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => CanvasElement[]> = {
+const ARTWORK_COVERS: Record<
+  string,
+  (style: TemplateStyle, zone: TextZone, accentUrl?: string) => CanvasElement[]
+> = {
   /** Oval portrait over the wash, name and dates in the artwork's clear zone. */
   "wash-portrait": (s, zone) => {
     const top = zone === "bottom" ? 10 : 34;
@@ -854,7 +1009,219 @@ const ARTWORK_COVERS: Record<string, (style: TemplateStyle, zone: TextZone) => C
       serviceDetails(s, textTop + 16),
     ];
   },
+
+  /**
+   * The flower-band cover: script opening line, a framed portrait, name,
+   * dates and service in the paper above the band, which the background
+   * keeps clear (textZone "top"). Everything ends by ~56% of the page, where
+   * the band begins to fade in.
+   */
+  "band-framed": (s) => [
+    text({
+      text: "In Loving Memory of",
+      fontFamily: s.script,
+      fontSize: 28,
+      align: "center",
+      color: s.accent,
+      x: 8,
+      y: 3.5,
+      w: 84,
+      h: 0,
+    }),
+    photo({ x: 31, y: 11, w: 38, h: 30, border: "double", borderColor: s.accent }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 20,
+      align: "center",
+      color: s.accent,
+      uppercase: true,
+      letterSpacing: 1.5,
+      x: 8,
+      y: 43,
+      w: 84,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 11,
+      align: "center",
+      color: s.muted,
+      x: 20,
+      y: 47.5,
+      w: 60,
+      h: 0,
+    }),
+    serviceDetails(s, 51, s.ink),
+  ],
+
+  /**
+   * Script name over an oval portrait flanked by "Sunrise" and "Sunset",
+   * for artwork that keeps one corner (bottom-right) and leaves the rest clear.
+   */
+  "band-oval": (s) => {
+    const flank = (label: string, date: string, x: number): CanvasElement[] => [
+      text({
+        text: label,
+        fontFamily: s.script,
+        fontSize: 24,
+        align: "center",
+        color: s.accent,
+        x,
+        y: 38,
+        w: 26,
+        h: 0,
+      }),
+      text({
+        text: date,
+        fontFamily: s.body,
+        fontSize: 10,
+        align: "center",
+        color: s.muted,
+        x,
+        y: 43.5,
+        w: 26,
+        h: 0,
+      }),
+    ];
+    return [
+      text({
+        text: "Celebrating the life of",
+        fontFamily: s.body,
+        fontSize: 10,
+        align: "center",
+        color: s.muted,
+        uppercase: true,
+        letterSpacing: 2,
+        x: 15,
+        y: 4.5,
+        w: 70,
+        h: 0,
+      }),
+      text({
+        text: PLACEHOLDER_NAME,
+        fontFamily: s.script,
+        fontSize: 36,
+        align: "center",
+        color: s.accent,
+        x: 8,
+        y: 8,
+        w: 84,
+        h: 0,
+      }),
+      photo({ shape: "oval", x: 29, y: 18, w: 42, h: 36, border: "single", borderColor: s.ink }),
+      ...flank("Sunrise", PLACEHOLDER_BORN, 2),
+      ...flank("Sunset", PLACEHOLDER_DIED, 72),
+      // Narrowed so it stays left of the corner flowers as they fade in.
+      { ...serviceDetails(s, 57, s.ink), x: 14, w: 56 } as CanvasElement,
+    ];
+  },
+
+  /**
+   * Light type on a dark full-bleed ground (satin), a portrait in a light
+   * frame, and — when the spec names one — a cutout spray in the corner.
+   */
+  "silk-frame": (s, _zone, accentUrl) => [
+    text({
+      text: "In Loving Memory of",
+      fontFamily: s.script,
+      fontSize: 28,
+      align: "center",
+      color: s.paper,
+      x: 8,
+      y: 3.5,
+      w: 84,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 19,
+      align: "center",
+      color: s.paper,
+      uppercase: true,
+      letterSpacing: 1.5,
+      x: 8,
+      y: 10.5,
+      w: 84,
+      h: 0,
+    }),
+    photo({ x: 27, y: 16, w: 46, h: 37, border: "double", borderColor: s.paper }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 11,
+      align: "center",
+      color: s.paper,
+      x: 20,
+      y: 55.5,
+      w: 60,
+      h: 0,
+    }),
+    serviceDetails(s, 59.5, s.paper),
+    ...(accentUrl ? [sprayElement(accentUrl, { x: 62, y: 70, w: 42, h: 32 })] : []),
+  ],
+
+  /**
+   * A picture across the whole page, knocked back, held in an inset frame
+   * with the type and a framed portrait set straight onto it.
+   */
+  "inset-frame": (s) => [
+    border({ variant: "double", color: s.accent, x: 4, y: 3, w: 92, h: 94 }),
+    text({
+      text: "Celebrating the life of",
+      fontFamily: s.script,
+      fontSize: 26,
+      align: "center",
+      color: s.ink,
+      x: 10,
+      y: 6,
+      w: 80,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_NAME,
+      fontFamily: s.heading,
+      fontSize: 20,
+      align: "center",
+      color: s.ink,
+      uppercase: true,
+      letterSpacing: 1.5,
+      x: 8,
+      y: 12.5,
+      w: 84,
+      h: 0,
+    }),
+    text({
+      text: PLACEHOLDER_DATES,
+      fontFamily: s.body,
+      fontSize: 11,
+      align: "center",
+      color: s.ink,
+      x: 20,
+      y: 17.5,
+      w: 60,
+      h: 0,
+    }),
+    photo({ x: 31, y: 23.5, w: 38, h: 31, border: "double", borderColor: s.accent }),
+    serviceDetails(s, 58, s.ink),
+  ],
 };
+
+/**
+ * Artwork covers whose type is set straight onto the picture rather than in a
+ * cleared zone, and which therefore need their own back page.
+ */
+const PHOTO_LED_ARTWORK: ReadonlySet<string> = new Set([
+  "band-framed",
+  "band-oval",
+  "silk-frame",
+  "inset-frame",
+]);
+
+/** Covers whose ground is dark, so every page over the artwork sets light type. */
+const LIGHT_TYPE_ARTWORK: ReadonlySet<string> = new Set(["silk-frame"]);
 
 export type ArtworkArchetypeId = keyof typeof ARTWORK_COVERS;
 
@@ -959,6 +1326,38 @@ function artworkBackPage(style: TemplateStyle, zone: TextZone): CanvasElement[] 
   ];
 }
 
+/**
+ * The back page of a photo-led artwork template: the same picture, the
+ * farewell in the clear upper half, and the cover's corner spray if it has one.
+ */
+function photoLedBackPage(style: TemplateStyle, light: boolean, accentUrl?: string): CanvasElement[] {
+  return [
+    text({
+      text: FAREWELL,
+      fontFamily: style.script,
+      fontSize: 30,
+      align: "center",
+      color: light ? style.paper : style.accent,
+      x: 10,
+      y: 22,
+      w: 80,
+      h: 0,
+    }),
+    text({
+      text: THANKS,
+      fontFamily: style.body,
+      fontSize: 12,
+      align: "center",
+      color: light ? style.paper : style.muted,
+      x: 15,
+      y: 34,
+      w: 70,
+      h: 0,
+    }),
+    ...(accentUrl ? [sprayElement(accentUrl, { x: 62, y: 70, w: 42, h: 32 })] : []),
+  ];
+}
+
 /** One generated template: what to build, and the catalogue metadata for it. */
 export interface TemplateSpec {
   slug: string;
@@ -979,6 +1378,11 @@ export interface TemplateSpec {
    * full-bleed image; `palette` must be one the background was rendered for.
    */
   background?: string;
+  /**
+   * BackgroundSpec id whose cutout spray decorates an artwork cover's corner
+   * — the roses on the satin. Only artwork archetypes use it.
+   */
+  accent?: string;
 }
 
 export interface BuildLayoutOptions {
@@ -986,6 +1390,8 @@ export interface BuildLayoutOptions {
   backgroundUrl?: string;
   /** URL of the rendered cutout spray for `spec.background`. */
   sprayUrl?: string;
+  /** URL of the rendered cutout spray for `spec.accent`. */
+  accentUrl?: string;
 }
 
 export function styleFor(spec: TemplateSpec): TemplateStyle {
@@ -1124,21 +1530,27 @@ function artworkPages(
   if (!options.backgroundUrl) {
     throw new Error(`Spec "${spec.slug}" needs backgroundUrl — run npm run backgrounds:fetch first`);
   }
+  if (spec.accent && !options.accentUrl) {
+    throw new Error(`Spec "${spec.slug}" needs accentUrl for "${spec.accent}" — run npm run backgrounds:fetch first`);
+  }
   const zone = background.textZone;
+  const back = PHOTO_LED_ARTWORK.has(archetype)
+    ? photoLedBackPage(style, LIGHT_TYPE_ARTWORK.has(archetype), options.accentUrl)
+    : artworkBackPage(style, zone);
   return [
     {
       id: uid("page"),
       background: style.paper,
       elements: [
         backgroundElement(options.backgroundUrl),
-        ...ARTWORK_COVERS[archetype](style, zone),
+        ...ARTWORK_COVERS[archetype](style, zone, options.accentUrl),
       ],
     },
     { id: uid("page"), background: style.paper, elements: middlePage(style, "minimal") },
     {
       id: uid("page"),
       background: style.paper,
-      elements: [backgroundElement(options.backgroundUrl), ...artworkBackPage(style, zone)],
+      elements: [backgroundElement(options.backgroundUrl), ...back],
     },
   ];
 }
@@ -1198,6 +1610,7 @@ const CURATED_ARTWORK: Array<
     typeSet: TypeSetId,
     icon: string,
     categories: string[],
+    accent?: string,
   ]
 > = [
   // Photo-led, spray-framed — the main register. The photograph is the
@@ -1220,6 +1633,23 @@ const CURATED_ARTWORK: Array<
   // can't be cut out (see its spec).
   ["Madonna Lily", "wash-portrait", "redoute-madonna-lily", "stone", "cormorant", "flower", ["floral", "religious"]],
   ["White Lily", "wash-arch", "redoute-madonna-lily", "bronze", "playfair", "flower", ["floral", "classic"]],
+  // The flower-band family: a photograph of real flowers along the foot or
+  // in the corner of a white page, the portrait and type above it.
+  ["Purple Flowers", "band-framed", "crocus-meadow", "violet", "cormorant", "flower", ["floral", "nature", "colourful"]],
+  ["Orchid", "band-framed", "white-blossom", "bronze", "classic", "flower", ["floral", "calm"]],
+  ["Pink Aura", "band-framed", "pastel-rose-band", "rose", "garamond", "heart", ["floral", "calm"]],
+  ["Pink Roses", "band-framed", "pastel-rose-corner", "rose", "classic", "flower", ["floral", "colourful"]],
+  ["Red & White Roses", "band-framed", "red-petal-band", "ink", "prata", "heart", ["floral", "classic"]],
+  ["Rose Petals", "band-framed", "rose-bush-band", "wine", "baskerville", "flower", ["floral", "colourful"]],
+  ["White Roses", "band-oval", "white-rose-corner", "violet", "playfair", "flower", ["floral", "classic"]],
+  ["Roses", "inset-frame", "sky-blossom", "rose", "playfair", "flower", ["floral", "nature"]],
+  // The Frankfort rose because its cut is clean: the other rose cutouts carry
+  // ground specks and highlight holes that white paper hides and satin shows.
+  ["Blue Silk", "silk-frame", "royal-satin", "blue", "classic", "flower", ["classic", "colourful"], "redoute-frankfort-rose"],
+  // Watercolour sprays in the corners.
+  ["Blue Flowers", "bouquet-corners", "rijks-bouquet", "blue", "cormorant", "flower", ["floral", "colourful"]],
+  ["Grey Flora", "sprig-oval", "sebastiana-sprig", "slate", "baskerville", "leaf", ["floral", "calm", "minimalistic"]],
+  ["Rosebud", "sprig-framed", "wild-rose-sprig", "forest", "classic", "flower", ["floral", "classic"]],
 ];
 
 /**
@@ -1258,7 +1688,7 @@ export const TEMPLATE_SPECS: TemplateSpec[] = [
     }),
   ),
   ...CURATED_ARTWORK.map(
-    ([name, archetype, background, palette, typeSet, icon, categories]): TemplateSpec => ({
+    ([name, archetype, background, palette, typeSet, icon, categories, accent]): TemplateSpec => ({
       slug: slugForName(name),
       name,
       archetype,
@@ -1267,6 +1697,7 @@ export const TEMPLATE_SPECS: TemplateSpec[] = [
       typeSet,
       icon,
       categories,
+      ...(accent ? { accent } : {}),
     }),
   ),
   ...CURATED_SOLID.map(
