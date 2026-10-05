@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  COLOUR_PORTRAIT_IDS,
+  MONO_PORTRAIT_IDS,
   PLACEHOLDER_PORTRAIT_IDS,
   placeholderPortraitKey,
   portraitIdForSeed,
-  portraitRotationForSeed,
+  portraitRotationFor,
+  portraitSetForPage,
   withPlaceholderPhotos,
 } from "./placeholderPortraits";
 import { TEMPLATE_SPECS, buildTemplateLayout } from "./templateGenerator";
@@ -22,24 +25,43 @@ describe("portraitIdForSeed", () => {
     }
   });
 
-  it("spreads the catalogue across all three, not one face everywhere", () => {
-    const used = new Set(TEMPLATE_SPECS.map((s) => portraitIdForSeed(s.slug)));
-    expect(used.size).toBe(PLACEHOLDER_PORTRAIT_IDS.length);
+  it("spreads the catalogue across each set, not one face everywhere", () => {
+    for (const set of [MONO_PORTRAIT_IDS, COLOUR_PORTRAIT_IDS]) {
+      const used = new Set(TEMPLATE_SPECS.map((s) => portraitIdForSeed(s.slug, set)));
+      expect(used.size).toBe(set.length);
+    }
   });
 });
 
 describe("placeholderPortraitKey", () => {
   it("keys by id", () => {
-    expect(placeholderPortraitKey("portrait-2")).toBe("templates/placeholders/portrait-2.jpg");
+    expect(placeholderPortraitKey("portrait-2")).toBe("templates/placeholders/portrait-2.webp");
   });
 });
 
-describe("portraitRotationForSeed", () => {
-  it("lists every portrait once, starting with this seed's pick", () => {
-    const rotation = portraitRotationForSeed("quiet-modern");
-    expect(rotation).toHaveLength(PLACEHOLDER_PORTRAIT_IDS.length);
-    expect(new Set(rotation).size).toBe(PLACEHOLDER_PORTRAIT_IDS.length);
-    expect(rotation[0]).toBe(portraitIdForSeed("quiet-modern"));
+const photo = (src: string | null) =>
+  ({ id: `w${Math.random()}`, type: "image", src, x: 0, y: 0, w: 10, h: 10 }) as const;
+
+describe("portraitSetForPage", () => {
+  it("puts black-and-white on a plain paper cover", () => {
+    expect(portraitSetForPage(page([photo(null)]))).toBe(MONO_PORTRAIT_IDS);
+  });
+
+  it("puts colour on a cover that carries artwork", () => {
+    expect(portraitSetForPage(page([photo("/band.jpg"), photo(null)]))).toBe(COLOUR_PORTRAIT_IDS);
+  });
+
+  it("gives a collage the colour set, never a mix", () => {
+    expect(portraitSetForPage(page([photo(null), photo(null)]))).toBe(COLOUR_PORTRAIT_IDS);
+  });
+});
+
+describe("portraitRotationFor", () => {
+  it("lists the cover's set once, starting with this seed's pick", () => {
+    const cover = page([photo("/spray.png"), photo(null)]);
+    const rotation = portraitRotationFor(cover, "quiet-modern");
+    expect([...rotation].sort()).toEqual([...COLOUR_PORTRAIT_IDS].sort());
+    expect(rotation[0]).toBe(portraitIdForSeed("quiet-modern", COLOUR_PORTRAIT_IDS));
   });
 });
 

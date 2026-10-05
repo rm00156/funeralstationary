@@ -18,7 +18,7 @@ import {
 } from "@/lib/catalogue.server";
 import { makeTemplateLayout, sizeText, toTemplateLayout } from "@/lib/designEditor";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
-import { portraitRotationForSeed, withPlaceholderPhotos } from "@/lib/placeholderPortraits";
+import { portraitRotationFor, withPlaceholderPhotos } from "@/lib/placeholderPortraits";
 import { getPricingData } from "@/lib/pricing.server";
 import {
   DESIGN_FOR_YOU_HREF,
@@ -103,7 +103,7 @@ export default async function TemplatePage({
   const layout =
     toTemplateLayout(template.layout, format.templatePages) ??
     makeTemplateLayout(template, format);
-  const portraits = portraitRotationForSeed(template.id).map(placeholderPortraitUrl);
+  const portraits = portraitRotationFor(layout[0], template.id).map(placeholderPortraitUrl);
   const views = layout.map((page, index) => ({
     label: VIEW_LABELS[format.templatePages][index] ?? `Page ${index + 1}`,
     page: withPlaceholderPhotos(page, portraits),

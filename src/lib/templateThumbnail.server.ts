@@ -16,7 +16,7 @@ import { launchHeadlessBrowser } from "@/lib/headlessBrowser.server";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";
 import { placeholderPortraitUrl } from "@/lib/backgroundAssets.server";
 import {
-  portraitRotationForSeed,
+  portraitRotationFor,
   withPlaceholderPhotos,
 } from "@/lib/placeholderPortraits";
 import { pageMetrics, type DesignDoc, type DesignPage, type PageTrim } from "@/lib/designEditor";
@@ -31,7 +31,7 @@ export async function renderTemplateThumbnail(
 ): Promise<Buffer> {
   const page0 = withPlaceholderPhotos(
     coverPage,
-    portraitRotationForSeed(seed).map(placeholderPortraitUrl),
+    portraitRotationFor(coverPage, seed).map(placeholderPortraitUrl),
   );
   const browser = await launchHeadlessBrowser();
   try {
