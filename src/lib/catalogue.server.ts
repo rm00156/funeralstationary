@@ -230,6 +230,29 @@ export const getTemplateBySlug = cache(
 );
 
 /**
+ * A saved design's own template, whatever its status. Archiving a template
+ * hides it from the shop, not from the designs already made from it — and
+ * opening such a design on some other template would re-point it on the next
+ * save.
+ */
+export const getTemplateForDesign = cache(async (slug: string): Promise<Template | null> => {
+  const [row] = await db
+    .select({
+      id: templates.id,
+      slug: templates.slug,
+      name: templates.name,
+      productSlug: products.slug,
+      image: templates.previewImageUrl,
+    })
+    .from(templates)
+    .innerJoin(products, eq(templates.productId, products.id))
+    .where(eq(templates.slug, slug))
+    .limit(1);
+  if (!row) return null;
+  return toTemplate(row, await loadCategoryLinks());
+});
+
+/**
  * The product a template belongs to, whatever the template's status (a
  * design keeps saving after its template is archived), or null for an
  * unknown slug.

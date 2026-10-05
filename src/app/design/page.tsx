@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 
 import DesignEditor from "@/components/DesignEditor";
-import { getProducts, getTemplateBySlug, getTemplates } from "@/lib/catalogue.server";
+import {
+  getProducts,
+  getTemplateBySlug,
+  getTemplateForDesign,
+  getTemplates,
+} from "@/lib/catalogue.server";
 import { getDesign } from "@/lib/designs.server";
 import { parseCarriedSelection, type Selection } from "@/lib/orderOfServicePricing";
 import { getPricingData } from "@/lib/pricing.server";
 import { readOwner } from "@/lib/session";
+import type { Product, Template } from "@/lib/templates";
 
 // The catalogue lives in MySQL and is editable from /admin, so this page
 // must render per-request rather than being frozen at build time.
@@ -40,16 +46,37 @@ export default async function DesignPage({
   const saved = owner && designParam ? await getDesign(owner, designParam) : null;
 
   const [templates, products] = await Promise.all([getTemplates(), getProducts()]);
-  const template =
-    templates.find((item) => item.id === (saved ? saved.templateId : templateParam)) ??
-    templates[0];
-  // A template belongs to exactly one product, and its layout is drawn on
-  // that product's trim — so a new design's product is its template's, never
-  // a ?product= that disagrees with it.
-  const product =
-    products.find((item) => item.id === (saved ? saved.productId : template?.productId)) ??
-    products.find((item) => item.id === productParam) ??
-    products[0];
+  const hasTemplates = (productId: string) => templates.some((item) => item.productId === productId);
+
+  let template: Template | undefined;
+  let product: Product | undefined;
+  if (saved) {
+    // A saved design opens on its own template even once that is archived —
+    // falling back to another (possibly another product's) would re-point
+    // the design on its next save, or have every save refused.
+    product =
+      products.find((item) => item.id === saved.productId) ??
+      products.find((item) => item.id === productParam) ??
+      products[0];
+    template =
+      templates.find((item) => item.id === saved.templateId) ??
+      (await getTemplateForDesign(saved.templateId)) ??
+      undefined;
+  } else {
+    // A template belongs to exactly one product, and its layout is drawn on
+    // that product's trim — so a new design's product is its template's,
+    // never a ?product= that disagrees with it. Without a usable template,
+    // ?product= still picks the product, and the design starts on its first.
+    const requested = templates.find((item) => item.id === templateParam);
+    product =
+      products.find((item) => item.id === requested?.productId) ??
+      products.find((item) => item.id === productParam && hasTemplates(item.id)) ??
+      products.find((item) => hasTemplates(item.id));
+    template =
+      requested?.productId === product?.id
+        ? requested
+        : templates.find((item) => item.productId === product?.id);
+  }
   if (!template || !product) {
     throw new Error("The catalogue is empty — run `npm run db:seed` first.");
   }

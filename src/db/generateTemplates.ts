@@ -56,6 +56,7 @@ import {
 } from "@/lib/designEditor";
 import {
   FLAT_PRODUCTS,
+  FLAT_TEMPLATE_PAGES,
   FLAT_TEMPLATE_SPECS,
   buildFlatTemplateLayout,
   flatBackgroundFormat,
@@ -221,9 +222,19 @@ async function jobs(): Promise<Job[]> {
     const flatSpecs = FLAT_TEMPLATE_SPECS.filter(
       (spec) => !flatOnly || spec.product === (productFlag as FlatProductId),
     );
+    // Each flat library authors a fixed number of pages (FLAT_TEMPLATE_PAGES);
+    // a product set up with another count would be handed layouts it can't
+    // print — the same refusal as the booklet's above.
     const trims = new Map<string, PageTrim>();
     for (const product of new Set(flatSpecs.map((spec) => spec.product))) {
-      trims.set(product, (await productTrim(product)).trim);
+      const format = await productTrim(product);
+      if (format.templatePages !== FLAT_TEMPLATE_PAGES[product]) {
+        throw new Error(
+          `"${product}" authors ${format.templatePages} template page(s), but its library ` +
+            `draws ${FLAT_TEMPLATE_PAGES[product]} — fix its format in /admin/products first.`,
+        );
+      }
+      trims.set(product, format.trim);
     }
     for (const spec of flatSpecs) {
       const trim = trims.get(spec.product)!;

@@ -8,6 +8,7 @@ import {
   canTransition,
   computeOrderTotals,
   lineSpec,
+  staleLineSpec,
   makeOrderNumber,
   parseOrderStatus,
   resolveSelectionStrict,
@@ -166,5 +167,16 @@ describe("lineSpec", () => {
         { pages: { label: "A1" }, paper: { label: "Mounted on 5mm board" } },
       ),
     ).toBe("A1 · Mounted on 5mm board");
+  });
+});
+
+describe("staleLineSpec", () => {
+  it("counts pages for a printed product", () => {
+    expect(staleLineSpec({ sizeLabel: "A5", sizedByOption: false }, 8)).toBe("A5 · 8 pages");
+    expect(staleLineSpec({ sizeLabel: "A5", sizedByOption: false }, 1)).toBe("A5 · 1 page");
+  });
+
+  it("shows only the size range for a board, whose page option is a size", () => {
+    expect(staleLineSpec({ sizeLabel: "A4 to A0", sizedByOption: true }, 1)).toBe("A4 to A0");
   });
 });

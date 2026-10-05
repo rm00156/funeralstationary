@@ -21,6 +21,7 @@ import {
   PRINT_ZOOM,
   coverWidthFactor,
   docTrim,
+  sizeRangeText,
   sizeText,
   toProductFormat,
   type ImageElement,
@@ -482,6 +483,13 @@ describe("product formats", () => {
     expect(sizeText(BOOKLET_FORMAT)).toBe("A5 (148 × 210 mm)");
     expect(sizeText(bookmark)).toBe("50 × 200 mm");
     expect(sizeText({ ...a6Card, sizeLabel: "A4 to A0", sizedByOption: true })).toBe("A4 to A0");
+  });
+
+  it("reads a size range however the admin typed it", () => {
+    for (const sizeLabel of ["A4 to A0", "A4–A0", "A4 - A0", "A4-A0"]) {
+      expect(sizeRangeText({ sizeLabel })).toBe("from A4 up to A0");
+    }
+    expect(sizeRangeText({ sizeLabel: "Any A size" })).toBe("Any A size");
   });
 
   it("narrows only covers slimmer than an A page", () => {

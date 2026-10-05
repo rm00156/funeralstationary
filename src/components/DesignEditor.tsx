@@ -139,6 +139,14 @@ const TABS: { id: TabId; label: string; Icon: ComponentType<{ size?: number | st
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
+/**
+ * Zoom bounds, shared by Fit and the +/− buttons so a fitted view is always
+ * reachable from the buttons. A board's artboard is far bigger than a
+ * booklet's, so it has to be allowed to shrink this far to fit.
+ */
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 2;
+
 /** Distance (screen px) within which a dragged element snaps to a guide. */
 const SNAP_PX = 6;
 
@@ -1022,9 +1030,7 @@ export default function DesignEditor({
       (area.clientWidth - 40) / artboardW,
       (area.clientHeight - 96) / artboardH,
     );
-    // A board's artboard is far bigger than a booklet's, so it has to be
-    // allowed to shrink further to fit.
-    setZoom(clamp(fit, 0.1, 2));
+    setZoom(clamp(fit, MIN_ZOOM, MAX_ZOOM));
   }, [artboardW, artboardH]);
 
   // Fit the page to whatever screen we open on (phones especially).
@@ -1538,7 +1544,7 @@ export default function DesignEditor({
               ) : pricing.pages.length > 1 && (
               <div>
                 <PanelHeading>
-                  {format.sizedByOption ? "Print size" : pagesAxisLabel(format)}
+                  {pagesAxisLabel(format)}
                 </PanelHeading>
                 <div className="flex flex-col gap-2">
                   {pricing.pages.map((option) => (
@@ -2340,7 +2346,7 @@ export default function DesignEditor({
             </ToolbarButton>
             <ToolbarButton
               label="Zoom out"
-              onClick={() => setZoom((z) => clamp(z - 0.1, 0.3, 2))}
+              onClick={() => setZoom((z) => clamp(z - 0.1, MIN_ZOOM, MAX_ZOOM))}
             >
               <Minus size={15} aria-hidden />
             </ToolbarButton>
@@ -2349,7 +2355,7 @@ export default function DesignEditor({
             </span>
             <ToolbarButton
               label="Zoom in"
-              onClick={() => setZoom((z) => clamp(z + 0.1, 0.3, 2))}
+              onClick={() => setZoom((z) => clamp(z + 0.1, MIN_ZOOM, MAX_ZOOM))}
             >
               <Plus size={15} aria-hidden />
             </ToolbarButton>

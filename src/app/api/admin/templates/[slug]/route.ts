@@ -3,6 +3,7 @@ import {
   adminDeleteTemplate,
   adminGetTemplate,
   adminUpdateTemplate,
+  TemplateMoveError,
 } from "@/lib/adminCatalogue.server";
 import { isAdmin, unauthorised } from "@/lib/adminSession";
 import {
@@ -86,6 +87,9 @@ export async function PATCH(
     if (!updated) return Response.json({ error: "Template not found" }, { status: 404 });
     return Response.json({ template: updated });
   } catch (error) {
+    if (error instanceof TemplateMoveError) {
+      return Response.json({ error: error.message }, { status: 409 });
+    }
     if (error instanceof Error && error.message.startsWith("Unknown")) {
       return Response.json({ error: error.message }, { status: 400 });
     }

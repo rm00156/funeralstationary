@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { Clock, FileText, Truck } from "lucide-react";
 
-import { sizeText, type ProductFormat } from "@/lib/designEditor";
+import { sizeRangeText, sizeText, type ProductFormat } from "@/lib/designEditor";
 import { formatPence, type DeliveryOption } from "@/lib/orderOfServicePricing";
 import { STANDARD_TURNAROUND } from "@/lib/site";
 
@@ -25,7 +25,7 @@ export default function QualityDelivery({
       body: !format
         ? "Printed to be kept."
         : format.sizedByOption
-          ? `Printed at the size you choose, ${format.sizeLabel}, made to be kept.`
+          ? `Printed at the size you choose, ${sizeRangeText(format)}, made to be kept.`
           : `Exact ${sizeText(format)}, made to be kept.`,
     },
     ...delivery.map((option) => ({

@@ -8,7 +8,7 @@ import { AlertTriangle, ShoppingBag, Trash2 } from "lucide-react";
 import ConfigField from "@/components/ConfigField";
 import { copiesText, formatPence, type PricingData } from "@/lib/orderOfServicePricing";
 import type { Cart, CartItem } from "@/lib/orders.server";
-import { lineSpec, type SelectionAxis } from "@/lib/orders";
+import { lineSpec, staleLineSpec, type SelectionAxis } from "@/lib/orders";
 
 /** Tell the header badge (and anything else listening) the basket changed. */
 export const notifyCartChanged = () => window.dispatchEvent(new Event("tfs:cart-changed"));
@@ -190,7 +190,7 @@ function CartLine({
               <p className="font-body text-sm text-on-surface-variant">
                 {item.quote
                   ? lineSpec(item.format, item.quote)
-                  : `${item.format.sizeLabel} · ${item.pageCount} pages`}
+                  : staleLineSpec(item.format, item.pageCount)}
                 {item.designId && (
                   <>
                     {" · "}

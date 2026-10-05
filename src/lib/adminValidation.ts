@@ -98,6 +98,27 @@ export function parsePageCount(value: unknown): number | null {
   return value;
 }
 
+/**
+ * Whether a page count suits a product's format, or why not. A flat product
+ * prints exactly the pages it authors — one side of a board (its options are
+ * sizes, not page counts), or the front and back of a card or bookmark — and
+ * a booklet needs a cover, at least one inside page and a back, so at least
+ * four once folded. Anything else makes withPageCount drop the back page or
+ * pad the job with blank sheets that print.
+ */
+export function pageCountFormatError(
+  pageCount: number,
+  templatePages: TemplatePageCount,
+): string | null {
+  if (templatePages === 1) {
+    return pageCount === 1 ? null : "This product prints one side, so its pageCount must be 1";
+  }
+  if (templatePages === 2) {
+    return pageCount === 2 ? null : "This product prints front and back, so its pageCount must be 2";
+  }
+  return pageCount >= 4 ? null : "A booklet needs at least 4 pages: cover, inside and back";
+}
+
 /** A trim edge in whole millimetres — a bookmark's 50 up to an A0's 1189. */
 export function parseTrimMm(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value)) return null;

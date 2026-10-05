@@ -6,6 +6,7 @@ import {
   parseMultiplier,
   parseOptionInput,
   parseOptionPatch,
+  pageCountFormatError,
   parsePageCount,
   parsePence,
   parseProductDescription,
@@ -71,6 +72,23 @@ describe("parsePageCount", () => {
     expect(parsePageCount(3)).toBeNull();
     expect(parsePageCount(0)).toBeNull();
     expect(parsePageCount(26)).toBeNull();
+  });
+});
+
+describe("pageCountFormatError", () => {
+  it("holds a board to one side and a card or bookmark to two", () => {
+    expect(pageCountFormatError(1, 1)).toBeNull();
+    expect(pageCountFormatError(2, 1)).not.toBeNull();
+    expect(pageCountFormatError(2, 2)).toBeNull();
+    expect(pageCountFormatError(4, 2)).not.toBeNull();
+    expect(pageCountFormatError(1, 2)).not.toBeNull();
+  });
+
+  it("refuses a booklet without room for a cover, inside and back", () => {
+    expect(pageCountFormatError(4, 3)).toBeNull();
+    expect(pageCountFormatError(24, 3)).toBeNull();
+    expect(pageCountFormatError(1, 3)).not.toBeNull();
+    expect(pageCountFormatError(2, 3)).not.toBeNull();
   });
 });
 

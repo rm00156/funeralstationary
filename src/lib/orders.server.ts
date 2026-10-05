@@ -27,7 +27,13 @@ import { isDuplicateKeyError } from "@/db/errors";
 import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders } from "@/db/schema";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
 import { getProductFormats } from "@/lib/catalogue.server";
-import { BOOKLET_FORMAT, type DesignDoc, type ProductFormat } from "@/lib/designEditor";
+import {
+  BOOKLET_FORMAT,
+  docTrim,
+  type DesignDoc,
+  type PageTrim,
+  type ProductFormat,
+} from "@/lib/designEditor";
 import { getDesign } from "@/lib/designs.server";
 import {
   describeIssue,
@@ -162,6 +168,8 @@ export interface OrderDetailItem {
   designName: string;
   productId: string;
   format: ProductFormat;
+  /** The trim the press artwork is drawn at — the snapshot's own, not the product's today. */
+  artworkTrim: PageTrim;
   templateId: string;
   pageCount: number;
   quote: Quote;
@@ -650,13 +658,14 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
   const details = detailsFrom(order);
   if (!details) return { ok: false, status: 400, error: "Please enter your delivery details" };
 
-  const pricings = await pricingByProduct(items);
+  const [pricings, formats] = await Promise.all([pricingByProduct(items), getProductFormats()]);
 
   const frozenLines: {
     item: OrderItemRow;
     selection: Selection;
     quote: Quote;
     doc: DesignDoc;
+    format: ProductFormat;
     name: string;
   }[] = [];
 
@@ -705,6 +714,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
       selection,
       quote: resolved.quote,
       doc: design.doc,
+      format: formats.get(item.productId) ?? BOOKLET_FORMAT,
       name: `${design.productLabel} — ${design.name}`,
     });
   }
@@ -731,6 +741,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
           unitPricePence: line.quote.unitPricePence,
           lineTotalPence: line.quote.printCostPence,
           docSnapshot: line.doc,
+          formatSnapshot: line.format,
         })
         .where(eq(orderItems.id, line.item.id));
     }
@@ -960,7 +971,10 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       designId: item.designId,
       designName: designName ?? "Design",
       productId: item.productId,
-      format: formats.get(item.productId) ?? BOOKLET_FORMAT,
+      // History reads the format the line was paid under; only a line paid
+      // before that was snapshotted falls back to the live one.
+      format: item.formatSnapshot ?? formats.get(item.productId) ?? BOOKLET_FORMAT,
+      artworkTrim: docTrim(item.docSnapshot),
       templateId: item.templateId,
       pageCount: item.docSnapshot.pages.length,
       quote: item.quoteSnapshot,

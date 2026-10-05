@@ -12,7 +12,7 @@ import {
   getSellableProduct,
   getTemplates,
 } from "@/lib/catalogue.server";
-import { sizeText } from "@/lib/designEditor";
+import { sizeRangeText, sizeText } from "@/lib/designEditor";
 import {
   copiesText,
   defaultSelection,
@@ -117,7 +117,7 @@ export default async function ProductPage({
               <p className="max-w-[34em] text-xl text-ink-2">
                 Choose a design, then add their photographs and words online.{" "}
                 {product.format.sizedByOption
-                  ? `Printed at the size you choose, from ${product.format.sizeLabel.replace(" to ", " up to ")}.`
+                  ? `Printed at the size you choose, ${sizeRangeText(product.format)}.`
                   : `Printed at exact ${sizeText(product.format)}.`}
               </p>
             </div>

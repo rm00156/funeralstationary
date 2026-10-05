@@ -16,7 +16,7 @@ import {
   getSellableProducts,
   getTemplateBySlug,
 } from "@/lib/catalogue.server";
-import { makeTemplateLayout, sizeText, toTemplateLayout } from "@/lib/designEditor";
+import { makeTemplateLayout, sizeRangeText, sizeText, toTemplateLayout } from "@/lib/designEditor";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { portraitRotationFor, withPlaceholderPhotos } from "@/lib/placeholderPortraits";
 import { getPricingData } from "@/lib/pricing.server";
@@ -117,7 +117,7 @@ export default async function TemplatePage({
         <>
           {format.sizedByOption ? (
             <p>
-              Printed at the size you choose, from {format.sizeLabel.replace(" to ", " up to ")}.
+              Printed at the size you choose, {sizeRangeText(format)}.
               Every A size is the same shape, so your design scales up exactly as you made it.
             </p>
           ) : (

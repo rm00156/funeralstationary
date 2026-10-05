@@ -214,3 +214,16 @@ export function lineSpec(
     quote.paper.label,
   ].join(" · ");
 }
+
+/**
+ * The spec line for a basket line that no longer prices (no quote): the size
+ * and its page count, or for a sized-by-option product just its size range —
+ * its "pages" option is a print size, and the one chosen is what went stale.
+ */
+export function staleLineSpec(
+  format: Pick<ProductFormat, "sizeLabel" | "sizedByOption">,
+  pageCount: number,
+): string {
+  if (format.sizedByOption) return format.sizeLabel;
+  return `${format.sizeLabel} · ${pageCount} ${pageCount === 1 ? "page" : "pages"}`;
+}

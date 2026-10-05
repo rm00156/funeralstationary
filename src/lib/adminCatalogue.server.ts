@@ -25,7 +25,7 @@ import {
   templateCategoryLinks,
   templates,
 } from "@/db/schema";
-import type { TemplateStatus } from "@/lib/adminValidation";
+import { parseLayoutPages, type TemplateStatus } from "@/lib/adminValidation";
 import { productFormatColumns } from "@/lib/catalogue.server";
 import { toProductFormat, type DesignPage, type ProductFormat } from "@/lib/designEditor";
 import type { ProductOccasion } from "@/lib/templates";
@@ -640,6 +640,46 @@ export async function adminCreateTemplate(input: {
   return (await adminGetTemplate(input.slug))!;
 }
 
+/** A template product move that would break designs or layouts already made. */
+export class TemplateMoveError extends Error {}
+
+/**
+ * A template can change product only while nothing depends on where it is.
+ * Its designs carry their product's id and trim, so once one exists the
+ * template stays put (which also keeps adminUpdateProduct's format lock
+ * honest: a product with designs always has a template). And an authored
+ * layout is drawn on its product's trim and page structure, so it may only
+ * move to a product with the same ones.
+ */
+async function assertTemplateCanMove(
+  templateId: number,
+  template: Pick<AdminTemplate, "productSlug" | "productFormat"> & {
+    layout: DesignPage[] | null;
+    draftLayout: DesignPage[] | null;
+  },
+  target: AdminProduct,
+) {
+  const [used] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(designs)
+    .where(eq(designs.templateId, templateId));
+  if (Number(used?.count ?? 0) > 0) {
+    throw new TemplateMoveError(
+      "This template already has customer designs, which belong to its product — it can't move to another.",
+    );
+  }
+  const { trim, templatePages } = template.productFormat;
+  const sameFormat =
+    target.trimWidthMm === trim.widthMm &&
+    target.trimHeightMm === trim.heightMm &&
+    target.templatePages === templatePages;
+  if ((template.layout || template.draftLayout) && !sameFormat) {
+    throw new TemplateMoveError(
+      `This template's layout is drawn for ${template.productSlug}'s size and pages; it can only move to a product with the same format.`,
+    );
+  }
+}
+
 export async function adminUpdateTemplate(
   slug: string,
   patch: {
@@ -658,7 +698,11 @@ export async function adminUpdateTemplate(
   if (patch.productSlug !== undefined) {
     const resolved = await resolveProductId(patch.productSlug);
     if (!resolved) throw new Error(`Unknown product "${patch.productSlug}"`);
-    productId = resolved;
+    const existing = await adminGetTemplate(slug);
+    if (existing && existing.productSlug !== patch.productSlug) {
+      await assertTemplateCanMove(templateId, existing, (await adminGetProduct(patch.productSlug))!);
+      productId = resolved;
+    }
   }
 
   const set = {
@@ -744,6 +788,11 @@ export async function adminSaveTemplateDraftLayout(
 ): Promise<boolean> {
   const templateId = await resolveTemplateId(slug);
   if (!templateId) return false;
+  // The route validates too; this guards every other caller (the generator,
+  // scripts) against a layout with pages its product doesn't print.
+  const template = await adminGetTemplate(slug);
+  const checked = parseLayoutPages(pages, template!.productFormat.templatePages);
+  if (!checked.ok) throw new Error(`Layout for "${slug}" rejected: ${checked.error}`);
   await db
     .update(templates)
     .set({ draftLayout: pages })

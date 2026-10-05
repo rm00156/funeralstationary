@@ -75,7 +75,7 @@ export default async function AdminOrderPage({
                       <p className="font-body text-sm text-on-surface-variant">
                         {copiesText(item.quantityCopies)} · {lineSpec(item.format, item.quote)}
                         {item.format.sizedByOption &&
-                          ` — artwork drawn at ${trimText(item.format.trim)}; scale to the size ordered`}
+                          ` — artwork drawn at ${trimText(item.artworkTrim)}; scale to the size ordered`}
                       </p>
                       <p className="font-body text-xs text-on-surface-variant">
                         {formatPence(item.unitPricePence)} each · {item.delivery.label} (

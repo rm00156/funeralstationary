@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
-import { adminUpdateOption, isOptionKind } from "@/lib/adminCatalogue.server";
+import { adminGetProduct, adminUpdateOption, isOptionKind } from "@/lib/adminCatalogue.server";
 import { isAdmin, unauthorised } from "@/lib/adminSession";
-import { parseOptionPatch } from "@/lib/adminValidation";
+import { pageCountFormatError, parseOptionPatch } from "@/lib/adminValidation";
+import type { TemplatePageCount } from "@/lib/designEditor";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,16 @@ export async function PATCH(
 
   const parsed = parseOptionPatch(kind, (body ?? {}) as Record<string, unknown>);
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
+
+  if (parsed.value.pageCount !== undefined) {
+    const product = await adminGetProduct(slug);
+    if (!product) return Response.json({ error: "Product not found" }, { status: 404 });
+    const formatError = pageCountFormatError(
+      parsed.value.pageCount,
+      product.templatePages as TemplatePageCount,
+    );
+    if (formatError) return Response.json({ error: formatError }, { status: 400 });
+  }
 
   const updated = await adminUpdateOption(slug, kind, optionSlug, parsed.value);
   if (!updated) return Response.json({ error: "Option not found" }, { status: 404 });

@@ -99,7 +99,7 @@ export function toProductFormat(row: ProductFormatRow): ProductFormat {
 
 /** What the page-count axis is called for a product. */
 export function pagesAxisLabel(format: ProductFormat): string {
-  return format.sizedByOption ? "Size" : "Pages";
+  return format.sizedByOption ? "Print size" : "Pages";
 }
 
 /** Pixel geometry of one page at 100% zoom (PX_PER_MM). */
@@ -167,6 +167,17 @@ export function coverWidthFactor(trim: PageTrim): number {
 export function sizeText(format: ProductFormat): string {
   if (format.sizedByOption || format.sizeLabel.includes("mm")) return format.sizeLabel;
   return `${format.sizeLabel} (${trimText(format.trim)})`;
+}
+
+/**
+ * The range a sized-by-option product is printed in, for "Printed at the
+ * size you choose, …" — "from A4 up to A0". The size label is admin-typed,
+ * so "A4 to A0", "A4–A0" and "A4 - A0" all read the same; anything else is
+ * used as written.
+ */
+export function sizeRangeText(format: Pick<ProductFormat, "sizeLabel">): string {
+  const ends = format.sizeLabel.split(/\s+to\s+|\s*[–—]\s*|\s+-\s+|(?<=\w)-(?=\w)/);
+  return ends.length === 2 ? `from ${ends[0].trim()} up to ${ends[1].trim()}` : format.sizeLabel;
 }
 
 /**

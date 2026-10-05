@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
-import type { DesignDoc } from "@/lib/designEditor";
+import type { DesignDoc, ProductFormat } from "@/lib/designEditor";
 import type { ReadinessIssue } from "@/lib/designReadiness";
 import type { Quote } from "@/lib/orderOfServicePricing";
 import { designs } from "./designs";
@@ -138,6 +138,15 @@ export const orderItems = mysqlTable(
     lineTotalPence: int("line_total_pence").notNull(),
     /** The exact DesignDoc sent to press — the design itself stays editable after ordering. */
     docSnapshot: json("doc_snapshot").$type<DesignDoc>().notNull(),
+    /**
+     * The product's format at the pay click — its size label, axis names and
+     * whether its page options are sizes — which is what the spec line on
+     * the order page and emails is written from. The format's labels stay
+     * editable in /admin, so without this a rename would rewrite every past
+     * order. Null on a draft line and on lines paid before it existed; those
+     * read the live format.
+     */
+    formatSnapshot: json("format_snapshot").$type<ProductFormat>(),
     /**
      * The audit record of the pre-order check: exactly which template
      * placeholders the customer was warned were still unedited, and when they
