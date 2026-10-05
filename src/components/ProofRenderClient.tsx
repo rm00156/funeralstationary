@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 
 import { PageCanvas } from "@/components/PageCanvas";
 import {
-  ARTBOARD_H_MM,
-  ARTBOARD_W_MM,
   PRINT_ZOOM,
+  docTrim,
+  pageMetrics,
   type DesignDoc,
+  type PageTrim,
 } from "@/lib/designEditor";
 
 declare global {
@@ -26,7 +27,8 @@ declare global {
 const noop = () => {};
 
 /**
- * Print layout: one artboard per physical page, at true size.
+ * Print layout: one artboard per physical page, at true size — the
+ * document's own trim plus bleed, so a bookmark prints on a bookmark sheet.
  *
  * Chromium's own printer emits live text and embedded fonts, so the press
  * PDF is vector rather than a raster of the screen — but only if the page
@@ -35,8 +37,10 @@ const noop = () => {};
  * every artboard, and print-color-adjust so the artwork's backgrounds
  * survive. The drop shadow is screen furniture and must not print.
  */
-const PRINT_CSS = `
-@page { size: ${ARTBOARD_W_MM}mm ${ARTBOARD_H_MM}mm; margin: 0; }
+const printCss = (trim: PageTrim) => {
+  const { artboardWMm, artboardHMm } = pageMetrics(trim);
+  return `
+@page { size: ${artboardWMm}mm ${artboardHMm}mm; margin: 0; }
 html, body { margin: 0; padding: 0; background: #fff; }
 [data-proof-container] { padding: 0 !important; gap: 0 !important; min-height: 0 !important; }
 [data-proof-page] { break-after: page; break-inside: avoid; }
@@ -44,6 +48,7 @@ html, body { margin: 0; padding: 0; background: #fff; }
 [data-proof-page] * { box-shadow: none !important; }
 * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 `;
+};
 
 /**
  * Hidden render target for the server-side proof job (see /api/proof).
@@ -143,7 +148,7 @@ export default function ProofRenderClient() {
       data-proof-ready={ready ? "true" : undefined}
       className="flex min-h-screen flex-col items-start gap-10 bg-white p-10"
     >
-      {print && <style>{PRINT_CSS}</style>}
+      {print && <style>{printCss(docTrim(doc))}</style>}
       {/* The dev-mode route indicator (nextjs-portal) mounts outside this
           container and is dev-only — hidden here so a local test proof
           doesn't pick it up; it never renders in a production build. */}
@@ -152,6 +157,7 @@ export default function ProofRenderClient() {
         <div key={page.id} data-proof-page={index}>
           <PageCanvas
             page={page}
+            trim={docTrim(doc)}
             zoom={print ? PRINT_ZOOM : 1}
             showCut={false}
             showSafe={false}

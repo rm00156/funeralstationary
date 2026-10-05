@@ -16,23 +16,17 @@
  */
 import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
 
-import {
-  ARTBOARD_H_MM,
-  ARTBOARD_W_MM,
-  BLEED_MM,
-  type DesignDoc,
-} from "@/lib/designEditor";
+import { BLEED_MM, docTrim, pageMetrics, type DesignDoc } from "@/lib/designEditor";
 import { renderProofPrintPdf } from "@/lib/proofRender.server";
 
 const MM_TO_PT = 72 / 25.4;
 const mmToPt = (mm: number) => mm * MM_TO_PT;
 
-const PAGE_W_PT = mmToPt(ARTBOARD_W_MM);
-const PAGE_H_PT = mmToPt(ARTBOARD_H_MM);
 const BLEED_PT = mmToPt(BLEED_MM);
 
 /** Two short ticks per corner, anchored at the trim line, in the bleed margin. */
 function drawCropMarks(page: PDFPage) {
+  const { width: PAGE_W_PT, height: PAGE_H_PT } = page.getSize();
   const gap = BLEED_PT * 0.3;
   const color = rgb(0, 0, 0);
   const corners = [
@@ -64,6 +58,11 @@ function drawCropMarks(page: PDFPage) {
  */
 export async function renderProofPdf(origin: string, doc: DesignDoc): Promise<Buffer> {
   const printed = await renderProofPrintPdf(origin, doc);
+  // The sheet is the document's own trim plus bleed — every format prints
+  // at true size (a board sold in several sizes is scaled by the press).
+  const { artboardWMm, artboardHMm } = pageMetrics(docTrim(doc));
+  const PAGE_W_PT = mmToPt(artboardWMm);
+  const PAGE_H_PT = mmToPt(artboardHMm);
   const pdfDoc = await PDFDocument.load(printed);
 
   const pages = pdfDoc.getPages();

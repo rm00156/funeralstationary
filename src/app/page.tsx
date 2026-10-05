@@ -36,7 +36,7 @@ export default async function Home() {
           <HomeDesigns product={lead} templates={leadTemplates.slice(0, HOME_DESIGN_COUNT)} />
         )}
         <ProductRange products={rest} />
-        <QualityDelivery delivery={leadPricing?.delivery ?? []} />
+        <QualityDelivery delivery={leadPricing?.delivery ?? []} format={lead?.format ?? null} />
         <Testimonials />
         <HelpBand />
       </main>

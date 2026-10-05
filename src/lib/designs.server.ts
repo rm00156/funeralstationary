@@ -21,7 +21,7 @@ import {
   products,
   templates,
 } from "@/db/schema";
-import type { DesignDoc } from "@/lib/designEditor";
+import { A5_TRIM, docTrim, sameTrim, type DesignDoc, type PageTrim } from "@/lib/designEditor";
 import type { Owner } from "@/lib/session";
 
 /** Max pages a doc may carry — mirrors the proof route's MAX_PAGES. */
@@ -72,6 +72,8 @@ function isLiveDesign() {
 export function validateDesignPayload(
   doc: unknown,
   expectedPages: number,
+  /** The product's trim. A doc is laid out on one size and must stay its product's. */
+  expectedTrim: PageTrim = A5_TRIM,
 ): { ok: true; doc: DesignDoc } | { ok: false; error: string } {
   if (!doc || typeof doc !== "object") return { ok: false, error: "doc is required" };
   const candidate = doc as DesignDoc;
@@ -94,6 +96,20 @@ export function validateDesignPayload(
     return {
       ok: false,
       error: `doc.pages has ${candidate.pages.length} pages but the chosen page option expects ${expectedPages}`,
+    };
+  }
+
+  // A doc with no trim predates formats and is A5, so an old booklet design
+  // still saves; anything else must be laid out on its product's own size.
+  const trim = docTrim(candidate);
+  if (
+    typeof trim.widthMm !== "number" ||
+    typeof trim.heightMm !== "number" ||
+    !sameTrim(trim, expectedTrim)
+  ) {
+    return {
+      ok: false,
+      error: `doc is laid out at ${trim.widthMm} × ${trim.heightMm} mm but this product is ${expectedTrim.widthMm} × ${expectedTrim.heightMm} mm`,
     };
   }
 

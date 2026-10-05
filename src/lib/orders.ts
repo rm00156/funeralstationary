@@ -6,6 +6,7 @@
  * without a database. The server seam that uses these is orders.server.ts.
  */
 import { orderStatusValues } from "@/db/schema/orders";
+import type { ProductFormat } from "@/lib/designEditor";
 import {
   getQuote,
   type PricingData,
@@ -195,4 +196,34 @@ export function buildStripeLineItems(
 
 export function sumLineItems(lines: ReadonlyArray<StripeLineItem>): number {
   return lines.reduce((sum, line) => sum + line.unitAmountPence * line.quantity, 0);
+}
+
+/**
+ * A line's printed spec, as the basket, the order pages and the emails show
+ * it: "A5 · 8 page · Silk", "A6 · Printed both sides · Silk card". The size
+ * leads unless it is itself what the customer chose — a board sold in several
+ * sizes, whose page-count option *is* the size ("A1 · Mounted on 5mm board").
+ */
+export function lineSpec(
+  format: Pick<ProductFormat, "sizeLabel" | "sizedByOption">,
+  quote: { pages: { label: string }; paper: { label: string } },
+): string {
+  return [
+    ...(format.sizedByOption ? [] : [format.sizeLabel]),
+    quote.pages.label,
+    quote.paper.label,
+  ].join(" · ");
+}
+
+/**
+ * The spec line for a basket line that no longer prices (no quote): the size
+ * and its page count, or for a sized-by-option product just its size range —
+ * its "pages" option is a print size, and the one chosen is what went stale.
+ */
+export function staleLineSpec(
+  format: Pick<ProductFormat, "sizeLabel" | "sizedByOption">,
+  pageCount: number,
+): string {
+  if (format.sizedByOption) return format.sizeLabel;
+  return `${format.sizeLabel} · ${pageCount} ${pageCount === 1 ? "page" : "pages"}`;
 }

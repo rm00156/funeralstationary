@@ -24,7 +24,7 @@ import {
   type ProductOccasion,
 } from "@/lib/templates";
 
-export type NavProduct = Product & { occasion: ProductOccasion };
+export type NavProduct = Pick<Product, "id" | "label"> & { occasion: ProductOccasion };
 
 const NAV_LINKS = [
   { label: "Reviews", href: "/reviews" },
@@ -36,7 +36,7 @@ const OTHER_WAYS = [
   { label: "Upload your own design", href: UPLOAD_DESIGN_HREF },
 ];
 
-const productHref = (product: Product) => `/products/${product.id}`;
+const productHref = (product: NavProduct) => `/products/${product.id}`;
 
 /** A header menu closes on an outside click or Escape, like a native menu. */
 function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | null>, close: () => void) {

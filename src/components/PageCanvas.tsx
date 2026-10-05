@@ -6,7 +6,7 @@
  * DesignEditor.tsx imports it from here like everyone else.
  */
 
-import type { ComponentType } from "react";
+import { createContext, useContext, type ComponentType } from "react";
 import {
   Bird,
   Cross,
@@ -25,15 +25,13 @@ import {
 } from "lucide-react";
 
 import {
-  ARTBOARD_H,
-  ARTBOARD_W,
+  A5_TRIM,
   BLEED_PX,
   DEFAULT_PHOTO_BORDER_COLOR,
   FONT_OPTIONS,
   FRAME_RING_GAP,
-  PAGE_H,
-  PAGE_W,
   RESIZE_HANDLES,
+  pageMetrics,
   frameDepth,
   frameRings,
   photoBorderRadius,
@@ -45,6 +43,7 @@ import {
   type FrameElement,
   type FrameVariant,
   type ImageElement,
+  type PageTrim,
   type ResizeHandle,
   type ShapeElement,
   type TextElement,
@@ -64,6 +63,13 @@ export const CLIPARTS: { id: string; label: string; Icon: ComponentType<{ size?:
   { id: "tree", label: "Tree", Icon: TreeDeciduous },
   { id: "candle", label: "Candle", Icon: Flame },
 ];
+
+/**
+ * The trim width of the page being drawn, in base px. An arch window's radius
+ * is half its width in px, and its width is a percentage of this — set by
+ * PageCanvas and StaticPage so the element views don't each need the trim.
+ */
+const PageWidthContext = createContext(pageMetrics(A5_TRIM).pageW);
 
 const fontCss = (id: FontFamilyId) =>
   FONT_OPTIONS.find((f) => f.id === id)?.css ?? "var(--font-body)";
@@ -88,6 +94,7 @@ export interface CanvasGuides {
  */
 export function PageCanvas({
   page,
+  trim = A5_TRIM,
   zoom,
   showCut,
   showSafe,
@@ -103,6 +110,8 @@ export function PageCanvas({
   editLocked = false,
 }: {
   page: DesignPage;
+  /** The page's trim — the document's (docTrim) or its product's. */
+  trim?: PageTrim;
   zoom: number;
   showCut: boolean;
   showSafe: boolean;
@@ -127,103 +136,106 @@ export function PageCanvas({
   onEndEdit: () => void;
   onBackgroundClick: () => void;
 }) {
+  const { pageW, pageH, artboardW, artboardH } = pageMetrics(trim);
   return (
-    <div
-      style={{ width: ARTBOARD_W * zoom, height: ARTBOARD_H * zoom }}
-      className="relative shrink-0"
-    >
+    <PageWidthContext.Provider value={pageW}>
       <div
-        style={{
-          width: ARTBOARD_W,
-          height: ARTBOARD_H,
-          transform: `scale(${zoom})`,
-          transformOrigin: "top left",
-          backgroundColor: page.background ?? "#ffffff",
-        }}
-        /* Nothing selected = the page as it prints, so anything hanging off
-           the sheet is clipped away. While an element is selected (which
-           includes the whole of a drag) the overhang is shown again, so you
-           can see and grab the part that sits outside the artboard. */
-        className={`absolute left-0 top-0 shadow-[0_8px_40px_rgba(31,26,30,0.18)] ${
-          selectedId ? "" : "overflow-hidden"
-        }`}
-        onPointerDown={(event) => {
-          if (event.target === event.currentTarget) onBackgroundClick();
-        }}
+        style={{ width: artboardW * zoom, height: artboardH * zoom }}
+        className="relative shrink-0"
       >
-        {/* trim box — the finished, cut page. Element coordinates (0-100%)
-            are measured against this box, not the bleed-inclusive artboard.
-            Same background as the artboard itself: bleed is just paper, not
-            a visually distinct region — only the cut line marks the trim. */}
         <div
-          className="absolute"
-          style={{ left: BLEED_PX, top: BLEED_PX, width: PAGE_W, height: PAGE_H }}
+          style={{
+            width: artboardW,
+            height: artboardH,
+            transform: `scale(${zoom})`,
+            transformOrigin: "top left",
+            backgroundColor: page.background ?? "#ffffff",
+          }}
+          /* Nothing selected = the page as it prints, so anything hanging off
+             the sheet is clipped away. While an element is selected (which
+             includes the whole of a drag) the overhang is shown again, so you
+             can see and grab the part that sits outside the artboard. */
+          className={`absolute left-0 top-0 shadow-[0_8px_40px_rgba(31,26,30,0.18)] ${
+            selectedId ? "" : "overflow-hidden"
+          }`}
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) onBackgroundClick();
           }}
         >
-          {page.elements.map((element) => (
-            <ElementView
-              key={element.id}
-              element={element}
-              locked={!!element.locked && !editLocked}
-              selected={element.id === selectedId}
-              editing={element.id === editingId}
-              onSelect={() => onSelect(element.id)}
-              onStartDrag={onStartDrag}
-              onStartEdit={() => onStartEdit(element)}
-              onEditText={(text) => onEditText(element.id, text)}
-              onEndEdit={onEndEdit}
-            />
-          ))}
+          {/* trim box — the finished, cut page. Element coordinates (0-100%)
+              are measured against this box, not the bleed-inclusive artboard.
+              Same background as the artboard itself: bleed is just paper, not
+              a visually distinct region — only the cut line marks the trim. */}
+          <div
+            className="absolute"
+            style={{ left: BLEED_PX, top: BLEED_PX, width: pageW, height: pageH }}
+            onPointerDown={(event) => {
+              if (event.target === event.currentTarget) onBackgroundClick();
+            }}
+          >
+            {page.elements.map((element) => (
+              <ElementView
+                key={element.id}
+                element={element}
+                locked={!!element.locked && !editLocked}
+                selected={element.id === selectedId}
+                editing={element.id === editingId}
+                onSelect={() => onSelect(element.id)}
+                onStartDrag={onStartDrag}
+                onStartEdit={() => onStartEdit(element)}
+                onEditText={(text) => onEditText(element.id, text)}
+                onEndEdit={onEndEdit}
+              />
+            ))}
 
-          {showSafe && (
+            {showSafe && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute border border-dashed"
+                style={{ inset: 16, borderColor: "#226b3d" }}
+              />
+            )}
+
+            {/* center snap guides — shown only while dragging near center */}
+            {guides?.v && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed"
+                style={{ borderColor: "#ec4899" }}
+              />
+            )}
+            {guides?.h && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed"
+                style={{ borderColor: "#ec4899" }}
+              />
+            )}
+          </div>
+
+          {/* bleed edge — the true sheet size before trimming */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 border border-outline-variant/60"
+          />
+
+          {/* cut line — sits exactly at the trim edge */}
+          {showCut && (
             <div
               aria-hidden
               className="pointer-events-none absolute border border-dashed"
-              style={{ inset: 16, borderColor: "#226b3d" }}
-            />
-          )}
-
-          {/* center snap guides — shown only while dragging near center */}
-          {guides?.v && (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-1/2 border-l border-dashed"
-              style={{ borderColor: "#ec4899" }}
-            />
-          )}
-          {guides?.h && (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed"
-              style={{ borderColor: "#ec4899" }}
+              style={{
+                left: BLEED_PX,
+                top: BLEED_PX,
+                width: pageW,
+                height: pageH,
+                borderColor: "#c2410c",
+              }}
             />
           )}
         </div>
-
-        {/* bleed edge — the true sheet size before trimming */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 border border-outline-variant/60"
-        />
-
-        {/* cut line — sits exactly at the trim edge */}
-        {showCut && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute border border-dashed"
-            style={{
-              left: BLEED_PX,
-              top: BLEED_PX,
-              width: PAGE_W,
-              height: PAGE_H,
-              borderColor: "#c2410c",
-            }}
-          />
-        )}
       </div>
-    </div>
+    </PageWidthContext.Provider>
   );
 }
 
@@ -410,19 +422,20 @@ function TextContent({
 }
 
 function ImageContent({ element }: { element: ImageElement }) {
+  const pageW = useContext(PageWidthContext);
   const border = element.border;
   const inset = border ? frameDepth(border) : 0;
-  const innerRadius = border ? photoInnerBorderRadius(element, inset) : undefined;
+  const innerRadius = border ? photoInnerBorderRadius(element, inset, pageW) : undefined;
   return (
     <div
       className={`relative h-full w-full overflow-hidden ${
         element.src || border ? "" : "border-2 border-dashed border-[#d3c2cd]"
       } ${element.src ? "" : "bg-[#faf6f8]"}`}
-      style={{ borderRadius: photoBorderRadius(element), padding: inset }}
+      style={{ borderRadius: photoBorderRadius(element, pageW), padding: inset }}
     >
       <div
         className="h-full w-full overflow-hidden"
-        style={{ borderRadius: innerRadius ?? photoBorderRadius(element) }}
+        style={{ borderRadius: innerRadius ?? photoBorderRadius(element, pageW) }}
       >
         {element.src ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -448,7 +461,7 @@ function ImageContent({ element }: { element: ImageElement }) {
           <FrameRings
             variant={border}
             color={element.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR}
-            radiusAt={(offset) => photoInnerBorderRadius(element, offset)}
+            radiusAt={(offset) => photoInnerBorderRadius(element, offset, pageW)}
           />
         </div>
       )}
@@ -533,53 +546,58 @@ function FrameRings({
 
 export function StaticPage({
   page,
+  trim = A5_TRIM,
   scale,
   plain = false,
 }: {
   page: DesignPage;
+  trim?: PageTrim;
   scale: number;
   /** No shadow or rounding — for when the page sits inside something that
       already has depth of its own, like a booklet leaf. */
   plain?: boolean;
 }) {
+  const { pageW, pageH } = pageMetrics(trim);
   return (
-    <div
-      style={{ width: PAGE_W * scale, height: PAGE_H * scale }}
-      className={`relative shrink-0 overflow-hidden ${
-        plain ? "" : "rounded-sm shadow-[0_4px_20px_rgba(31,26,30,0.15)]"
-      }`}
-    >
+    <PageWidthContext.Provider value={pageW}>
       <div
-        style={{
-          width: PAGE_W,
-          height: PAGE_H,
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          backgroundColor: page.background ?? "#ffffff",
-        }}
-        className="absolute left-0 top-0"
+        style={{ width: pageW * scale, height: pageH * scale }}
+        className={`relative shrink-0 overflow-hidden ${
+          plain ? "" : "rounded-sm shadow-[0_4px_20px_rgba(31,26,30,0.15)]"
+        }`}
       >
-        {page.elements.map((element) => (
-          <div
-            key={element.id}
-            className="pointer-events-none absolute"
-            style={{
-              left: `${element.x}%`,
-              top: `${element.y}%`,
-              width: `${element.w}%`,
-              height: element.type === "text" ? "auto" : `${element.h}%`,
-              transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
-            }}
-          >
-            <ElementContent
-              element={element}
-              editing={false}
-              onEditText={() => {}}
-              onEndEdit={() => {}}
-            />
-          </div>
-        ))}
+        <div
+          style={{
+            width: pageW,
+            height: pageH,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+            backgroundColor: page.background ?? "#ffffff",
+          }}
+          className="absolute left-0 top-0"
+        >
+          {page.elements.map((element) => (
+            <div
+              key={element.id}
+              className="pointer-events-none absolute"
+              style={{
+                left: `${element.x}%`,
+                top: `${element.y}%`,
+                width: `${element.w}%`,
+                height: element.type === "text" ? "auto" : `${element.h}%`,
+                transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
+              }}
+            >
+              <ElementContent
+                element={element}
+                editing={false}
+                onEditText={() => {}}
+                onEndEdit={() => {}}
+              />
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </PageWidthContext.Provider>
   );
 }

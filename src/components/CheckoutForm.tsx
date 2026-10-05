@@ -5,9 +5,9 @@ import { useState } from "react";
 import { Lock } from "lucide-react";
 
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
-import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
-import { formatPence } from "@/lib/orderOfServicePricing";
+import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import type { Cart } from "@/lib/orders.server";
+import { lineSpec } from "@/lib/orders";
 
 const fieldInput =
   "w-full rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-4 py-3 font-body text-base text-on-surface focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15";
@@ -172,8 +172,8 @@ export default function CheckoutForm({
               <div>
                 <p className="font-medium text-on-surface">{item.designName}</p>
                 <p className="text-on-surface-variant">
-                  {item.quantityCopies} copies
-                  {item.quote ? ` · ${PAGE_SIZE_LABEL} · ${item.quote.pages.label} · ${item.quote.paper.label}` : ""}
+                  {copiesText(item.quantityCopies)}
+                  {item.quote ? ` · ${lineSpec(item.format, item.quote)}` : ""}
                 </p>
                 {item.delivery && (
                   <p className="text-on-surface-variant">

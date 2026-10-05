@@ -8,9 +8,9 @@
  * confirmation flag, never a verdict.
  */
 import type { DesignDoc, DesignPage } from "@/lib/designEditor";
-import { makeStarterDoc } from "@/lib/designEditor";
+import { BOOKLET_FORMAT, makeStarterDoc } from "@/lib/designEditor";
 import { checkDesignReadiness, type DesignReadiness } from "@/lib/designReadiness";
-import { getTemplateBySlug } from "@/lib/catalogue.server";
+import { getProductFormats, getTemplateBySlug } from "@/lib/catalogue.server";
 
 /**
  * The pages a design was instantiated from: the template's authored layout,
@@ -29,7 +29,8 @@ async function templateDefaultPages(
   const template = await getTemplateBySlug(templateId);
   if (!template) return null;
   if (template.layout) return template.layout;
-  return makeStarterDoc(template, pageCount).pages;
+  const format = (await getProductFormats()).get(template.productId) ?? BOOKLET_FORMAT;
+  return makeStarterDoc(template, pageCount, format).pages;
 }
 
 /** Run the pre-order check against the template the design came from. */

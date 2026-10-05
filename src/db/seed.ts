@@ -66,7 +66,10 @@ async function main() {
   // changed. Seeding is therefore bootstrap-only: it refuses to touch a
   // populated catalogue unless explicitly forced. (Template `layout` is
   // excluded from the upsert's update columns below, so even a forced reseed
-  // never clobbers admin-authored layouts.)
+  // never clobbers admin-authored layouts — and so are a product's trim and
+  // template pages and a template's product, the things those layouts and
+  // every design made from them are drawn on. adminUpdateProduct and
+  // adminUpdateTemplate lock them; a reseed mustn't be the way round.)
   const [existingProduct] = await db.select({ id: products.id }).from(products).limit(1);
   if (existingProduct && process.env.SEED_FORCE !== "1") {
     console.log(
@@ -79,6 +82,9 @@ async function main() {
     "label",
     "description",
     "occasion",
+    "sizeLabel",
+    "sizedByOption",
+    "paperLabel",
     "sortOrder",
     "isActive",
   ]);
@@ -97,7 +103,6 @@ async function main() {
   });
   const templateBySlug = await upsertAndMapBySlug(templates, templateRows, [
     "name",
-    "productId",
     "previewImageUrl",
     "status",
     "sortOrder",

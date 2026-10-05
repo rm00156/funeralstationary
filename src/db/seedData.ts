@@ -10,20 +10,21 @@
  * inserted, so slug-to-id resolution has to happen in seed.ts, which runs
  * against a live database.
  */
-import { CATEGORY_ACCENTS } from "@/lib/designEditor";
-import {
-  CATEGORIES,
-  DEFAULT_PRODUCT,
-  DELIVERY_OPTIONS,
-  PAGE_OPTIONS,
-  PAPER_OPTIONS,
-  PRODUCTS,
-  QUANTITY_OPTIONS,
-  TEMPLATES,
-} from "./seedCatalogue";
+import { BOOKLET_FORMAT, CATEGORY_ACCENTS } from "@/lib/designEditor";
+import { CATEGORIES, PRICING, PRODUCTS, TEMPLATES } from "./seedCatalogue";
 
 const toPence = (pounds: number) => Math.round(pounds * 100);
 const toMultiplier = (value: number) => value.toFixed(4);
+
+/** The products table's defaults — the A5 booklet. */
+const BOOKLET_FORMAT_ROW = {
+  sizeLabel: BOOKLET_FORMAT.sizeLabel,
+  trimWidthMm: BOOKLET_FORMAT.trim.widthMm,
+  trimHeightMm: BOOKLET_FORMAT.trim.heightMm,
+  templatePages: BOOKLET_FORMAT.templatePages,
+  sizedByOption: BOOKLET_FORMAT.sizedByOption,
+  paperLabel: BOOKLET_FORMAT.paperLabel,
+};
 
 export function buildProductsSeed() {
   return PRODUCTS.map((product, index) => ({
@@ -31,6 +32,7 @@ export function buildProductsSeed() {
     label: product.label,
     description: product.description,
     occasion: product.occasion,
+    ...(product.format ?? BOOKLET_FORMAT_ROW),
     sortOrder: index,
     isActive: true,
   }));
@@ -68,52 +70,62 @@ export function buildTemplateCategoryLinksSeed() {
   );
 }
 
+// Each product's options keep their list order as sort_order.
+
 export function buildPaperOptionsSeed() {
-  return PAPER_OPTIONS.map((option, index) => ({
-    productSlug: DEFAULT_PRODUCT,
-    slug: option.id,
-    label: option.label,
-    multiplier: toMultiplier(option.multiplier),
-    note: option.note ?? null,
-    sortOrder: index,
-    isActive: true,
-  }));
+  return Object.entries(PRICING).flatMap(([productSlug, { paper }]) =>
+    paper.map((option, index) => ({
+      productSlug,
+      slug: option.id,
+      label: option.label,
+      multiplier: toMultiplier(option.multiplier),
+      note: option.note ?? null,
+      sortOrder: index,
+      isActive: true,
+    })),
+  );
 }
 
 export function buildQuantityOptionsSeed() {
-  return QUANTITY_OPTIONS.map((option, index) => ({
-    productSlug: DEFAULT_PRODUCT,
-    slug: option.id,
-    label: option.label,
-    multiplier: toMultiplier(option.multiplier),
-    note: option.note ?? null,
-    copies: option.value,
-    sortOrder: index,
-    isActive: true,
-  }));
+  return Object.entries(PRICING).flatMap(([productSlug, { quantity }]) =>
+    quantity.map((option, index) => ({
+      productSlug,
+      slug: option.id,
+      label: option.label,
+      multiplier: toMultiplier(option.multiplier),
+      note: option.note ?? null,
+      copies: option.value,
+      sortOrder: index,
+      isActive: true,
+    })),
+  );
 }
 
 export function buildPageCountOptionsSeed() {
-  return PAGE_OPTIONS.map((option, index) => ({
-    productSlug: DEFAULT_PRODUCT,
-    slug: option.id,
-    label: option.label,
-    pageCount: option.pages,
-    baseRatePence: toPence(option.rate),
-    note: option.note ?? null,
-    sortOrder: index,
-    isActive: true,
-  }));
+  return Object.entries(PRICING).flatMap(([productSlug, { pages }]) =>
+    pages.map((option, index) => ({
+      productSlug,
+      slug: option.id,
+      label: option.label,
+      pageCount: option.pages,
+      baseRatePence: toPence(option.rate),
+      note: option.note ?? null,
+      sortOrder: index,
+      isActive: true,
+    })),
+  );
 }
 
 export function buildDeliveryOptionsSeed() {
-  return DELIVERY_OPTIONS.map((option, index) => ({
-    productSlug: DEFAULT_PRODUCT,
-    slug: option.id,
-    label: option.label,
-    pricePence: toPence(option.price),
-    note: option.note,
-    sortOrder: index,
-    isActive: true,
-  }));
+  return Object.entries(PRICING).flatMap(([productSlug, { delivery }]) =>
+    delivery.map((option, index) => ({
+      productSlug,
+      slug: option.id,
+      label: option.label,
+      pricePence: toPence(option.price),
+      note: option.note,
+      sortOrder: index,
+      isActive: true,
+    })),
+  );
 }

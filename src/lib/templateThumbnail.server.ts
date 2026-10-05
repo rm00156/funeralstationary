@@ -16,28 +16,37 @@ import { launchHeadlessBrowser } from "@/lib/headlessBrowser.server";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";
 import { placeholderPortraitUrl } from "@/lib/backgroundAssets.server";
 import {
-  portraitRotationForSeed,
+  portraitRotationFor,
   withPlaceholderPhotos,
 } from "@/lib/placeholderPortraits";
-import type { DesignDoc, DesignPage } from "@/lib/designEditor";
+import { pageMetrics, type DesignDoc, type DesignPage, type PageTrim } from "@/lib/designEditor";
 
 export async function renderTemplateThumbnail(
   origin: string,
   coverPage: DesignPage,
   /** Template slug, so each template keeps the same stand-in across republishes. */
   seed = "template",
+  /** The template's product's trim; a layout stores no size of its own. */
+  trim?: PageTrim,
 ): Promise<Buffer> {
   const page0 = withPlaceholderPhotos(
     coverPage,
-    portraitRotationForSeed(seed).map(placeholderPortraitUrl),
+    portraitRotationFor(coverPage, seed).map(placeholderPortraitUrl),
   );
   const browser = await launchHeadlessBrowser();
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 500, height: 700, deviceScaleFactor: 2 });
+    // Big enough for the whole artboard plus /proof-render's padding — an A4
+    // board's is larger than a booklet's.
+    const { artboardW, artboardH } = pageMetrics(trim);
+    await page.setViewport({
+      width: Math.max(500, Math.ceil(artboardW) + 80),
+      height: Math.max(700, Math.ceil(artboardH) + 80),
+      deviceScaleFactor: 2,
+    });
     await page.goto(`${origin}/proof-render`, { waitUntil: "networkidle0" });
 
-    const doc: DesignDoc = { templateId: "preview", pages: [page0] };
+    const doc: DesignDoc = { templateId: "preview", pages: [page0], trim };
     await page.evaluate((doc) => {
       window.__PROOF_DATA__ = doc;
       window.dispatchEvent(new Event("proof-data-ready"));

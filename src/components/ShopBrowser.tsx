@@ -7,7 +7,8 @@ import { ArrowRight } from "lucide-react";
 
 import { DesignForYouCard, UploadDesignCard } from "@/components/OtherWaysCards";
 import ProductCard from "@/components/ProductCard";
-import { formatPence } from "@/lib/orderOfServicePricing";
+import { coverWidthFactor, trimAspect } from "@/lib/designEditor";
+import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import {
   OCCASION_LABELS,
   PRODUCT_OCCASIONS,
@@ -65,7 +66,13 @@ export default function ShopBrowser({ products }: { products: ProductShowcase[] 
             className="card-link grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] overflow-hidden rounded-2xl border border-line bg-surface no-underline"
           >
             <div className="flex min-h-[320px] items-center justify-center bg-mist-3 px-6 py-10">
-              <div className="cover relative aspect-[148/210] w-[190px] rotate-[-4deg] overflow-hidden rounded-[3px] bg-sheet">
+              <div
+                className="cover relative rotate-[-4deg] overflow-hidden rounded-[3px] bg-sheet"
+                style={{
+                  aspectRatio: trimAspect(featured.format.trim),
+                  width: 190 * coverWidthFactor(featured.format.trim),
+                }}
+              >
                 <Image
                   src={featured.image}
                   alt={`${featured.label} design`}
@@ -89,7 +96,7 @@ export default function ShopBrowser({ products }: { products: ProductShowcase[] 
               </p>
               <p className="text-[17px] text-ink">
                 <strong className="font-semibold">From {formatPence(featured.fromPence)}</strong>{" "}
-                <span className="text-ink-3">for {featured.fromCopies} copies</span>
+                <span className="text-ink-3">for {copiesText(featured.fromCopies)}</span>
               </p>
               <span className="btn btn-primary mt-2 self-start text-[17px]">
                 Browse {featured.templateCount}{" "}

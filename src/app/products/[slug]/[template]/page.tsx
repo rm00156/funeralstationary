@@ -16,15 +16,9 @@ import {
   getSellableProducts,
   getTemplateBySlug,
 } from "@/lib/catalogue.server";
-import {
-  makeTemplateLayout,
-  PAGE_H_MM,
-  PAGE_SIZE_LABEL,
-  PAGE_W_MM,
-  toTemplateLayout,
-} from "@/lib/designEditor";
-import { formatPence } from "@/lib/orderOfServicePricing";
-import { portraitRotationForSeed, withPlaceholderPhotos } from "@/lib/placeholderPortraits";
+import { makeTemplateLayout, sizeRangeText, sizeText, toTemplateLayout } from "@/lib/designEditor";
+import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
+import { portraitRotationFor, withPlaceholderPhotos } from "@/lib/placeholderPortraits";
 import { getPricingData } from "@/lib/pricing.server";
 import {
   DESIGN_FOR_YOU_HREF,
@@ -39,8 +33,12 @@ import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "@/lib/storage";
 // this page must render per-request rather than being frozen at build time.
 export const dynamic = "force-dynamic";
 
-/** The three authored template pages (cover / middle / back), as the gallery names them. */
-const VIEW_LABELS = ["Front cover", "Inside pages", "Back cover"];
+/** The authored template pages, as the gallery names them, by how many there are. */
+const VIEW_LABELS: Record<1 | 2 | 3, string[]> = {
+  1: ["The design"],
+  2: ["Front", "Back"],
+  3: ["Front cover", "Inside pages", "Back cover"],
+};
 
 const IMAGE_TYPE_NAMES: Record<(typeof ALLOWED_IMAGE_TYPES)[number], string> = {
   "image/jpeg": "JPEG",
@@ -72,7 +70,7 @@ export async function generateMetadata({
   const { product, template } = found;
   return {
     title: `${template.name} – ${product.label} | The Funeral Stationery`,
-    description: `Personalise the ${template.name} design online with your own photographs and words. ${product.label} from ${formatPence(product.fromPence)} for ${product.fromCopies} copies, delivered anywhere in the UK.`,
+    description: `Personalise the ${template.name} design online with your own photographs and words. ${product.label} from ${formatPence(product.fromPence)} for ${copiesText(product.fromCopies)}, delivered anywhere in the UK.`,
   };
 }
 
@@ -101,23 +99,32 @@ export default async function TemplatePage({
   // the generic starter document when it has none. Photo windows are empty in
   // the stored layout, so they are filled with stand-in portraits for this
   // preview only — the same substitution the thumbnail renderer makes.
-  const layout = toTemplateLayout(template.layout) ?? makeTemplateLayout(template);
-  const portraits = portraitRotationForSeed(template.id).map(placeholderPortraitUrl);
+  const { format } = product;
+  const layout =
+    toTemplateLayout(template.layout, format.templatePages) ??
+    makeTemplateLayout(template, format);
+  const portraits = portraitRotationFor(layout[0], template.id).map(placeholderPortraitUrl);
   const views = layout.map((page, index) => ({
-    label: VIEW_LABELS[index] ?? `Page ${index + 1}`,
+    label: VIEW_LABELS[format.templatePages][index] ?? `Page ${index + 1}`,
     page: withPlaceholderPhotos(page, portraits),
   }));
 
   const productHref = `/products/${product.id}`;
   const details = [
     {
-      title: "Size and paper",
+      title: `Size and ${format.paperLabel.toLowerCase()}`,
       body: (
         <>
-          <p>
-            Exact {PAGE_SIZE_LABEL} ({PAGE_W_MM} × {PAGE_H_MM} mm). Printed on heavyweight paper so
-            it lasts as a keepsake.
-          </p>
+          {format.sizedByOption ? (
+            <p>
+              Printed at the size you choose, {sizeRangeText(format)}.
+              Every A size is the same shape, so your design scales up exactly as you made it.
+            </p>
+          ) : (
+            <p>
+              Exact {sizeText(format)}. Printed on heavyweight paper so it lasts as a keepsake.
+            </p>
+          )}
           {pricing.paper.length > 0 && (
             <ul className="mt-3 flex flex-col gap-1.5">
               {pricing.paper.map((paper) => (
@@ -186,7 +193,7 @@ export default async function TemplatePage({
 
             <div className="flex flex-wrap items-start gap-x-14 gap-y-10">
               <div className="min-w-0 flex-[1.3_1_520px] lg:sticky lg:top-6">
-                <TemplateGallery name={template.name} views={views} />
+                <TemplateGallery name={template.name} views={views} trim={format.trim} />
               </div>
 
               <div className="flex min-w-0 flex-[1_1_380px] flex-col gap-7">
@@ -198,9 +205,9 @@ export default async function TemplatePage({
                     {template.name}
                   </h1>
                   <p className="text-ink-2">
-                    Personalise every page online — their name and dates, your photographs and the
-                    wording — then choose how many you need. We print on heavyweight paper and
-                    deliver anywhere in the UK.
+                    Personalise it online — their name and dates, your photographs and the
+                    wording — then choose how many you need. We print it for you and deliver
+                    anywhere in the UK.
                   </p>
                   {styles.length > 0 && (
                     <ul aria-label="Styles" className="flex flex-wrap gap-2 pt-1">
@@ -218,7 +225,12 @@ export default async function TemplatePage({
                   )}
                 </div>
 
-                <TemplateBuyBox productId={product.id} templateId={template.id} pricing={pricing} />
+                <TemplateBuyBox
+                  productId={product.id}
+                  templateId={template.id}
+                  pricing={pricing}
+                  format={format}
+                />
 
                 <p className="text-base text-ink-2">
                   Rather we did it for you?{" "}
@@ -243,9 +255,11 @@ export default async function TemplatePage({
               <ul className="flex flex-col gap-3">
                 {[
                   "Their name, dates, and the date and place of the service",
-                  "The cover photograph, and the photos inside",
+                  format.templatePages === 3
+                    ? "The cover photograph, and the photos inside"
+                    : "The photographs, and where they sit",
                   "All of the wording, on every page",
-                  pricing.pages.length > 1
+                  pricing.pages.length > 1 && !format.sizedByOption
                     ? "The number of pages, to fit everything you want to include"
                     : "The fonts and colours of the text",
                 ].map((item) => (

@@ -59,26 +59,23 @@ import {
 } from "lucide-react";
 
 import {
-  ARTBOARD_H,
-  ARTBOARD_W,
   FONT_OPTIONS,
   imageShape,
   DEFAULT_PHOTO_BORDER_COLOR,
   FRAME_VARIANTS,
   INK_PALETTE,
   PAGE_BACKGROUND_PALETTE,
-  PAGE_H,
-  PAGE_H_MM,
-  PAGE_SIZE_LABEL,
-  PAGE_W,
-  PAGE_W_MM,
+  docTrim,
   instantiateLayout,
   makeStarterDoc,
   makeTemplateLayout,
+  pageMetrics,
+  pagesAxisLabel,
   resizeBox,
   templateAccent,
   templatePageLabel,
   toTemplateLayout,
+  trimText,
   uid,
   withPageCount,
   type CanvasElement,
@@ -87,6 +84,7 @@ import {
   type FontFamilyId,
   type FrameVariant,
   type PhotoShape,
+  type ProductFormat,
   type ProofRequest,
   type ResizeHandle,
   type TextElement,
@@ -103,6 +101,7 @@ import PreOrderCheckDialog, {
   type PreOrderCheck,
 } from "@/components/PreOrderCheckDialog";
 import {
+  copiesText,
   defaultSelection,
   formatPence,
   getQuote,
@@ -139,6 +138,14 @@ const TABS: { id: TabId; label: string; Icon: ComponentType<{ size?: number | st
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+/**
+ * Zoom bounds, shared by Fit and the +/− buttons so a fitted view is always
+ * reachable from the buttons. A board's artboard is far bigger than a
+ * booklet's, so it has to be allowed to shrink this far to fit.
+ */
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 2;
 
 /** Distance (screen px) within which a dragged element snaps to a guide. */
 const SNAP_PX = 6;
@@ -191,6 +198,7 @@ export default function DesignEditor({
   template,
   productId,
   productLabel,
+  format,
   templates,
   pricing,
   initialLayout,
@@ -201,7 +209,12 @@ export default function DesignEditor({
   template: Template;
   productId: string;
   productLabel: string;
-  /** The published template catalogue, for the template picker panel. */
+  /**
+   * The product's trim and page structure. A new document is laid out on
+   * this trim; a saved one carries its own (docTrim), which it was made on.
+   */
+  format: ProductFormat;
+  /** This product's published templates, for the template picker panel. */
   templates: Template[];
   /** This product's pricing options, loaded from the DB by the page. */
   pricing: PricingData;
@@ -242,10 +255,12 @@ export default function DesignEditor({
   // The page-count option and the document's page count must agree from the
   // first render (autosave validates doc.pages.length against the option), so
   // both initialisers derive from this one resolution.
-  // Authoring always works on exactly cover/middle/back, normalising any
-  // older layout that was authored at a different length.
+  // Authoring always works on exactly the product's template pages (a
+  // booklet's cover/middle/back), normalising any older layout that was
+  // authored at a different length.
   const startingPages = templateAuthoring
-    ? (toTemplateLayout(templateAuthoring.initialPages) ?? makeTemplateLayout(template))
+    ? (toTemplateLayout(templateAuthoring.initialPages, format.templatePages) ??
+      makeTemplateLayout(template, format))
     : savedDesign
       ? null
       : (initialLayout ?? null);
@@ -265,9 +280,9 @@ export default function DesignEditor({
       const pageCount = authoring
         ? startingPages.length
         : (initialPageOption?.pages ?? startingPages.length);
-      return instantiateLayout(template.id, startingPages, pageCount);
+      return instantiateLayout(template.id, startingPages, pageCount, format.trim);
     }
-    return makeStarterDoc(template, initialPageOption?.pages ?? 4);
+    return makeStarterDoc(template, initialPageOption?.pages ?? format.templatePages, format);
   });
   const [history, setHistory] = useState<DesignDoc[]>([]);
   const [future, setFuture] = useState<DesignDoc[]>([]);
@@ -690,6 +705,12 @@ export default function DesignEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo, copySelected, pasteClipboard, deleteSelected, selectedId]);
 
+  // The document's own size — what it was made on, so a saved design keeps
+  // rendering at its trim whatever its product says today.
+  const trim = docTrim(doc);
+  const metrics = pageMetrics(trim);
+  const pageLabel = (index: number) => templatePageLabel(index, format.templatePages);
+
   /* ------------------------------ drag / resize ----------------------- */
 
   const startDrag = (
@@ -754,8 +775,8 @@ export default function DesignEditor({
         moved = true;
         snapshot();
       }
-      const dx = ((move.clientX - startX) / (PAGE_W * dragZoom)) * 100;
-      const dy = ((move.clientY - startY) / (PAGE_H * dragZoom)) * 100;
+      const dx = ((move.clientX - startX) / (metrics.pageW * dragZoom)) * 100;
+      const dy = ((move.clientY - startY) / (metrics.pageH * dragZoom)) * 100;
 
       if (mode === "move") {
         let nextX = clamp(origin.x + dx, -30, 96);
@@ -768,8 +789,8 @@ export default function DesignEditor({
         // content) — for them the horizontal guide snaps the top edge to
         // center rather than a true vertical center, since the rendered
         // height isn't known during drag.
-        const snapThresholdX = (SNAP_PX / (PAGE_W * dragZoom)) * 100;
-        const snapThresholdY = (SNAP_PX / (PAGE_H * dragZoom)) * 100;
+        const snapThresholdX = (SNAP_PX / (metrics.pageW * dragZoom)) * 100;
+        const snapThresholdY = (SNAP_PX / (metrics.pageH * dragZoom)) * 100;
         const centerX = nextX + origin.w / 2;
         const centerY = nextY + origin.h / 2;
         const snapV = Math.abs(centerX - 50) <= snapThresholdX;
@@ -794,6 +815,7 @@ export default function DesignEditor({
           const box = resizeBox(origin, handle, dx, dy, {
             autoHeight: isText,
             rotation: origin.rotation ?? 0,
+            trim,
           });
           if (el.type === "text" && origin.type === "text") {
             const fontSize = Math.max(
@@ -955,20 +977,25 @@ export default function DesignEditor({
       if (!confirmed) return;
       // Keep the page-count invariant: adopt the layout's own length when a
       // page option matches it, otherwise fit the layout to the current one.
-      const matchingOption = pricing.pages.find(
-        (option) => option.pages === layout.length,
-      );
+      // The current option wins when it already fits: a board's sizes all
+      // have one page, and applying a design must not reset the size.
+      const currentOption = pricing.pages.find((option) => option.id === pagesOptionId);
+      const matchingOption =
+        currentOption?.pages === layout.length
+          ? currentOption
+          : pricing.pages.find((option) => option.pages === layout.length);
       if (matchingOption) setPagesOptionId(matchingOption.id);
       commit(
         instantiateLayout(
           next.id,
           layout,
           matchingOption ? layout.length : doc.pages.length,
+          trim,
         ),
       );
       flash(`Applied “${next.name}”`);
     } else {
-      const starter = makeStarterDoc(next, doc.pages.length);
+      const starter = makeStarterDoc(next, doc.pages.length, { ...format, trim });
       // templateId has to move with the cover: it's what gets persisted to
       // designs.template_id, so leaving it behind would save the design under
       // whichever template happened to be open first.
@@ -995,15 +1022,16 @@ export default function DesignEditor({
     setPageIndex((current) => Math.min(current, option.pages - 1));
   };
 
+  const { artboardW, artboardH } = metrics;
   const fitZoom = useCallback(() => {
     const area = canvasAreaRef.current;
     if (!area) return;
     const fit = Math.min(
-      (area.clientWidth - 40) / ARTBOARD_W,
-      (area.clientHeight - 96) / ARTBOARD_H,
+      (area.clientWidth - 40) / artboardW,
+      (area.clientHeight - 96) / artboardH,
     );
-    setZoom(clamp(fit, 0.3, 2));
-  }, []);
+    setZoom(clamp(fit, MIN_ZOOM, MAX_ZOOM));
+  }, [artboardW, artboardH]);
 
   // Fit the page to whatever screen we open on (phones especially).
   useEffect(() => {
@@ -1466,9 +1494,11 @@ export default function DesignEditor({
                 </h2>
                 <PanelHeading>Finished size</PanelHeading>
                 <div className="rounded-xl border-2 border-secondary bg-surface-container-lowest p-4 text-center ambient-shadow">
-                  <p className="font-display text-2xl text-primary">{PAGE_SIZE_LABEL}</p>
+                  <p className="font-display text-2xl text-primary">{format.sizeLabel}</p>
                   <p className="font-body text-xs text-on-surface-variant">
-                    {PAGE_W_MM} x {PAGE_H_MM}mm portrait
+                    {format.sizedByOption
+                      ? "Any A size: your design scales to the one you choose"
+                      : `${trimText(trim)} ${trim.widthMm > trim.heightMm ? "landscape" : "portrait"}`}
                   </p>
                 </div>
               </div>
@@ -1493,23 +1523,29 @@ export default function DesignEditor({
                           }`}
                         >
                           <span className="block font-body text-sm font-medium text-on-surface">
-                            {templatePageLabel(index)}
+                            {pageLabel(index)}
                           </span>
                           <span className="block font-body text-xs text-on-surface-variant">
-                            {index === 1
-                              ? "Repeats to fill every inside page"
-                              : index === 0
-                                ? "Front of the booklet"
-                                : "Back of the booklet"}
+                            {format.templatePages < 3
+                              ? index === 0
+                                ? "The printed front"
+                                : "The printed back"
+                              : index === 1
+                                ? "Repeats to fill every inside page"
+                                : index === 0
+                                  ? "Front of the booklet"
+                                  : "Back of the booklet"}
                           </span>
                         </button>
                       </li>
                     ))}
                   </ol>
                 </div>
-              ) : (
+              ) : pricing.pages.length > 1 && (
               <div>
-                <PanelHeading>Number of pages</PanelHeading>
+                <PanelHeading>
+                  {pagesAxisLabel(format)}
+                </PanelHeading>
                 <div className="flex flex-col gap-2">
                   {pricing.pages.map((option) => (
                     <button
@@ -1523,7 +1559,7 @@ export default function DesignEditor({
                           : "bg-surface-container-lowest text-on-surface-variant border border-outline-variant/60 hover:bg-surface-container"
                       }`}
                     >
-                      {option.pages} pages (sides)
+                      {format.sizedByOption ? option.label : `${option.pages} pages (sides)`}
                     </button>
                   ))}
                 </div>
@@ -1532,7 +1568,9 @@ export default function DesignEditor({
 
               {!authoring && (
               <div>
-                <PanelHeading>Paper stock</PanelHeading>
+                <PanelHeading>
+                  {format.paperLabel === "Paper" ? "Paper stock" : format.paperLabel}
+                </PanelHeading>
                 <div className="flex flex-col gap-2">
                   {pricing.paper.map((option) => (
                     <button
@@ -1563,7 +1601,7 @@ export default function DesignEditor({
               {!authoring && (
               <div className="rounded-xl border border-line bg-surface-container-lowest p-4 ambient-shadow">
                 <p className="font-body text-sm text-on-surface-variant">
-                  {quote.quantity.value} copies for{" "}
+                  {copiesText(quote.quantity.value)} for{" "}
                   <span className="font-semibold text-secondary">
                     {formatPence(quote.totalPence)}
                   </span>{" "}
@@ -2090,7 +2128,7 @@ export default function DesignEditor({
             <div>
               <PanelHeading>
                 {authoring
-                  ? `Layers — ${templatePageLabel(pageIndex).toLowerCase()}`
+                  ? `Layers — ${pageLabel(pageIndex).toLowerCase()}`
                   : `Layers — page ${pageIndex + 1}`}
               </PanelHeading>
               {page.elements.length === 0 ? (
@@ -2201,6 +2239,7 @@ export default function DesignEditor({
           >
             <PageCanvas
               page={page}
+              trim={trim}
               zoom={zoom}
               showCut={showCut}
               showSafe={showSafe}
@@ -2268,7 +2307,7 @@ export default function DesignEditor({
               <ArrowUp size={16} aria-hidden />
             </button>
             <span className="font-body text-sm text-on-surface-variant tabular-nums">
-              {authoring ? templatePageLabel(pageIndex) : `${pageIndex + 1}/${doc.pages.length}`}
+              {authoring ? pageLabel(pageIndex) : `${pageIndex + 1}/${doc.pages.length}`}
             </span>
             <button
               type="button"
@@ -2307,7 +2346,7 @@ export default function DesignEditor({
             </ToolbarButton>
             <ToolbarButton
               label="Zoom out"
-              onClick={() => setZoom((z) => clamp(z - 0.1, 0.3, 2))}
+              onClick={() => setZoom((z) => clamp(z - 0.1, MIN_ZOOM, MAX_ZOOM))}
             >
               <Minus size={15} aria-hidden />
             </ToolbarButton>
@@ -2316,7 +2355,7 @@ export default function DesignEditor({
             </span>
             <ToolbarButton
               label="Zoom in"
-              onClick={() => setZoom((z) => clamp(z + 0.1, 0.3, 2))}
+              onClick={() => setZoom((z) => clamp(z + 0.1, MIN_ZOOM, MAX_ZOOM))}
             >
               <Plus size={15} aria-hidden />
             </ToolbarButton>
@@ -2426,26 +2465,35 @@ export default function DesignEditor({
             </div>
             {previewMode === "booklet" ? (
               <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2">
-                {/* A template is only ever cover / middle / back, so show it
-                    the way a customer would actually get it: expanded to a
-                    real booklet, middle page repeated. */}
-                {authoring && (
+                {/* A booklet template is only ever cover / middle / back, so
+                    show it the way a customer would actually get it: expanded
+                    to a real booklet, middle page repeated. */}
+                {authoring && format.templatePages === 3 && (
                   <p className="text-center font-body text-xs text-on-surface-variant">
                     Shown as an 8-page booklet, middle page repeated.
                   </p>
                 )}
                 <BookletPreview
-                  pages={authoring ? withPageCount(doc, 8).pages : doc.pages}
-                  renderPage={(page, scale) => <StaticPage page={page} scale={scale} plain />}
+                  pages={
+                    authoring && format.templatePages === 3
+                      ? withPageCount(doc, 8).pages
+                      : doc.pages
+                  }
+                  pageW={metrics.pageW}
+                  pageH={metrics.pageH}
+                  renderPage={(page, scale) => (
+                    <StaticPage page={page} trim={trim} scale={scale} plain />
+                  )}
                 />
               </div>
             ) : (
               <div className="flex flex-wrap justify-center gap-6 overflow-auto pb-2">
                 {doc.pages.map((previewPage, index) => (
                   <div key={previewPage.id} className="flex flex-col items-center gap-2">
-                    <StaticPage page={previewPage} scale={0.45} />
+                    {/* The same height whatever the format: 0.45 of an A5 page. */}
+                    <StaticPage page={previewPage} trim={trim} scale={283.5 / metrics.pageH} />
                     <span className="font-body text-xs text-on-surface-variant">
-                      {authoring ? templatePageLabel(index) : `Page ${index + 1}`}
+                      {authoring ? pageLabel(index) : `Page ${index + 1}`}
                     </span>
                   </div>
                 ))}

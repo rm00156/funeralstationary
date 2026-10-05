@@ -14,6 +14,7 @@ import {
   mergeCredits,
   sprayAssetKey,
   type BackgroundCredit,
+  type BackgroundFormat,
 } from "@/lib/backgroundArtwork";
 import {
   placeholderPortraitKey,
@@ -26,16 +27,24 @@ function localPath(key: string): string {
 }
 
 /** The URL a page element should use for a rendered background. */
-export function backgroundAssetUrl(id: string, palette: PaletteId): string {
-  const key = backgroundAssetKey(id, palette);
+export function backgroundAssetUrl(
+  id: string,
+  palette: PaletteId,
+  format: BackgroundFormat = "a5",
+): string {
+  const key = backgroundAssetKey(id, palette, format);
   return isStorageConfigured() ? publicUrlFor(key) : `/${key}`;
 }
 
 /** True when a rendered background already exists (local mode only — S3 is always rewritten). */
-export async function backgroundAssetExists(id: string, palette: PaletteId): Promise<boolean> {
+export async function backgroundAssetExists(
+  id: string,
+  palette: PaletteId,
+  format: BackgroundFormat = "a5",
+): Promise<boolean> {
   if (isStorageConfigured()) return false;
   try {
-    await access(localPath(backgroundAssetKey(id, palette)));
+    await access(localPath(backgroundAssetKey(id, palette, format)));
     return true;
   } catch {
     return false;
@@ -77,8 +86,9 @@ export async function saveBackgroundAsset(
   id: string,
   palette: PaletteId,
   jpeg: Buffer,
+  format: BackgroundFormat = "a5",
 ): Promise<string> {
-  const key = backgroundAssetKey(id, palette);
+  const key = backgroundAssetKey(id, palette, format);
   if (isStorageConfigured()) return uploadObject(key, jpeg, "image/jpeg");
   const file = localPath(key);
   await mkdir(path.dirname(file), { recursive: true });

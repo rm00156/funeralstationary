@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
 import AdminOptionTable from "@/components/AdminOptionTable";
+import AdminProductFormatForm from "@/components/AdminProductFormatForm";
 import {
   adminGetProduct,
   adminListOptions,
@@ -63,12 +64,19 @@ export default async function AdminProductPricingPage({
       </p>
 
       <div className="flex flex-col gap-8">
+        <AdminProductFormatForm product={product} />
         {KIND_ORDER.map((kind) => (
           <AdminOptionTable
             key={kind}
             productSlug={slug}
             kind={kind}
-            title={KIND_TITLES[kind]}
+            title={
+              kind === "page-count" && product.sizedByOption
+                ? "Sizes (1 page each)"
+                : kind === "paper" && product.paperLabel !== "Paper"
+                  ? `${product.paperLabel} options`
+                  : KIND_TITLES[kind]
+            }
             options={optionsByKind.get(kind) ?? []}
           />
         ))}

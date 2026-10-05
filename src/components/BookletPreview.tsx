@@ -10,7 +10,9 @@ import {
 } from "react";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 
-import { PAGE_H, PAGE_W, type DesignPage } from "@/lib/designEditor";
+import { pageMetrics, type DesignPage } from "@/lib/designEditor";
+
+const A5_PAGE = pageMetrics();
 
 /** Slow into the fold, ease out flat — a page, not a swing door. */
 const EASE = "cubic-bezier(.4,.1,.2,1)";
@@ -51,10 +53,15 @@ export default function BookletPreview({
   renderPage,
   /** Largest scale a page renders at; the stage shrinks below it to fit. */
   maxScale = 1,
+  /** One page's trim in base px (pageMetrics) — a card is not an A5 leaf. */
+  pageW = A5_PAGE.pageW,
+  pageH = A5_PAGE.pageH,
 }: {
   pages: DesignPage[];
   renderPage: (page: DesignPage, scale: number) => ReactNode;
   maxScale?: number;
+  pageW?: number;
+  pageH?: number;
 }) {
   const leafCount = Math.max(1, Math.ceil(pages.length / 2));
   const [turned, setTurned] = useState(0);
@@ -71,15 +78,15 @@ export default function BookletPreview({
     if (!stage) return;
     const fit = () => {
       const { width, height } = stage.getBoundingClientRect();
-      const byWidth = (width * 0.86) / (PAGE_W * 2);
-      const byHeight = (height * 0.86) / PAGE_H;
+      const byWidth = (width * 0.86) / (pageW * 2);
+      const byHeight = (height * 0.86) / pageH;
       setScale(Math.max(0.2, Math.min(maxScale, byWidth, byHeight)));
     };
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(stage);
     return () => observer.disconnect();
-  }, [maxScale]);
+  }, [maxScale, pageW, pageH]);
 
   const canTurn = pages.length > 1;
   const atStart = turned === 0;
@@ -147,8 +154,8 @@ export default function BookletPreview({
     go(direction);
   };
 
-  const w = PAGE_W * scale;
-  const h = PAGE_H * scale;
+  const w = pageW * scale;
+  const h = pageH * scale;
 
   // Slide the book so what's visible sits centred: closed, only the right
   // half has anything on it; fully turned, only the left.

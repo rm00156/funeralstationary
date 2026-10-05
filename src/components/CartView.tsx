@@ -6,10 +6,9 @@ import { useState } from "react";
 import { AlertTriangle, ShoppingBag, Trash2 } from "lucide-react";
 
 import ConfigField from "@/components/ConfigField";
-import { PAGE_SIZE_LABEL } from "@/lib/designEditor";
-import { formatPence, type PricingData } from "@/lib/orderOfServicePricing";
+import { copiesText, formatPence, type PricingData } from "@/lib/orderOfServicePricing";
 import type { Cart, CartItem } from "@/lib/orders.server";
-import type { SelectionAxis } from "@/lib/orders";
+import { lineSpec, staleLineSpec, type SelectionAxis } from "@/lib/orders";
 
 /** Tell the header badge (and anything else listening) the basket changed. */
 export const notifyCartChanged = () => window.dispatchEvent(new Event("tfs:cart-changed"));
@@ -189,8 +188,9 @@ function CartLine({
                 {item.productLabel} · {item.templateName}
               </p>
               <p className="font-body text-sm text-on-surface-variant">
-                {PAGE_SIZE_LABEL} · {item.pageCount} pages
-                {item.quote ? ` · ${item.quote.paper.label} paper` : ""}
+                {item.quote
+                  ? lineSpec(item.format, item.quote)
+                  : staleLineSpec(item.format, item.pageCount)}
                 {item.designId && (
                   <>
                     {" · "}
@@ -228,7 +228,7 @@ function CartLine({
           // Copies are listed as "15 copies" so the number can't be read as a page count.
           const options =
             axis === "quantity"
-              ? (pricing?.quantity ?? []).map((option) => ({ id: option.id, label: `${option.value} copies` }))
+              ? (pricing?.quantity ?? []).map((option) => ({ id: option.id, label: copiesText(option.value) }))
               : pricing?.delivery ?? [];
           return (
             <ConfigField

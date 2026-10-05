@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight, Truck } from "lucide-react";
 
+import { pagesAxisLabel, type ProductFormat } from "@/lib/designEditor";
 import {
+  copiesText,
   defaultSelection,
   formatPence,
   getQuote,
@@ -14,10 +16,11 @@ import {
 } from "@/lib/orderOfServicePricing";
 
 /** Each axis, with the narrowest its option buttons may get before wrapping. */
-const AXES: { key: keyof Selection; label: string; minWidth: string }[] = [
-  { key: "pages", label: "Pages", minWidth: "96px" },
+const axes = (format: ProductFormat): { key: keyof Selection; label: string; minWidth: string }[] => [
+  // A board's page-count options are its print sizes, and its paper is its finish.
+  { key: "pages", label: pagesAxisLabel(format), minWidth: "96px" },
   { key: "quantity", label: "Copies", minWidth: "72px" },
-  { key: "paper", label: "Paper", minWidth: "130px" },
+  { key: "paper", label: format.paperLabel, minWidth: "130px" },
   { key: "delivery", label: "Delivery", minWidth: "180px" },
 ];
 
@@ -36,10 +39,12 @@ export default function TemplateBuyBox({
   productId,
   templateId,
   pricing,
+  format,
 }: {
   productId: string;
   templateId: string;
   pricing: PricingData;
+  format: ProductFormat;
 }) {
   const [selection, setSelection] = useState<Selection>(() => defaultSelection(pricing));
   const quote = useMemo(() => getQuote(pricing, selection), [pricing, selection]);
@@ -57,7 +62,7 @@ export default function TemplateBuyBox({
 
   return (
     <div className="flex flex-col gap-7">
-      {AXES.filter(({ key }) => pricing[key].length > 1).map(({ key, label, minWidth }) => {
+      {axes(format).filter(({ key }) => pricing[key].length > 1).map(({ key, label, minWidth }) => {
         const note = noteFor(key);
         // Only delivery options carry a price of their own.
         const options: { id: string; label: string; pricePence?: number }[] = pricing[key];
@@ -109,7 +114,7 @@ export default function TemplateBuyBox({
       <div className="flex flex-col gap-[18px] rounded-xl border border-line bg-surface p-6">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-base text-ink-2">
-            {quote.quantity.value} copies · {quote.pages.label}
+            {copiesText(quote.quantity.value)} · {quote.pages.label}
             <span className="block text-[15px] text-ink-3">
               {formatPence(quote.unitPricePence)} each
               {quote.delivery.pricePence > 0 &&

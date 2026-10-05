@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { Clock, FileText, Truck } from "lucide-react";
 
-import { PAGE_H_MM, PAGE_SIZE_LABEL, PAGE_W_MM } from "@/lib/designEditor";
+import { sizeRangeText, sizeText, type ProductFormat } from "@/lib/designEditor";
 import { formatPence, type DeliveryOption } from "@/lib/orderOfServicePricing";
 import { STANDARD_TURNAROUND } from "@/lib/site";
 
@@ -9,13 +9,24 @@ import { STANDARD_TURNAROUND } from "@/lib/site";
  * "Printed properly, delivered on time". The delivery rows are the lead
  * product's own delivery options — label, price and note straight from its
  * pricing table — so this section can't quote a price the basket won't charge.
+ * The size line is the lead product's format, for the same reason.
  */
-export default function QualityDelivery({ delivery }: { delivery: DeliveryOption[] }) {
+export default function QualityDelivery({
+  delivery,
+  format,
+}: {
+  delivery: DeliveryOption[];
+  format: ProductFormat | null;
+}) {
   const rows = [
     {
       icon: FileText,
       title: "Heavyweight paper",
-      body: `Exact ${PAGE_SIZE_LABEL} size, ${PAGE_W_MM} × ${PAGE_H_MM} mm, made to be kept.`,
+      body: !format
+        ? "Printed to be kept."
+        : format.sizedByOption
+          ? `Printed at the size you choose, ${sizeRangeText(format)}, made to be kept.`
+          : `Exact ${sizeText(format)}, made to be kept.`,
     },
     ...delivery.map((option) => ({
       icon: Truck,

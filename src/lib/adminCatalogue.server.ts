@@ -25,8 +25,9 @@ import {
   templateCategoryLinks,
   templates,
 } from "@/db/schema";
-import type { TemplateStatus } from "@/lib/adminValidation";
-import type { DesignPage } from "@/lib/designEditor";
+import { parseLayoutPages, type TemplateStatus } from "@/lib/adminValidation";
+import { productFormatColumns } from "@/lib/catalogue.server";
+import { toProductFormat, type DesignPage, type ProductFormat } from "@/lib/designEditor";
 import type { ProductOccasion } from "@/lib/templates";
 
 // Re-exported for the admin routes; the helpers themselves live in
@@ -56,7 +57,22 @@ export interface AdminProduct {
   occasion: ProductOccasion;
   sortOrder: number;
   isActive: boolean;
+  /** The format columns, flat as they're edited (ProductFormatRow). */
+  sizeLabel: string;
+  trimWidthMm: number;
+  trimHeightMm: number;
+  templatePages: number;
+  sizedByOption: boolean;
+  paperLabel: string;
+  /**
+   * Templates of any status. Once there is one, the trim and template pages
+   * are fixed — its layout is percentages of them.
+   */
+  templateCount: number;
 }
+
+/** The format columns an admin may only change while a product has no templates. */
+export type LockedFormatField = "trimWidthMm" | "trimHeightMm" | "templatePages";
 
 const productSelection = {
   slug: products.slug,
@@ -65,13 +81,22 @@ const productSelection = {
   occasion: products.occasion,
   sortOrder: products.sortOrder,
   isActive: products.isActive,
+  ...productFormatColumns,
+  templateCount: sql<number>`(select count(*) from ${templates} where ${templates.productId} = ${products.id})`,
 };
 
+/** count(*) arrives as a string from mysql2. */
+const withCount = <T extends { templateCount: number | string }>(row: T) => ({
+  ...row,
+  templateCount: Number(row.templateCount),
+});
+
 export async function adminListProducts(): Promise<AdminProduct[]> {
-  return db
+  const rows = await db
     .select(productSelection)
     .from(products)
     .orderBy(asc(products.sortOrder), asc(products.id));
+  return rows.map(withCount);
 }
 
 export async function adminGetProduct(slug: string): Promise<AdminProduct | null> {
@@ -80,7 +105,7 @@ export async function adminGetProduct(slug: string): Promise<AdminProduct | null
     .from(products)
     .where(eq(products.slug, slug))
     .limit(1);
-  return row ?? null;
+  return row ? withCount(row) : null;
 }
 
 export async function adminCreateProduct(input: {
@@ -100,10 +125,22 @@ export async function adminUpdateProduct(
     occasion?: ProductOccasion;
     sortOrder?: number;
     isActive?: boolean;
+    sizeLabel?: string;
+    trimWidthMm?: number;
+    trimHeightMm?: number;
+    templatePages?: number;
+    sizedByOption?: boolean;
+    paperLabel?: string;
   },
-): Promise<AdminProduct | null> {
+): Promise<AdminProduct | { locked: LockedFormatField[] } | null> {
   const existing = await adminGetProduct(slug);
   if (!existing) return null;
+  // Changing the trim or the page structure under existing templates would
+  // stretch or orphan every layout. A same-value write is not a change.
+  const locked = (["trimWidthMm", "trimHeightMm", "templatePages"] as const).filter(
+    (field) => patch[field] !== undefined && patch[field] !== existing[field],
+  );
+  if (locked.length > 0 && existing.templateCount > 0) return { locked };
   await db.update(products).set(patch).where(eq(products.slug, slug));
   return adminGetProduct(slug);
 }
@@ -411,6 +448,8 @@ export interface AdminTemplate {
   slug: string;
   name: string;
   productSlug: string;
+  /** The product's format — the trim and page structure its layout is drawn on. */
+  productFormat: ProductFormat;
   previewImageUrl: string;
   status: TemplateStatus;
   sortOrder: number;
@@ -447,6 +486,7 @@ const templateSelection = {
   slug: templates.slug,
   name: templates.name,
   productSlug: products.slug,
+  ...productFormatColumns,
   previewImageUrl: templates.previewImageUrl,
   status: templates.status,
   sortOrder: templates.sortOrder,
@@ -455,6 +495,54 @@ const templateSelection = {
   hasDraftLayout: sql<number>`(${templates.draftLayout} is not null)`,
   updatedAt: templates.updatedAt,
 };
+
+type TemplateRow = {
+  id: number;
+  slug: string;
+  name: string;
+  productSlug: string;
+  sizeLabel: string;
+  trimWidthMm: number;
+  trimHeightMm: number;
+  templatePages: number;
+  sizedByOption: boolean;
+  paperLabel: string;
+  previewImageUrl: string;
+  status: TemplateStatus;
+  sortOrder: number;
+  hasDraftLayout: number;
+  updatedAt: Date;
+};
+
+function toAdminTemplate(
+  row: TemplateRow,
+  categoriesByTemplate: Map<number, string[]>,
+): AdminTemplate {
+  const {
+    id,
+    hasDraftLayout,
+    sizeLabel,
+    trimWidthMm,
+    trimHeightMm,
+    templatePages,
+    sizedByOption,
+    paperLabel,
+    ...rest
+  } = row;
+  return {
+    ...rest,
+    productFormat: toProductFormat({
+      sizeLabel,
+      trimWidthMm,
+      trimHeightMm,
+      templatePages,
+      sizedByOption,
+      paperLabel,
+    }),
+    hasDraftLayout: !!hasDraftLayout,
+    categories: categoriesByTemplate.get(id) ?? [],
+  };
+}
 
 export async function adminListTemplates(): Promise<AdminTemplate[]> {
   const [rows, categoriesByTemplate] = await Promise.all([
@@ -465,11 +553,7 @@ export async function adminListTemplates(): Promise<AdminTemplate[]> {
       .orderBy(asc(templates.sortOrder), asc(templates.id)),
     loadTemplateCategories(),
   ]);
-  return rows.map(({ id, hasDraftLayout, ...row }) => ({
-    ...row,
-    hasDraftLayout: !!hasDraftLayout,
-    categories: categoriesByTemplate.get(id) ?? [],
-  }));
+  return rows.map((row) => toAdminTemplate(row, categoriesByTemplate));
 }
 
 export async function adminGetTemplate(slug: string): Promise<
@@ -493,13 +577,11 @@ export async function adminGetTemplate(slug: string): Promise<
     .limit(1);
   if (!row) return null;
   const categoriesByTemplate = await loadTemplateCategories();
-  const { id, hasDraftLayout, ...rest } = row;
+  const { layout, draftLayout, ...rest } = row;
   return {
-    ...rest,
-    hasDraftLayout: !!hasDraftLayout,
-    categories: categoriesByTemplate.get(id) ?? [],
-    layout: row.layout ?? null,
-    draftLayout: row.draftLayout ?? null,
+    ...toAdminTemplate(rest, categoriesByTemplate),
+    layout: layout ?? null,
+    draftLayout: draftLayout ?? null,
   };
 }
 
@@ -558,6 +640,46 @@ export async function adminCreateTemplate(input: {
   return (await adminGetTemplate(input.slug))!;
 }
 
+/** A template product move that would break designs or layouts already made. */
+export class TemplateMoveError extends Error {}
+
+/**
+ * A template can change product only while nothing depends on where it is.
+ * Its designs carry their product's id and trim, so once one exists the
+ * template stays put (which also keeps adminUpdateProduct's format lock
+ * honest: a product with designs always has a template). And an authored
+ * layout is drawn on its product's trim and page structure, so it may only
+ * move to a product with the same ones.
+ */
+async function assertTemplateCanMove(
+  templateId: number,
+  template: Pick<AdminTemplate, "productSlug" | "productFormat"> & {
+    layout: DesignPage[] | null;
+    draftLayout: DesignPage[] | null;
+  },
+  target: AdminProduct,
+) {
+  const [used] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(designs)
+    .where(eq(designs.templateId, templateId));
+  if (Number(used?.count ?? 0) > 0) {
+    throw new TemplateMoveError(
+      "This template already has customer designs, which belong to its product — it can't move to another.",
+    );
+  }
+  const { trim, templatePages } = template.productFormat;
+  const sameFormat =
+    target.trimWidthMm === trim.widthMm &&
+    target.trimHeightMm === trim.heightMm &&
+    target.templatePages === templatePages;
+  if ((template.layout || template.draftLayout) && !sameFormat) {
+    throw new TemplateMoveError(
+      `This template's layout is drawn for ${template.productSlug}'s size and pages; it can only move to a product with the same format.`,
+    );
+  }
+}
+
 export async function adminUpdateTemplate(
   slug: string,
   patch: {
@@ -576,7 +698,11 @@ export async function adminUpdateTemplate(
   if (patch.productSlug !== undefined) {
     const resolved = await resolveProductId(patch.productSlug);
     if (!resolved) throw new Error(`Unknown product "${patch.productSlug}"`);
-    productId = resolved;
+    const existing = await adminGetTemplate(slug);
+    if (existing && existing.productSlug !== patch.productSlug) {
+      await assertTemplateCanMove(templateId, existing, (await adminGetProduct(patch.productSlug))!);
+      productId = resolved;
+    }
   }
 
   const set = {
@@ -662,6 +788,11 @@ export async function adminSaveTemplateDraftLayout(
 ): Promise<boolean> {
   const templateId = await resolveTemplateId(slug);
   if (!templateId) return false;
+  // The route validates too; this guards every other caller (the generator,
+  // scripts) against a layout with pages its product doesn't print.
+  const template = await adminGetTemplate(slug);
+  const checked = parseLayoutPages(pages, template!.productFormat.templatePages);
+  if (!checked.ok) throw new Error(`Layout for "${slug}" rejected: ${checked.error}`);
   await db
     .update(templates)
     .set({ draftLayout: pages })

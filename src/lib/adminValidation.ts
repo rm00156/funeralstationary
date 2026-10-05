@@ -10,7 +10,12 @@ import type {
   AdminOptionPatch,
   OptionKind,
 } from "@/lib/adminCatalogue.server";
-import { TEMPLATE_PAGE_COUNT, type DesignPage } from "@/lib/designEditor";
+import {
+  TEMPLATE_PAGE_COUNT,
+  templatePageLabels,
+  type DesignPage,
+  type TemplatePageCount,
+} from "@/lib/designEditor";
 import { MAX_PAGES } from "@/lib/designs.server";
 import { PRODUCT_OCCASIONS, type ProductOccasion } from "@/lib/templates";
 
@@ -82,11 +87,54 @@ export function parseBoolean(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
 
-/** Booklet page counts: even (folded sheets) and within the proof cap. */
+/**
+ * Page counts: 1 for a single-sided sheet (a board), otherwise even (both
+ * sides of a card, or a booklet's folded sheets) and within the proof cap.
+ */
 export function parsePageCount(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  if (value === 1) return value;
   if (value < 2 || value > MAX_PAGES || value % 2 !== 0) return null;
   return value;
+}
+
+/**
+ * Whether a page count suits a product's format, or why not. A flat product
+ * prints exactly the pages it authors — one side of a board (its options are
+ * sizes, not page counts), or the front and back of a card or bookmark — and
+ * a booklet needs a cover, at least one inside page and a back, so at least
+ * four once folded. Anything else makes withPageCount drop the back page or
+ * pad the job with blank sheets that print.
+ */
+export function pageCountFormatError(
+  pageCount: number,
+  templatePages: TemplatePageCount,
+): string | null {
+  if (templatePages === 1) {
+    return pageCount === 1 ? null : "This product prints one side, so its pageCount must be 1";
+  }
+  if (templatePages === 2) {
+    return pageCount === 2 ? null : "This product prints front and back, so its pageCount must be 2";
+  }
+  return pageCount >= 4 ? null : "A booklet needs at least 4 pages: cover, inside and back";
+}
+
+/** A trim edge in whole millimetres — a bookmark's 50 up to an A0's 1189. */
+export function parseTrimMm(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  return value >= 20 && value <= 1500 ? value : null;
+}
+
+/** How many template pages a product authors: front, front + back, or cover/middle/back. */
+export function parseTemplatePages(value: unknown): TemplatePageCount | null {
+  return value === 1 || value === 2 || value === 3 ? value : null;
+}
+
+/** A short display name — a size ("A6", "50 × 200 mm") or an axis ("Finish"). */
+export function parseShortLabel(value: unknown, max: number): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length >= 1 && trimmed.length <= max ? trimmed : null;
 }
 
 export function parseCopies(value: unknown): number | null {
@@ -166,7 +214,7 @@ export function parseOptionInput(
   if (kind === "page-count") {
     const pageCount = parsePageCount(body.pageCount);
     if (pageCount === null) {
-      return { ok: false, error: `pageCount must be an even number up to ${MAX_PAGES}` };
+      return { ok: false, error: `pageCount must be 1 or an even number up to ${MAX_PAGES}` };
     }
     const baseRatePence = parsePence(body.baseRatePence);
     if (baseRatePence === null) {
@@ -235,7 +283,7 @@ export function parseOptionPatch(
     if (kind !== "page-count") return { ok: false, error: "Only page-count options have pageCount" };
     const pageCount = parsePageCount(body.pageCount);
     if (pageCount === null) {
-      return { ok: false, error: `pageCount must be an even number up to ${MAX_PAGES}` };
+      return { ok: false, error: `pageCount must be 1 or an even number up to ${MAX_PAGES}` };
     }
     patch.pageCount = pageCount;
   }
@@ -263,22 +311,25 @@ export function parseOptionPatch(
 
 /**
  * A template layout payload: null (clear the authored layout) or exactly the
- * cover/middle/back triple — the middle page is what repeats to fill a
- * customer's chosen page count, so any other length has no meaning. Depth of
- * checking mirrors validateDesignPayload — page shape only, element internals
- * are trusted from the editor.
+ * product's authored pages — cover/middle/back for a booklet (the middle page
+ * is what repeats to fill a customer's chosen page count), front/back for a
+ * flat card, a front alone for a board — so any other length has no meaning.
+ * Depth of checking mirrors validateDesignPayload — page shape only, element
+ * internals are trusted from the editor.
  */
 export function parseLayoutPages(
   value: unknown,
+  templatePages: TemplatePageCount = TEMPLATE_PAGE_COUNT,
 ): { ok: true; pages: DesignPage[] | null } | { ok: false; error: string } {
   if (value === null) return { ok: true, pages: null };
   if (!Array.isArray(value)) {
     return { ok: false, error: "pages must be null or an array" };
   }
-  if (value.length !== TEMPLATE_PAGE_COUNT) {
+  if (value.length !== templatePages) {
+    const labels = templatePageLabels(templatePages).join(", ").toLowerCase();
     return {
       ok: false,
-      error: `A layout must have exactly ${TEMPLATE_PAGE_COUNT} pages (cover, middle, back)`,
+      error: `A layout must have exactly ${templatePages} ${templatePages === 1 ? "page" : "pages"} (${labels})`,
     };
   }
   for (const page of value) {

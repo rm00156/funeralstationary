@@ -7,6 +7,7 @@ import {
   primaryKey,
   smallint,
   timestamp,
+  tinyint,
   varchar,
   char,
 } from "drizzle-orm/mysql-core";
@@ -32,6 +33,21 @@ export const products = mysqlTable("products", {
   /** When it's needed — the shop's grouping. The values live in templates.ts
    * (client-safe) so the admin parser and the menus can't drift from the enum. */
   occasion: mysqlEnum("occasion", PRODUCT_OCCASIONS).notNull().default("service"),
+  /*
+   * The product's format (ProductFormat in designEditor.ts): the trim every
+   * design and template of it is drawn on, how many template pages it
+   * authors, and what its axes are called. The defaults are the A5 booklet's.
+   * The trim and template pages are fixed once a template exists — a layout
+   * is percentages of this trim, so changing it would stretch every one.
+   */
+  sizeLabel: varchar("size_label", { length: 64 }).notNull().default("A5"),
+  trimWidthMm: smallint("trim_width_mm").notNull().default(148),
+  trimHeightMm: smallint("trim_height_mm").notNull().default(210),
+  /** 1 = front only, 2 = front and back, 3 = cover / middle / back. */
+  templatePages: tinyint("template_pages").notNull().default(3),
+  /** The page-count options are print sizes of one A-series design (a memory board). */
+  sizedByOption: boolean("sized_by_option").notNull().default(false),
+  paperLabel: varchar("paper_label", { length: 40 }).notNull().default("Paper"),
   sortOrder: smallint("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
 });

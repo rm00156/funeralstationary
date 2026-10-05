@@ -10,7 +10,14 @@
  * here downloads anything.
  */
 
-import { FULL_BLEED_BOX, uid, type ImageElement } from "@/lib/designEditor";
+import {
+  A5_TRIM,
+  FULL_BLEED_BOX,
+  fullBleedBox,
+  uid,
+  type ImageElement,
+  type PageTrim,
+} from "@/lib/designEditor";
 import type { PaletteId } from "@/lib/templateGenerator";
 
 /** Where a source image comes from. Each kind maps to one fetch adapter. */
@@ -32,6 +39,26 @@ export type BackgroundSourceRef =
 
 /** Which part of the page the artwork leaves clear for text. */
 export type TextZone = "top" | "bottom";
+
+/**
+ * The artboards a background is rendered for. Every A size shares A5's shape,
+ * so one A5 render covers the booklet, the A6 cards and the board; a bookmark
+ * is a quarter as wide as it is tall, and a cover crop of the A5 render would
+ * keep a sliver of it, so a background opts in to its own bookmark render.
+ */
+export type BackgroundFormat = "a5" | "bookmark";
+
+/** The trim each format is rendered at, bleed added. */
+export const BACKGROUND_FORMAT_TRIMS: Record<BackgroundFormat, PageTrim> = {
+  a5: A5_TRIM,
+  bookmark: { widthMm: 50, heightMm: 200 },
+};
+
+/** The layout knobs a bookmark render may set differently; the rest carry over. */
+export type BackgroundLayout = Pick<
+  BackgroundSpec,
+  "focus" | "placement" | "fade" | "radialFade" | "glow" | "shade"
+>;
 
 export interface BackgroundSpec {
   /** Slug; the asset filename and what template specs reference. Immutable. */
@@ -86,6 +113,17 @@ export interface BackgroundSpec {
    */
   glow?: { color: string; end: number };
   /**
+   * Darken a photograph toward its top and bottom edges so light type set on
+   * it holds — the sky behind "Celebrating" and the land under the name.
+   * Opacities 0–1 at each edge, easing to nothing by the middle of the page.
+   */
+  shade?: { color: string; top: number; bottom: number };
+  /**
+   * Also render for a bookmark (BackgroundFormat), with these overrides — a
+   * flower band that is 44% of an A5 page would be 88mm of a bookmark.
+   */
+  bookmark?: BackgroundLayout;
+  /**
    * Cut this specimen out of its ground as a transparent PNG, for use as a
    * corner or edge spray over a photo-led layout. Only suitable for a plate
    * on plain, even ground. `tolerance` is the RGB distance from the sampled
@@ -121,7 +159,7 @@ export interface BackgroundSpec {
   };
   /** Which zone compositions should put the name and dates in. */
   textZone: TextZone;
-  /** Palettes to render a tinted variant for. */
+  /** Palettes to render a tinted variant for. Empty for a plate used only as a cutout. */
   palettes: readonly PaletteId[];
 }
 
@@ -136,8 +174,33 @@ export const DEFAULT_SPRAY_MIN_ENCLOSED = 0.002;
  * background's URL without an index file: object-storage key when S3 is
  * configured, otherwise the path under public/.
  */
-export function backgroundAssetKey(id: string, palette: PaletteId): string {
-  return `templates/backgrounds/${id}-${palette}.jpg`;
+export function backgroundAssetKey(
+  id: string,
+  palette: PaletteId,
+  format: BackgroundFormat = "a5",
+): string {
+  // The A5 key predates formats; every generated template references it.
+  return format === "a5"
+    ? `templates/backgrounds/${id}-${palette}.jpg`
+    : `templates/backgrounds/${id}-${palette}-${format}.jpg`;
+}
+
+/** The formats a background is rendered for. */
+export function backgroundFormats(spec: BackgroundSpec): BackgroundFormat[] {
+  return spec.bookmark ? ["a5", "bookmark"] : ["a5"];
+}
+
+/** A background's layout knobs for one format: the bookmark overrides, else its own. */
+export function backgroundLayout(spec: BackgroundSpec, format: BackgroundFormat): BackgroundLayout {
+  const own: BackgroundLayout = {
+    focus: spec.focus,
+    placement: spec.placement,
+    fade: spec.fade,
+    radialFade: spec.radialFade,
+    glow: spec.glow,
+    shade: spec.shade,
+  };
+  return format === "bookmark" && spec.bookmark ? { ...own, ...spec.bookmark } : own;
 }
 
 /**
@@ -155,14 +218,14 @@ export function sprayAssetKey(id: string): string {
  * artboard (bleed included), locked so the customer can't move or delete it.
  * Must be the first element on the page so everything else draws above it.
  */
-export function backgroundElement(src: string): ImageElement {
+export function backgroundElement(src: string, trim?: PageTrim): ImageElement {
   return {
     id: uid("image"),
     type: "image",
     src,
     shape: "rect",
     locked: true,
-    ...FULL_BLEED_BOX,
+    ...(trim ? fullBleedBox(trim) : FULL_BLEED_BOX),
   };
 }
 
@@ -318,6 +381,10 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     fade: { edge: "top", start: 72, end: 58 },
     wash: 0,
     tint: 0,
+    bookmark: {
+      placement: { x: 0, y: 64, w: 100, h: 36 },
+      fade: { edge: "top", start: 76, end: 64 },
+    },
     textZone: "top",
     palettes: ["violet"],
   },
@@ -348,6 +415,10 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     // Kept soft: this is the quiet one of the family, petals as a blush.
     wash: 0.25,
     tint: 0,
+    bookmark: {
+      placement: { x: 0, y: 64, w: 100, h: 36 },
+      fade: { edge: "top", start: 76, end: 64 },
+    },
     textZone: "top",
     palettes: ["rose"],
   },
@@ -472,7 +543,187 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     textZone: "bottom",
     palettes: ["forest"],
   },
+
+  // Photographic scenes for the memorial card and bookmark: a landscape
+  // across the whole page with the portrait and light type set straight onto
+  // it. Untinted and unwashed — the picture is the point — but shaded toward
+  // the top and bottom edges so white type holds on a pale sky. Each also
+  // renders tall for the bookmark, cropped on `focus` (the sun, the rainbow,
+  // the engine), since a centre strip of a landscape loses its subject.
+  scene("lake-sunset", "Lake at Sunset", "File:Gander Bay lake sunset. (Unsplash).jpg",
+    "Gander Bay lake sunset, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.6, y: 0.5 }, { top: 0.25, bottom: 0.3 }),
+  scene("twilight-lake", "Twilight Lake", "File:Twilight lake sunset. (Unsplash).jpg",
+    "Twilight lake sunset, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.42, y: 0.5 }, { top: 0.3, bottom: 0.5 }),
+  scene("lake-jetty", "Lakeside Jetty", "File:Peaceful lake sunset. (Unsplash).jpg",
+    "Peaceful lake sunset, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.5, y: 0.5 }, { top: 0.3, bottom: 0.5 }),
+  scene("countryside-sunset", "Countryside Sunset", "File:Countryside sunset (Unsplash).jpg",
+    "Countryside sunset, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.5, y: 0.5 }, { top: 0.3, bottom: 0.5 }),
+  scene("country-dawn", "Dawn in the Country", "File:Dawn In The Country (Unsplash).jpg",
+    "Dawn In The Country, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.62, y: 0.5 }, { top: 0.35, bottom: 0.5 }),
+  scene("hay-bales", "Harvest Evening", "File:Bourdeilles pastures sunset (Unsplash).jpg",
+    "Bourdeilles pastures sunset, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.72, y: 0.5 }, { top: 0.3, bottom: 0.5 }),
+  scene("wheat-sunset", "Wheat at Sunset", "File:Wheat field sunset (Unsplash).jpg",
+    "Wheat field sunset, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.3, y: 0.5 }, { top: 0.3, bottom: 0.5 }),
+  scene("rainbow-meadow", "Rainbow Meadow", "File:Desna meadows rainbow.JPG",
+    "Desna meadows rainbow, by Аимаина хикари. Via Wikimedia Commons.",
+    { x: 0.84, y: 0.5 }, { top: 0.3, bottom: 0.55 }),
+  scene("steam-viaduct", "Steam Railway", 'File:Talyllyn Railway No. 6 "Douglas" on the Dolgoch Viaduct - April 2019.jpg',
+    "Talyllyn Railway No. 6 on the Dolgoch Viaduct, by William Davies. Via Wikimedia Commons.",
+    // The bookmark's narrow strip moves right, onto the engine and carriages.
+    { x: 0.32, y: 0.5 }, { top: 0.35, bottom: 0.55 }, { x: 0.62, y: 0.5 }),
+  scene("beach-sunset", "Beach at Sunset", "File:Sunset over the beach (Unsplash).jpg",
+    "Sunset over the beach, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.78, y: 0.5 }, { top: 0.25, bottom: 0.45 }),
+
+  // Two more flower bands, rendered for the bookmark as well.
+  {
+    id: "sunflower-band",
+    name: "Sunflower Band",
+    source: { kind: "commons", file: "File:Impressive sunflowers (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Impressive sunflowers, via Unsplash. Via Wikimedia Commons.",
+    placement: { x: 0, y: 58, w: 100, h: 42 },
+    focus: { x: 0.45, y: 0.6 },
+    fade: { edge: "top", start: 72, end: 58 },
+    wash: 0,
+    tint: 0,
+    glow: { color: "#f6e7a8", end: 40 },
+    bookmark: {
+      placement: { x: 0, y: 66, w: 100, h: 34 },
+      focus: { x: 0.55, y: 0.6 },
+      fade: { edge: "top", start: 76, end: 66 },
+      glow: { color: "#f6e7a8", end: 30 },
+    },
+    textZone: "top",
+    palettes: ["bronze"],
+  },
+  {
+    id: "poppy-band",
+    name: "Poppy Band",
+    source: { kind: "commons", file: "File:Poppies (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Poppies, via Unsplash. Via Wikimedia Commons.",
+    // Zoomed in and anchored on the bottom edge: the poppies fill only the
+    // lower part of the frame, and the hazy sky above them reads as a grey
+    // smear on white paper unless it's cropped away and faded out long.
+    inset: 0.12,
+    placement: { x: 0, y: 46, w: 100, h: 54 },
+    focus: { x: 0.5, y: 1 },
+    fade: { edge: "top", start: 76, end: 52 },
+    wash: 0,
+    tint: 0,
+    bookmark: {
+      placement: { x: 0, y: 60, w: 100, h: 40 },
+      focus: { x: 0.45, y: 1 },
+      fade: { edge: "top", start: 74, end: 60 },
+    },
+    textZone: "top",
+    palettes: ["wine"],
+  },
+
+  // Cutouts for the memorial cards and bookmarks — sprays only, so no
+  // palette variants are rendered.
+  cutout("redoute-daffodil", "Daffodil",
+    { kind: "commons", file: "File:Narcissus pseudonarcissus - Les liliacées - vol. 3 - t. 158 - clean.jpg" },
+    "Public domain",
+    "Pierre-Joseph Redouté, Narcissus pseudonarcissus, from Les Liliacées. Via Wikimedia Commons.",
+    // Cropped above the bulb and roots; the dissected flower beside it is an island.
+    { tolerance: 38, cropBottom: 0.24, minIsland: 0.01 }),
+  cutout("flora-batava-bluebell", "Bluebell",
+    { kind: "commons", file: "File:Hyacinthus non-scriptus — Flora Batava — Volume v1.jpg" },
+    "Public domain",
+    "Jan Kops, Hyacinthus non-scriptus, from Flora Batava. Via Wikimedia Commons.",
+    // Trimmed past the torn sheet edge at top left.
+    { tolerance: 40, inset: 0.08, cropBottom: 0.3, minIsland: 0.02 }),
+  cutout("thome-thistle", "Thistle",
+    { kind: "commons", file: "File:Illustration Carduus nutans0 white.jpg" },
+    "Public domain",
+    "Otto Wilhelm Thomé, Carduus nutans, from Flora von Deutschland, Österreich und der Schweiz. Via Wikimedia Commons.",
+    // The ground pockets between the spines are small, so clear them small.
+    { tolerance: 30, minEnclosedRegion: 0.0002, minIsland: 0.02 }),
+  cutout("rijks-blue-butterfly", "Blue Butterfly",
+    { kind: "commons", file: "File:Boven- en onderaanzicht van een vlinder, RP-T-FM-105.jpg" },
+    "CC0 (Rijksmuseum)",
+    "Boven- en onderaanzicht van een vlinder, RP-T-FM-105. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    // The upper view only: the underside below it is cropped away.
+    { tolerance: 36, inset: 0.08, cropBottom: 0.5, minIsland: 0.005 }),
+  cutout("sydney-robin", "Scarlet Robin",
+    { kind: "commons", file: "File:SLNSW 823075 f24 Scarlet Robin Petroica multicolor.jpg" },
+    "Public domain",
+    "Sydney Bird Painter, Scarlet Robin. State Library of New South Wales. Via Wikimedia Commons.",
+    { tolerance: 36, minIsland: 0.003 }),
+  cutout("rijks-quince-branch", "Flowering Branch",
+    { kind: "commons", file: "File:Bloeiende tak Japanse kers, RP-T-1954-262.jpg" },
+    "CC0 (Rijksmuseum)",
+    "Bloeiende tak Japanse kers, RP-T-1954-262. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    { tolerance: 36, minIsland: 0.003 }),
+  cutout("american-flora-poppy", "Corn Poppy",
+    { kind: "commons", file: "File:The American Flora. Vol. 1, 1855 - pl. 17 Papaver rhoeas (6022329916).jpg" },
+    "Public domain",
+    "Papaver rhoeas, plate 17 of The American Flora, vol. 1 (1855). Biodiversity Heritage Library. Via Wikimedia Commons.",
+    { tolerance: 40, cropBottom: 0.12, minIsland: 0.005 }),
+  cutout("ishizaki-sunflower", "Sunflower Study",
+    {
+      kind: "commons",
+      file: "File:Naturalis Biodiversity Center - RMNH.ART.746 - Helianthus annuus - Yūshi Ishizaki - Cock Blomhoff Collection - pencil drawing - water colour.jpg",
+    },
+    "Public domain",
+    "Ishizaki Yūshi, Helianthus annuus. Naturalis Biodiversity Center. Via Wikimedia Commons.",
+    // The name labels above the flower go as islands.
+    { tolerance: 36, cropBottom: 0.04, minIsland: 0.01 }),
+  cutout("rijks-lily-butterflies", "Lily and Butterflies",
+    { kind: "commons", file: "File:Twee vlinders bij een lelie, RP-T-1957-339.jpg" },
+    "CC0 (Rijksmuseum)",
+    "Twee vlinders bij een lelie, RP-T-1957-339. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
+    // A ruled border inside the sheet: trimmed past it.
+    { tolerance: 36, inset: 0.09, minIsland: 0.003 }),
 ];
+
+/** A full-bleed photographic scene, rendered for the A5 page and the bookmark. */
+function scene(
+  id: string,
+  name: string,
+  file: string,
+  credit: string,
+  focus: { x: number; y: number },
+  shade: { top: number; bottom: number },
+  bookmarkFocus?: { x: number; y: number },
+): BackgroundSpec {
+  return {
+    id,
+    name,
+    source: { kind: "commons", file },
+    licence: "CC0",
+    credit,
+    focus,
+    inset: 0,
+    wash: 0,
+    tint: 0,
+    shade: { color: "#0d0b10", ...shade },
+    bookmark: bookmarkFocus ? { focus: bookmarkFocus } : {},
+    textZone: "top",
+    palettes: ["ink"],
+  };
+}
+
+/** A plate used only as a cutout spray: no palette variants to render. */
+function cutout(
+  id: string,
+  name: string,
+  source: BackgroundSourceRef,
+  licence: string,
+  credit: string,
+  spray: NonNullable<BackgroundSpec["spray"]>,
+): BackgroundSpec {
+  return { id, name, source, licence, credit, spray, textZone: "bottom", palettes: [] };
+}
 
 export function getBackgroundSpec(id: string): BackgroundSpec | undefined {
   return BACKGROUND_SPECS.find((spec) => spec.id === id);
