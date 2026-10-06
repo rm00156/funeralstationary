@@ -38,6 +38,8 @@ export interface TemplateRow {
   name: string;
   productSlug: string;
   previewImageUrl: string;
+  /** The admin's pinned stand-in portrait, or null — the thumbnail is drawn with it. */
+  placeholderPortrait: string | null;
   layout: unknown;
   draftLayout: unknown;
   status: string;
@@ -77,7 +79,7 @@ function rewritten(row: TemplateRow, from: string, to: string) {
 export function templateDiff(source: TemplateRow, target: TemplateRow, from: string, to: string): string[] {
   const want = rewritten(source, from, to);
   const diffs: string[] = [];
-  for (const key of ["name", "productSlug", "previewImageUrl", "status", "sortOrder"] as const) {
+  for (const key of ["name", "productSlug", "previewImageUrl", "placeholderPortrait", "status", "sortOrder"] as const) {
     if (want[key] !== target[key]) diffs.push(key);
   }
   if (canonicalJson(want.layout) !== canonicalJson(target.layout ?? null)) diffs.push("layout");
@@ -142,6 +144,7 @@ export function parseS3Origin(origin: string): { bucket: string; region: string 
 
 const TEMPLATE_QUERY = `
   select t.id, t.slug, t.name, p.slug productSlug, t.preview_image_url previewImageUrl,
+         t.placeholder_portrait placeholderPortrait,
          t.layout, t.draft_layout draftLayout, t.status, t.sort_order sortOrder, t.updated_at updatedAt,
          (select group_concat(c.slug order by l.position separator ',')
             from template_category_links l join template_categories c on c.id = l.category_id
@@ -265,6 +268,7 @@ async function main() {
           name: want.name,
           product_id: products.get(want.productSlug)!,
           preview_image_url: want.previewImageUrl,
+          placeholder_portrait: want.placeholderPortrait,
           layout: want.layout == null ? null : JSON.stringify(want.layout),
           draft_layout: want.draftLayout == null ? null : JSON.stringify(want.draftLayout),
           status: want.status,

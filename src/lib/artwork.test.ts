@@ -107,6 +107,18 @@ describe("evaluateArtwork — size", () => {
     expect(size?.detail).toContain("smaller");
   });
 
+  it("still warns about pages without bleed when another page is scaled", () => {
+    const exact: AnalysedPage = { mediaMm: { w: 148, h: 210 } };
+    const scaled: AnalysedPage = { mediaMm: { w: 210, h: 297 } };
+    const report = evaluateArtwork(file([exact, exact, exact, scaled]), booklet(4));
+    expect(report.checks.find((entry) => entry.id === "size")?.detail).toContain("(page 4)");
+    expect(report.checks.find((entry) => entry.id === "bleed")).toMatchObject({
+      status: "warn",
+      title: "No bleed around the edges",
+    });
+    expect(report.checks.find((entry) => entry.id === "bleed")?.detail).toContain("(pages 1, 2 and 3)");
+  });
+
   it("blocks a landscape file for a portrait product", () => {
     const landscape: AnalysedPage = { mediaMm: { w: 216, h: 154 } };
     const report = evaluateArtwork(file(repeat(landscape, 8)), booklet());
@@ -230,6 +242,26 @@ describe("evaluateArtwork — photos and fonts", () => {
     });
   });
 
+  it("warns about pages it couldn't walk, rather than passing them", () => {
+    const pages = repeat({ ...A5_BLEED, minImagePpi: 300 }, 8);
+    const report = evaluateArtwork(file(pages, { uncheckedPages: [6, 7, 8] }), booklet());
+    expect(report.checks.map((entry) => entry.id)).toEqual(["size", "pages", "content"]);
+    expect(check(file(pages, { uncheckedPages: [6, 7, 8] }), booklet(), "content")?.detail).toContain(
+      "pages 6, 7 and 8",
+    );
+    expect(report.warnings).toBe(true);
+  });
+
+  it("still reports what it found on the pages it could check", () => {
+    const analysis = file(repeat(A5_BLEED, 8), { uncheckedPages: [8], unembeddedFonts: ["Arial"] });
+    expect(evaluateArtwork(analysis, booklet()).checks.map((entry) => entry.id)).toEqual([
+      "size",
+      "pages",
+      "content",
+      "fonts",
+    ]);
+  });
+
   it("says so when a protected file couldn't be looked inside", () => {
     const report = evaluateArtwork(file(repeat(A5_BLEED, 8), { encrypted: true }), booklet());
     expect(report.checks.map((entry) => entry.id)).toEqual(["size", "pages", "photos"]);
@@ -250,7 +282,14 @@ describe("printTrim", () => {
   it("is the option's A size for a board, else the product's trim", () => {
     expect(printTrim(BOARD, { label: "A1" })).toEqual({ widthMm: 594, heightMm: 841 });
     expect(printTrim(BOARD, { label: "Poster" })).toEqual(BOARD.trim);
+    expect(printTrim(BOARD, { label: "A10" })).toEqual(BOARD.trim);
     expect(printTrim(BOOKLET_FORMAT, { label: "A1" })).toEqual(BOOKLET_FORMAT.trim);
+  });
+
+  it("finds the A size in an edited label, then in the slug", () => {
+    expect(printTrim(BOARD, { label: "A1 easel" })).toEqual({ widthMm: 594, heightMm: 841 });
+    expect(printTrim(BOARD, { label: "Large (a2)" })).toEqual({ widthMm: 420, heightMm: 594 });
+    expect(printTrim(BOARD, { id: "board-a3", label: "Large" })).toEqual({ widthMm: 297, heightMm: 420 });
   });
 });
 

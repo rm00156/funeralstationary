@@ -8,8 +8,12 @@
  * request-body reason as photos (see storage.ts). The server reads it back
  * once, from storage, to analyse it, and keeps the analysis on the row; every
  * later check against a different product or page count reuses it.
+ *
+ * The presigned PUT stays usable after the check, so the bytes that were
+ * analysed are written again to a key only the server writes, and the row
+ * (and every order line) points there: the file printed is the file checked.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { artworkUploads } from "@/db/schema";
 import {
@@ -24,12 +28,14 @@ import {
 import { getSellableProduct } from "@/lib/catalogue.server";
 import { analysePdf } from "@/lib/pdfAnalysis";
 import { getPricingData } from "@/lib/pricing.server";
-import { ownerKey, type Owner } from "@/lib/session";
+import type { Owner } from "@/lib/session";
 import {
   createUploadUrl,
+  deleteObject,
   isStorageConfigured,
   publicUrlFor,
   readObject,
+  uploadObject,
 } from "@/lib/storage";
 import type { ProductShowcase } from "@/lib/templates";
 import type { PricingData } from "@/lib/orderOfServicePricing";
@@ -106,7 +112,10 @@ export async function createPdfUpload(
   }
 
   const id = crypto.randomUUID();
-  const storageKey = `uploads/${ownerKey(owner)}/${id}.pdf`;
+  // Not under the owner's key, unlike photos: the press file's link is handed
+  // to staff and printers, and a guest's key is their session cookie. No url
+  // until the check freezes the file (analyseUpload).
+  const storageKey = `uploads/incoming/${id}.pdf`;
   const uploadUrl = await createUploadUrl(storageKey, ARTWORK_CONTENT_TYPE);
   await db.insert(artworkUploads).values({
     id,
@@ -114,7 +123,7 @@ export async function createPdfUpload(
     source: "pdf",
     fileName: cleanFileName(input.fileName),
     storageKey,
-    url: publicUrlFor(storageKey),
+    url: null,
     byteSize: Math.round(size),
   });
   return { id, uploadUrl };
@@ -137,7 +146,10 @@ export async function getUpload(owner: Owner, id: string): Promise<ArtworkUpload
     .from(artworkUploads)
     .where(and(eq(artworkUploads.id, id), ownedBy(owner)))
     .limit(1);
-  if (!row) return null;
+  return row ? toUpload(row) : null;
+}
+
+function toUpload(row: typeof artworkUploads.$inferSelect): ArtworkUpload {
   return {
     id: row.id,
     source: row.source,
@@ -156,13 +168,20 @@ function isMissingObject(error: unknown): boolean {
   return name === "NoSuchKey" || name === "NotFound";
 }
 
+export type AnalysedUpload = ArtworkUpload & { analysis: ArtworkAnalysis };
+
 /**
  * The file's facts, read once: downloaded from storage, analysed, and stored
  * on the row. Every later check — a different product, a different page
  * count — evaluates the stored facts without touching the file again.
+ *
+ * A readable file's bytes are frozen at a fresh server-written key first, and
+ * the row moves to it in the same conditional UPDATE that stores the facts,
+ * so a re-PUT to the presigned URL afterwards changes nothing that prints.
+ * Returns the row as it now stands.
  */
-export async function analyseUpload(upload: ArtworkUpload): Promise<ArtworkAnalysis> {
-  if (upload.analysis) return upload.analysis;
+export async function analyseUpload(upload: ArtworkUpload): Promise<AnalysedUpload> {
+  if (upload.analysis) return { ...upload, analysis: upload.analysis };
   if (upload.source !== "pdf" || !upload.storageKey) {
     throw new Error("Only an uploaded PDF can be analysed");
   }
@@ -181,11 +200,32 @@ export async function analyseUpload(upload: ArtworkUpload): Promise<ArtworkAnaly
   }
 
   const analysis = await analysePdf(bytes);
-  await db
+  // An unreadable file is refused whatever is chosen, so there is nothing to keep.
+  const frozenKey = analysis.ok ? `uploads/${upload.id}-${crypto.randomUUID().slice(0, 8)}.pdf` : null;
+  if (frozenKey) await uploadObject(frozenKey, Buffer.from(bytes), ARTWORK_CONTENT_TYPE);
+
+  // Conditional, so of two checks racing on one upload the first to store its
+  // facts wins and the other adopts them — its own frozen copy is orphaned.
+  const [result] = await db
     .update(artworkUploads)
-    .set({ analysis, analysedAt: new Date() })
-    .where(eq(artworkUploads.id, upload.id));
-  return analysis;
+    .set({
+      analysis,
+      analysedAt: new Date(),
+      ...(frozenKey
+        ? { storageKey: frozenKey, url: publicUrlFor(frozenKey), byteSize: bytes.byteLength }
+        : {}),
+    })
+    .where(and(eq(artworkUploads.id, upload.id), isNull(artworkUploads.analysis)));
+  const [row] = await db.select().from(artworkUploads).where(eq(artworkUploads.id, upload.id)).limit(1);
+  if (!row?.analysis) throw new Error(`Upload ${upload.id} vanished while being checked`);
+
+  if (result.affectedRows > 0 && frozenKey) {
+    // Best-effort tidy-up: the incoming copy is never read again.
+    deleteObject(upload.storageKey).catch((error) =>
+      console.error(`Could not delete the incoming upload ${upload.storageKey}`, error),
+    );
+  }
+  return { ...toUpload(row), analysis: row.analysis };
 }
 
 export interface ResolvedTarget {
@@ -221,5 +261,5 @@ export async function checkUpload(
   if (!upload) throw new UploadError(404, "Upload not found");
   const { target } = await resolveArtworkTarget(choice.product, choice.pages);
   if (upload.source === "canva") return { checks: [], blocking: false, warnings: false };
-  return evaluateArtwork(await analyseUpload(upload), target);
+  return evaluateArtwork((await analyseUpload(upload)).analysis, target);
 }

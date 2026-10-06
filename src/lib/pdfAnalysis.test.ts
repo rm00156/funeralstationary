@@ -100,6 +100,19 @@ describe("analysePdf — page sizes", () => {
     });
     expect(result.pageCount).toBe(8);
     expect(result.pages).toHaveLength(8);
+    expect(result.uncheckedPages).toBeUndefined();
+  });
+
+  it("names a page whose content can't be decoded, rather than calling it checked", async () => {
+    const result = await analysed((doc) => {
+      doc.addPage([148 * MM, 210 * MM]);
+      const broken = doc.addPage([148 * MM, 210 * MM]);
+      const stream = doc.context.flateStream("q Q");
+      stream.dict.set(PDFName.of("Filter"), PDFName.of("NoSuchDecode"));
+      broken.node.set(PDFName.of("Contents"), doc.context.register(stream));
+    });
+    expect(result.pageCount).toBe(2);
+    expect(result.uncheckedPages).toEqual([2]);
   });
 });
 

@@ -382,6 +382,9 @@ export default function UploadFlow({
         pages: choice.pages,
         paper: choice.paper,
         quantity: choice.quantity,
+        // The delivery this step shows and totals, not whatever the basket
+        // would otherwise pick from another line.
+        delivery: quote.delivery.id,
         serviceDate: serviceDate || null,
         confirmed,
         acceptWarnings: accepted,

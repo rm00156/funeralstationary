@@ -74,6 +74,12 @@ export type ArtworkAnalysis =
        * content isn't, so photos and fonts went unchecked.
        */
       encrypted: boolean;
+      /**
+       * 1-based pages whose content couldn't be walked to the end — it broke
+       * off, or the file ran past the operator ceiling — so their photos and
+       * fonts went unchecked. Absent on analyses stored before it existed.
+       */
+      uncheckedPages?: number[];
     }
   | { ok: false; reason: "unreadable" | "empty" };
 
@@ -84,7 +90,8 @@ export type ArtworkAnalysis =
 export type ArtworkCheckStatus = "pass" | "warn" | "block";
 
 export interface ArtworkCheck {
-  id: "file" | "size" | "pages" | "photos" | "fonts";
+  /** "bleed" is the no-bleed warning when a worse size warning leads; "content", pages left unchecked. */
+  id: "file" | "size" | "bleed" | "pages" | "photos" | "fonts" | "content";
   status: ArtworkCheckStatus;
   title: string;
   detail: string;
@@ -161,10 +168,18 @@ const A_SIZES: Record<string, PageTrim> = {
   A6: { widthMm: 105, heightMm: 148 },
 };
 
-/** The size an option prints at: its A size for a board ("A1"), else the trim. */
-export function printTrim(format: ProductFormat, option: { label: string }): PageTrim {
+/**
+ * The size an option prints at: its A size for a board, else the trim. The
+ * label is admin-editable copy ("A1", "A1 easel", "Large (A1)"), so an A size
+ * is looked for anywhere in it, then in the option's slug.
+ */
+export function printTrim(format: ProductFormat, option: { id?: string; label: string }): PageTrim {
   if (!format.sizedByOption) return format.trim;
-  return A_SIZES[option.label.trim().toUpperCase()] ?? format.trim;
+  for (const text of [option.label, option.id ?? ""]) {
+    const match = /(?:^|[^a-z0-9])(a[0-6])(?![0-9])/i.exec(text);
+    if (match) return A_SIZES[match[1].toUpperCase()];
+  }
+  return format.trim;
 }
 
 type PageFit =
@@ -251,17 +266,37 @@ export function pagesText(pages: readonly number[]): string {
 
 const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
 
-function sizeCheck(
+/**
+ * The size check: the worst fit of any page leads. When that is a scaled
+ * page, pages without bleed get their own warning too — the customer is
+ * accepting both with "Print it as it is". A blocking fit needs a new file
+ * anyway, so it stands alone.
+ */
+function sizeChecks(
   analysis: Extract<ArtworkAnalysis, { ok: true }>,
   target: ArtworkTarget,
   fitted: { fit: PageFit; box: BoxMm }[],
-): ArtworkCheck {
-  const { format } = target;
-  const trim = format.trim;
+): ArtworkCheck[] {
   const effective = fitted.map(({ fit }) => fit);
   const worstRank = Math.max(...effective.map((fit) => FIT_RANK[fit]));
   const worst = (Object.keys(FIT_RANK) as PageFit[]).find((fit) => FIT_RANK[fit] === worstRank)!;
-  const offending = effective.flatMap((fit, index) => (fit === worst ? [index + 1] : []));
+  const checks = [fitCheck(analysis, target, fitted, worst)];
+  if (worst === "scaled" && effective.includes("exact")) {
+    checks.push({ ...fitCheck(analysis, target, fitted, "exact"), id: "bleed" });
+  }
+  return checks;
+}
+
+/** The check for the pages that fit `fit`. */
+function fitCheck(
+  analysis: Extract<ArtworkAnalysis, { ok: true }>,
+  target: ArtworkTarget,
+  fitted: { fit: PageFit; box: BoxMm }[],
+  fit: PageFit,
+): ArtworkCheck {
+  const { format } = target;
+  const trim = format.trim;
+  const offending = fitted.flatMap((page, index) => (page.fit === fit ? [index + 1] : []));
   const where =
     offending.length === analysis.pageCount
       ? ""
@@ -272,7 +307,7 @@ function sizeCheck(
     ? `The right shape to print at ${target.pages.label}`
     : format.sizeLabel;
 
-  switch (worst) {
+  switch (fit) {
     case "bleed":
       return {
         id: "size",
@@ -457,7 +492,7 @@ export function evaluateArtwork(analysis: ArtworkAnalysis, target: ArtworkTarget
   }
 
   const fitted = analysis.pages.map((page) => fitFor(page, target));
-  const checks: ArtworkCheck[] = [sizeCheck(analysis, target, fitted)];
+  const checks: ArtworkCheck[] = sizeChecks(analysis, target, fitted);
   // A file in spreads has twice the pages its sheet count says, so a page
   // count — let alone an offer to switch to it — would only mislead; the
   // size check already says what to do.
@@ -471,8 +506,23 @@ export function evaluateArtwork(analysis: ArtworkAnalysis, target: ArtworkTarget
     });
   } else {
     const photos = photosCheck(analysis, target, fitted);
-    if (photos) checks.push(photos);
-    checks.push(fontsCheck(analysis));
+    const fonts = fontsCheck(analysis);
+    const unchecked = analysis.uncheckedPages ?? [];
+    if (unchecked.length > 0) {
+      // A pass would claim pages nobody looked at, so only what was actually
+      // found on the checked pages is reported, beside what went unchecked.
+      checks.push({
+        id: "content",
+        status: "warn",
+        title: "We couldn’t check every page",
+        detail: `Your file is very detailed, so we checked its size and pages, but not the photos or fonts on ${pagesText(unchecked)}.`,
+      });
+      if (photos?.status === "warn") checks.push(photos);
+      if (fonts.status === "warn") checks.push(fonts);
+    } else {
+      if (photos) checks.push(photos);
+      checks.push(fonts);
+    }
   }
   return {
     checks,

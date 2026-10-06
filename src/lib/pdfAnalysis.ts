@@ -203,6 +203,8 @@ interface WalkState {
   minPpi: number | undefined;
   fontCache: Map<PDFDict, FontFacts>;
   unembedded: Set<string>;
+  /** Some of the current page's content couldn't be decoded, so went unwalked. */
+  skipped: boolean;
 }
 
 function fontFacts(state: WalkState, font: PDFDict): FontFacts {
@@ -294,7 +296,10 @@ function walk(
           const id = ref instanceof PDFRef ? ref.toString() : key.name;
           if (chain.has(id) || chain.size >= MAX_FORM_DEPTH) break;
           const content = streamBytes(object);
-          if (!content) break;
+          if (!content) {
+            state.skipped = true;
+            break;
+          }
           const matrix = dict.lookup(name("Matrix"));
           const formMatrix =
             matrix instanceof PDFArray && matrix.size() === 6
@@ -328,7 +333,7 @@ function measureImage(state: WalkState, dict: PDFDict, ctm: Matrix): void {
   state.minPpi = state.minPpi === undefined ? ppi : Math.min(state.minPpi, ppi);
 }
 
-function pageContent(doc: PDFDocument, page: PDFPage): Uint8Array {
+function pageContent(state: WalkState, doc: PDFDocument, page: PDFPage): Uint8Array {
   const contents = page.node.Contents();
   const streams: PDFObject[] = contents instanceof PDFArray ? contents.asArray() : contents ? [contents] : [];
   const parts: Uint8Array[] = [];
@@ -339,6 +344,7 @@ function pageContent(doc: PDFDocument, page: PDFPage): Uint8Array {
     // Streams in an array are one content stream split at token boundaries;
     // a newline between them keeps the last token of one off the next.
     if (bytes) parts.push(bytes, new Uint8Array([10]));
+    else state.skipped = true;
   }
   const total = parts.reduce((sum, part) => sum + part.length, 0);
   const joined = new Uint8Array(total);
@@ -430,10 +436,12 @@ export async function analysePdf(bytes: Uint8Array): Promise<ArtworkAnalysis> {
     minPpi: undefined,
     fontCache: new Map(),
     unembedded: new Set(),
+    skipped: false,
   };
 
   const analysed: AnalysedPage[] = [];
-  for (const page of pages) {
+  const unchecked: number[] = [];
+  for (const [index, page] of pages.entries()) {
     let boxes: ReturnType<typeof pageBoxes>;
     try {
       boxes = pageBoxes(page);
@@ -443,12 +451,18 @@ export async function analysePdf(bytes: Uint8Array): Promise<ArtworkAnalysis> {
     const entry: AnalysedPage = { ...boxes };
     if (!encrypted) {
       state.minPpi = undefined;
+      state.skipped = false;
+      let complete = true;
       try {
         const resources = asDict(doc, page.node.getInheritableAttribute(name("Resources")));
-        walk(state, pageContent(doc, page), resources, IDENTITY, new Set());
+        walk(state, pageContent(state, doc, page), resources, IDENTITY, new Set());
       } catch {
         // A page whose content can't be walked still has a size worth checking.
+        complete = false;
       }
+      // The ceiling stops the walk mid-page and skips every page after it.
+      if (state.operatorBudget <= 0 || state.skipped) complete = false;
+      if (!complete) unchecked.push(index + 1);
       if (state.minPpi !== undefined) entry.minImagePpi = Math.round(state.minPpi);
     }
     analysed.push(entry);
@@ -460,5 +474,6 @@ export async function analysePdf(bytes: Uint8Array): Promise<ArtworkAnalysis> {
     pages: analysed,
     unembeddedFonts: [...state.unembedded].sort(),
     encrypted,
+    ...(unchecked.length > 0 ? { uncheckedPages: unchecked } : {}),
   };
 }

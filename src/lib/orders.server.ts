@@ -33,6 +33,7 @@ import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders 
 import {
   evaluateArtwork,
   parseServiceDate,
+  printTrim,
   type ArtworkReport,
   type ArtworkSnapshot,
 } from "@/lib/artwork";
@@ -41,6 +42,7 @@ import { getProductFormats, getProductLabels } from "@/lib/catalogue.server";
 import {
   BOOKLET_FORMAT,
   docTrim,
+  trimText,
   type DesignDoc,
   type PageTrim,
   type ProductFormat,
@@ -641,7 +643,9 @@ export interface AddUploadCartItemInput extends LineChoice {
 
 /**
  * Add the customer's own artwork to the basket — the /upload flow's last step.
- * Idempotent per upload, like designs.
+ * One line per upload, like designs; adding it again — after going back and
+ * choosing other pages, paper or copies — updates that line to the choice
+ * just checked and confirmed rather than keeping the old one.
  *
  * The file check is the pre-order gate here, and it is re-run on the server
  * whatever the client last showed: a blocking fault (wrong size, wrong number
@@ -656,13 +660,15 @@ export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemIn
   const serviceDate = parseServiceDate(input.serviceDate);
   if (!serviceDate.ok) throw new CartError(400, serviceDate.error);
 
-  const upload = await getUpload(owner, input.uploadId);
-  if (!upload) throw new CartError(404, "Upload not found");
+  const found = await getUpload(owner, input.uploadId);
+  if (!found) throw new CartError(404, "Upload not found");
   const { product, pricing, target } = await resolveArtworkTarget(input.product, input.pages);
 
   // Checked before a basket is created, so a refused file leaves nothing
-  // behind. A Canva link has no file to read until staff download it.
-  const analysis = upload.source === "pdf" ? await analyseUpload(upload) : null;
+  // behind. A Canva link has no file to read until staff download it. The
+  // analysed row is the one to snapshot: it points at the frozen copy.
+  const upload = found.source === "pdf" ? await analyseUpload(found) : found;
+  const analysis = upload.analysis;
   const report: ArtworkReport = analysis
     ? evaluateArtwork(analysis, target)
     : { checks: [], blocking: false, warnings: false };
@@ -682,18 +688,15 @@ export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemIn
 
   const order = await getOrCreateDraftOrder(owner);
   const existing = await listDraftItems(order.id);
-  if (existing.some((item) => item.uploadId === upload.id)) {
-    const cart = await getCart(owner);
-    if (!cart) throw new Error("Basket vanished");
-    return cart;
-  }
+  const current = existing.find((item) => item.uploadId === upload.id);
+  const others = existing.filter((item) => item !== current);
 
   const base = defaultSelection(pricing);
   const selection: Selection = {
     quantity: input.quantity ?? base.quantity,
     pages: target.pages.id,
     paper: input.paper ?? base.paper,
-    delivery: input.delivery ?? initialDeliverySlug(existing, product.id, pricing),
+    delivery: input.delivery ?? initialDeliverySlug(others, product.id, pricing),
   };
   const quote = assertLineChoiceValid(pricing, selection);
 
@@ -712,14 +715,8 @@ export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemIn
     confirmedAt: now.toISOString(),
   };
 
-  await db.insert(orderItems).values({
-    id: crypto.randomUUID(),
-    orderId: order.id,
-    designId: null,
-    uploadId: upload.id,
-    position: existing.length,
+  const line = {
     productId: product.id,
-    templateId: null,
     quantityOptionId: selection.quantity,
     pageCountOptionId: selection.pages,
     paperOptionId: selection.paper,
@@ -730,10 +727,23 @@ export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemIn
     quantityCopies: quote.quantity.value,
     unitPricePence: quote.unitPricePence,
     lineTotalPence: quote.printCostPence,
-    docSnapshot: null,
     artworkSnapshot,
     serviceDate: serviceDate.date,
-  });
+  };
+  if (current) {
+    await db.update(orderItems).set(line).where(eq(orderItems.id, current.id));
+  } else {
+    await db.insert(orderItems).values({
+      id: crypto.randomUUID(),
+      orderId: order.id,
+      designId: null,
+      uploadId: upload.id,
+      position: existing.length,
+      templateId: null,
+      docSnapshot: null,
+      ...line,
+    });
+  }
 
   const cart = await getCart(owner);
   if (!cart) throw new Error("Basket vanished immediately after insert");
@@ -897,12 +907,30 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
           itemId: item.id,
         };
       }
+      // The file was checked against the page count (and, for a board, the
+      // print size) its option had when it was added. An admin edit to that
+      // option since would charge for one thing and print another, so the
+      // customer has to add the file again and see it checked afresh.
+      const format = formats.get(item.productId) ?? BOOKLET_FORMAT;
+      const checkedAgainst = item.quoteSnapshot.pages;
+      const printedSize = (option: { id: string; label: string }) => trimText(printTrim(format, option));
+      if (
+        resolved.quote.pages.pages !== checkedAgainst.pages ||
+        printedSize(resolved.quote.pages) !== printedSize(checkedAgainst)
+      ) {
+        return {
+          ok: false,
+          status: 409,
+          error: `The options for "${name}" have changed since it was checked — please take it out and add your file again`,
+          itemId: item.id,
+        };
+      }
       frozenLines.push({
         item,
         selection,
         quote: resolved.quote,
         doc: null,
-        format: formats.get(item.productId) ?? BOOKLET_FORMAT,
+        format,
         name: `${labels.get(item.productId) ?? item.productId} — ${name}`,
       });
       continue;

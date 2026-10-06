@@ -183,7 +183,14 @@ async function generate(job: Job, sortOrder: number) {
   // Best-effort, matching the admin publish route: a thumbnail failure leaves
   // a usable template rather than aborting the whole run.
   try {
-    const png = await renderTemplateThumbnail(origin, pages[0], job.slug, job.trim);
+    // A --force rebuild keeps the portrait an admin pinned, like the publish flow.
+    const png = await renderTemplateThumbnail(
+      origin,
+      pages[0],
+      job.slug,
+      job.trim,
+      existing?.placeholderPortrait,
+    );
     const url = await saveTemplateThumbnail(job.slug, png);
     await adminUpdateTemplate(job.slug, { previewImageUrl: url });
     return { outcome: "created" as const, thumbnail: true };

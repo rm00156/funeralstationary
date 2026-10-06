@@ -168,13 +168,19 @@ export async function readObject(storageKey: string, maxBytes?: number): Promise
   if (!response.Body) throw new Error(`Stored object ${storageKey} has no body`);
   // A presigned PUT doesn't bind the size the client declared, so the cap is
   // enforced here, before the body is read into memory.
-  if (maxBytes !== undefined && (response.ContentLength ?? 0) > maxBytes) {
-    (response.Body as { destroy?: () => void }).destroy?.();
+  const tooLarge = () => {
     const error = new Error(`Stored object ${storageKey} is larger than ${maxBytes} bytes`);
     error.name = "ObjectTooLarge";
-    throw error;
+    return error;
+  };
+  if (maxBytes !== undefined && (response.ContentLength ?? 0) > maxBytes) {
+    (response.Body as { destroy?: () => void }).destroy?.();
+    throw tooLarge();
   }
-  return response.Body.transformToByteArray();
+  const bytes = await response.Body.transformToByteArray();
+  // Not every S3-compatible store sends a length; check what actually came.
+  if (maxBytes !== undefined && bytes.byteLength > maxBytes) throw tooLarge();
+  return bytes;
 }
 
 export async function deleteObject(storageKey: string): Promise<void> {

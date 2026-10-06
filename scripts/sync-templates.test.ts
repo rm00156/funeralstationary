@@ -19,6 +19,7 @@ function row(overrides: Partial<TemplateRow> = {}): TemplateRow {
     name: "Roses",
     productSlug: "order-of-service",
     previewImageUrl: `${FROM}/template-previews/roses.png`,
+    placeholderPortrait: null,
     layout: [{ elements: [{ type: "image", src: `${FROM}/templates/backgrounds/roses-rose.jpg` }] }],
     draftLayout: null,
     status: "published",
@@ -70,6 +71,12 @@ describe("templateDiff", () => {
     const source = row();
     const target = synced(source, { status: "draft", categories: ["classic", "floral"], draftLayout: [] });
     expect(templateDiff(source, target, FROM, TO)).toEqual(["status", "draftLayout", "categories"]);
+  });
+  it("carries a pinned stand-in portrait, which the thumbnail is drawn with", () => {
+    const source = row({ placeholderPortrait: "portrait-5" });
+    expect(templateDiff(source, synced(source, { placeholderPortrait: null }), FROM, TO)).toEqual([
+      "placeholderPortrait",
+    ]);
   });
 });
 
