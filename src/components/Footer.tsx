@@ -25,7 +25,6 @@ const HEADING = "mb-1 font-display text-xl font-medium text-white";
  */
 export default async function Footer() {
   const products = await getSellableProducts();
-  const lead = products[0];
 
   return (
     <footer className="site-chrome mt-auto bg-plum-night font-body text-base text-on-plum-muted">
@@ -61,11 +60,6 @@ export default async function Footer() {
 
           <nav aria-label="Help" className="flex flex-col gap-3">
             <h2 className={HEADING}>Help</h2>
-            {lead && (
-              <Link href={`/products/${lead.id}#prices`} className={LINK}>
-                Price calculator
-              </Link>
-            )}
             <Link href="/shop" className={LINK}>
               Shop
             </Link>
