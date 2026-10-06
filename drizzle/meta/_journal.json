@@ -113,6 +113,20 @@
       "when": 1791217925096,
       "tag": "0015_order_format_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1791222309182,
+      "tag": "0016_artwork_uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1791275172508,
+      "tag": "0017_template_placeholder_portrait",
+      "breakpoints": true
     }
   ]
 }

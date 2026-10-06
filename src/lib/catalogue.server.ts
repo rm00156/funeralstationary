@@ -62,6 +62,15 @@ export const getProductFormats = cache(async (): Promise<Map<string, ProductForm
   return new Map(rows.map(({ slug, ...format }) => [slug, toProductFormat(format)]));
 });
 
+/**
+ * Every product's label, active or not, by slug — for a basket or order line
+ * of the customer's own artwork, which has no design row to join it from.
+ */
+export const getProductLabels = cache(async (): Promise<Map<string, string>> => {
+  const rows = await db.select({ slug: products.slug, label: products.label }).from(products);
+  return new Map(rows.map((row) => [row.slug, row.label]));
+});
+
 export const getCategories = cache(async (): Promise<TemplateCategory[]> => {
   const rows = await db
     .select({ slug: templateCategories.slug, label: templateCategories.label })
@@ -209,7 +218,9 @@ export const getTemplates = cache(async (): Promise<Template[]> => {
 export const getTemplateBySlug = cache(
   async (
     slug: string,
-  ): Promise<(Template & { layout: DesignPage[] | null }) | null> => {
+  ): Promise<
+    (Template & { layout: DesignPage[] | null; placeholderPortrait: string | null }) | null
+  > => {
     const [row] = await db
       .select({
         id: templates.id,
@@ -218,6 +229,7 @@ export const getTemplateBySlug = cache(
         productSlug: products.slug,
         image: templates.previewImageUrl,
         layout: templates.layout,
+        placeholderPortrait: templates.placeholderPortrait,
       })
       .from(templates)
       .innerJoin(products, eq(templates.productId, products.id))
@@ -225,7 +237,11 @@ export const getTemplateBySlug = cache(
       .limit(1);
     if (!row) return null;
     const links = await loadCategoryLinks();
-    return { ...toTemplate(row, links), layout: row.layout ?? null };
+    return {
+      ...toTemplate(row, links),
+      layout: row.layout ?? null,
+      placeholderPortrait: row.placeholderPortrait,
+    };
   },
 );
 

@@ -90,6 +90,11 @@ export async function generateOrderItemProof(
     .limit(1);
   const version = (latest?.version ?? 0) + 1;
 
+  if (!item.docSnapshot) {
+    // The customer's own artwork: their PDF is the press file, and there is
+    // no design to render.
+    throw new Error("This line is the customer's own artwork — there is nothing to render");
+  }
   const doc = await proofArtwork(item.designId, item.docSnapshot);
   const images = await renderProofPageImages(origin, doc);
 
@@ -182,7 +187,8 @@ export async function runPostPaymentSideEffects(
   if (!order) return;
 
   if (isStorageConfigured()) {
-    for (const item of order.items) {
+    // Artwork lines are skipped: the customer's file is already the press file.
+    for (const item of order.items.filter((line) => !line.artwork)) {
       try {
         await generateOrderItemProof(orderId, item.id, origins.render);
       } catch (error) {

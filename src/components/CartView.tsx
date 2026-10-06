@@ -173,9 +173,16 @@ function CartLine({
       }`}
     >
       <div className="flex gap-5">
-        <span className="relative block h-28 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-container-low">
-          {item.templateImage && (
+        <span className="relative flex h-28 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low">
+          {item.templateImage ? (
             <Image src={item.templateImage} alt="" fill sizes="80px" className="object-contain p-1" />
+          ) : (
+            item.artwork && (
+              // The customer's own file: no template artwork to show, so say what it is.
+              <span className="font-body text-xs font-bold uppercase tracking-wide text-primary">
+                {item.artwork.source === "canva" ? "Canva" : "PDF"}
+              </span>
+            )
           )}
         </span>
         <div className="min-w-0 flex-1">

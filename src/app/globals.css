@@ -40,6 +40,12 @@
   --color-success-bg: #eef5f0;
   --color-success-border: #bfd9c8;
   --color-success-text: #1f4d33;
+  /* Checks: a warning that can be accepted, and a fault that blocks. Text
+     colours are 4.5:1+ on their own backgrounds and on white. */
+  --color-warn-bg: #fbefdc;
+  --color-warn-text: #8a4a0c;
+  --color-block-bg: #f9e7e7;
+  --color-block-text: #9a2b2b;
 
   /*
    * Legacy "Serene Legacy" names, kept as aliases of the palette above so the
@@ -117,6 +123,10 @@
   --color-success-bg: var(--color-success-bg);
   --color-success-border: var(--color-success-border);
   --color-success-text: var(--color-success-text);
+  --color-warn-bg: var(--color-warn-bg);
+  --color-warn-text: var(--color-warn-text);
+  --color-block-bg: var(--color-block-bg);
+  --color-block-text: var(--color-block-text);
 
   --color-surface-dim: var(--color-surface-dim);
   --color-surface-bright: var(--color-surface-bright);

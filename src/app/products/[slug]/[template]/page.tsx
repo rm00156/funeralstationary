@@ -103,7 +103,7 @@ export default async function TemplatePage({
   const layout =
     toTemplateLayout(template.layout, format.templatePages) ??
     makeTemplateLayout(template, format);
-  const portraits = portraitRotationFor(layout[0], template.id).map(placeholderPortraitUrl);
+  const portraits = portraitRotationFor(layout[0], template.id, template.placeholderPortrait).map(placeholderPortraitUrl);
   const views = layout.map((page, index) => ({
     label: VIEW_LABELS[format.templatePages][index] ?? `Page ${index + 1}`,
     page: withPlaceholderPhotos(page, portraits),

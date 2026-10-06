@@ -18,6 +18,11 @@
  * product-scoped and a line is its own print job, so a basket can mix
  * products and each line is priced against its own product's catalogue.
  *
+ * A line prints one of two things: an editor design (design_id, re-read
+ * live until the pay click) or the customer's own artwork from /upload
+ * (upload_id, with everything about it frozen in artwork_snapshot when it is
+ * added — an upload never changes, so there is nothing live to follow).
+ *
  * Nothing in this module touches Chromium or email — those side effects live
  * in orderFulfilment.server.ts so the basket routes don't trace them in.
  */
@@ -25,11 +30,19 @@ import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
 import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders } from "@/db/schema";
+import {
+  evaluateArtwork,
+  parseServiceDate,
+  printTrim,
+  type ArtworkReport,
+  type ArtworkSnapshot,
+} from "@/lib/artwork";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
-import { getProductFormats } from "@/lib/catalogue.server";
+import { getProductFormats, getProductLabels } from "@/lib/catalogue.server";
 import {
   BOOKLET_FORMAT,
   docTrim,
+  trimText,
   type DesignDoc,
   type PageTrim,
   type ProductFormat,
@@ -65,6 +78,7 @@ import {
 // loads collapse to one query set per distinct product.
 import { getPageCountOption, getPricingData } from "@/lib/pricing.server";
 import type { Owner } from "@/lib/session";
+import { analyseUpload, getUpload, resolveArtworkTarget } from "@/lib/uploads.server";
 
 /** A client-caused failure the route can map straight to a status code. */
 export class CartError extends Error {
@@ -98,17 +112,27 @@ export function cartErrorResponse(error: unknown): Response | null {
 /* Shapes                                                              */
 /* ------------------------------------------------------------------ */
 
+/** What a line of the customer's own artwork shows: the file they recognise. */
+export interface CartArtwork {
+  source: ArtworkSnapshot["source"];
+  fileName: string | null;
+  canvaUrl: string | null;
+}
+
 export interface CartItem {
   id: string;
   designId: string | null;
   designName: string;
   /** The design was removed after being added; the line can't be bought. */
   designMissing: boolean;
+  /** Set on a line of the customer's own artwork (/upload); null for a design. */
+  artwork: CartArtwork | null;
   productId: string;
   productLabel: string;
   /** The product's size and axis names, for the line's spec (lineSpec). */
   format: ProductFormat;
-  templateId: string;
+  /** Null on an artwork line, which has no template. */
+  templateId: string | null;
   templateName: string;
   templateImage: string | null;
   pageCount: number;
@@ -170,7 +194,10 @@ export interface OrderDetailItem {
   format: ProductFormat;
   /** The trim the press artwork is drawn at — the snapshot's own, not the product's today. */
   artworkTrim: PageTrim;
-  templateId: string;
+  templateId: string | null;
+  /** The customer's own artwork and its checks; null on an editor-design line. */
+  artwork: ArtworkSnapshot | null;
+  serviceDate: string | null;
   pageCount: number;
   quote: Quote;
   quantityCopies: number;
@@ -342,6 +369,15 @@ async function pricingByProduct(items: OrderItemRow[]): Promise<Map<string, Pric
   return new Map(slugs.map((slug, index) => [slug, loaded[index]]));
 }
 
+/** An artwork line's name in the basket and on the order: the file they sent. */
+export function artworkName(artwork: Pick<ArtworkSnapshot, "fileName" | "source">): string {
+  return artwork.fileName ?? (artwork.source === "canva" ? "Your Canva design" : "Your design");
+}
+
+function toCartArtwork(snapshot: ArtworkSnapshot): CartArtwork {
+  return { source: snapshot.source, fileName: snapshot.fileName, canvaUrl: snapshot.canvaUrl };
+}
+
 async function insertEvent(
   orderId: string,
   event: { type: string; fromStatus?: string | null; toStatus?: string | null; note?: string | null; actor?: string },
@@ -378,11 +414,52 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     if (item.designId) liveDesigns.set(item.designId, await getDesign(owner, item.designId));
   }
 
-  const [pricings, formats] = await Promise.all([pricingByProduct(rows), getProductFormats()]);
+  const [pricings, formats, labels] = await Promise.all([
+    pricingByProduct(rows),
+    getProductFormats(),
+    getProductLabels(),
+  ]);
 
   const items: CartItem[] = rows.map((item) => {
-    const design = item.designId ? liveDesigns.get(item.designId) ?? null : null;
     const pricing = pricings.get(item.productId)!;
+    const format = formats.get(item.productId) ?? BOOKLET_FORMAT;
+
+    if (item.artworkSnapshot) {
+      // The customer's own artwork: everything but copies and delivery was
+      // fixed by the file when it was added, so the line's own slugs are it.
+      const selection: Selection = {
+        quantity: item.quantityOptionId ?? "",
+        pages: item.pageCountOptionId ?? "",
+        paper: item.paperOptionId ?? "",
+        delivery: item.deliveryOptionId ?? "",
+      };
+      const resolved = resolveSelectionStrict(pricing, selection);
+      const quote = resolved.ok ? resolved.quote : null;
+      return {
+        id: item.id,
+        designId: null,
+        designName: artworkName(item.artworkSnapshot),
+        designMissing: false,
+        artwork: toCartArtwork(item.artworkSnapshot),
+        productId: item.productId,
+        productLabel: labels.get(item.productId) ?? item.productId,
+        format,
+        templateId: null,
+        templateName: "Your own design",
+        templateImage: null,
+        pageCount: item.artworkSnapshot.pageCount ?? quote?.pages.pages ?? 0,
+        selection,
+        quote,
+        stale: resolved.ok ? [] : resolved.invalid,
+        delivery: resolveDelivery(item, pricing),
+        deliveryOptions: pricing.delivery,
+        quantityCopies: quote?.quantity.value ?? item.quantityCopies,
+        unitPricePence: quote?.unitPricePence ?? item.unitPricePence,
+        lineTotalPence: quote?.printCostPence ?? item.lineTotalPence,
+      };
+    }
+
+    const design = item.designId ? liveDesigns.get(item.designId) ?? null : null;
     const selection: Selection = {
       quantity: item.quantityOptionId ?? "",
       pages: design?.pagesOptionId ?? item.pageCountOptionId ?? "",
@@ -396,13 +473,14 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
       designId: item.designId,
       designName: design?.name ?? "Removed design",
       designMissing: !design,
+      artwork: null,
       productId: item.productId,
-      productLabel: design?.productLabel ?? item.productId,
-      format: formats.get(item.productId) ?? BOOKLET_FORMAT,
+      productLabel: design?.productLabel ?? labels.get(item.productId) ?? item.productId,
+      format,
       templateId: design?.templateId ?? item.templateId,
-      templateName: design?.templateName ?? item.templateId,
+      templateName: design?.templateName ?? item.templateId ?? "",
       templateImage: design?.templateImage ?? null,
-      pageCount: design?.pageCount ?? item.docSnapshot.pages.length,
+      pageCount: design?.pageCount ?? item.docSnapshot?.pages.length ?? 0,
       selection,
       quote,
       stale: resolved.ok ? [] : resolved.invalid,
@@ -550,6 +628,128 @@ export async function addCartItem(
   return cart;
 }
 
+export interface AddUploadCartItemInput extends LineChoice {
+  uploadId: string;
+  /** The step-1 choice the file was checked against. */
+  product: unknown;
+  pages: unknown;
+  paper?: string;
+  serviceDate?: unknown;
+  /** The "I've checked the names, dates and spelling" tick. */
+  confirmed: boolean;
+  /** "Print it as it is": the customer has seen the warnings and accepts them. */
+  acceptWarnings: boolean;
+}
+
+/**
+ * Add the customer's own artwork to the basket — the /upload flow's last step.
+ * One line per upload, like designs; adding it again — after going back and
+ * choosing other pages, paper or copies — updates that line to the choice
+ * just checked and confirmed rather than keeping the old one.
+ *
+ * The file check is the pre-order gate here, and it is re-run on the server
+ * whatever the client last showed: a blocking fault (wrong size, wrong number
+ * of pages, unreadable) is refused, and warnings must be accepted. What the
+ * customer was shown, accepted and confirmed is frozen into artwork_snapshot,
+ * the evidence for "we print exactly what you send us".
+ */
+export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemInput): Promise<Cart> {
+  if (!input.confirmed) {
+    throw new CartError(400, "Please confirm you’ve checked the names, dates and spelling");
+  }
+  const serviceDate = parseServiceDate(input.serviceDate);
+  if (!serviceDate.ok) throw new CartError(400, serviceDate.error);
+
+  const found = await getUpload(owner, input.uploadId);
+  if (!found) throw new CartError(404, "Upload not found");
+  const { product, pricing, target } = await resolveArtworkTarget(input.product, input.pages);
+
+  // Checked before a basket is created, so a refused file leaves nothing
+  // behind. A Canva link has no file to read until staff download it. The
+  // analysed row is the one to snapshot: it points at the frozen copy.
+  const upload = found.source === "pdf" ? await analyseUpload(found) : found;
+  const analysis = upload.analysis;
+  const report: ArtworkReport = analysis
+    ? evaluateArtwork(analysis, target)
+    : { checks: [], blocking: false, warnings: false };
+  if (report.blocking) {
+    throw new CartError(
+      409,
+      report.checks.filter((check) => check.status === "block").map((check) => check.title).join(". "),
+      { reason: "blocked", report },
+    );
+  }
+  if (report.warnings && !input.acceptWarnings) {
+    throw new CartError(409, "Please confirm you’d like it printed as it is", {
+      reason: "confirm",
+      report,
+    });
+  }
+
+  const order = await getOrCreateDraftOrder(owner);
+  const existing = await listDraftItems(order.id);
+  const current = existing.find((item) => item.uploadId === upload.id);
+  const others = existing.filter((item) => item !== current);
+
+  const base = defaultSelection(pricing);
+  const selection: Selection = {
+    quantity: input.quantity ?? base.quantity,
+    pages: target.pages.id,
+    paper: input.paper ?? base.paper,
+    delivery: input.delivery ?? initialDeliverySlug(others, product.id, pricing),
+  };
+  const quote = assertLineChoiceValid(pricing, selection);
+
+  const now = new Date();
+  const artworkSnapshot: ArtworkSnapshot = {
+    source: upload.source,
+    fileName: upload.fileName,
+    url: upload.url,
+    storageKey: upload.storageKey,
+    byteSize: upload.byteSize,
+    canvaUrl: upload.canvaUrl,
+    pageCount: analysis?.ok ? analysis.pageCount : null,
+    trim: product.format.trim,
+    checks: report.checks,
+    warningsAcceptedAt: report.warnings ? now.toISOString() : null,
+    confirmedAt: now.toISOString(),
+  };
+
+  const line = {
+    productId: product.id,
+    quantityOptionId: selection.quantity,
+    pageCountOptionId: selection.pages,
+    paperOptionId: selection.paper,
+    deliveryOptionId: selection.delivery,
+    deliveryLabel: quote.delivery.label,
+    deliveryPricePence: quote.delivery.pricePence,
+    quoteSnapshot: quote,
+    quantityCopies: quote.quantity.value,
+    unitPricePence: quote.unitPricePence,
+    lineTotalPence: quote.printCostPence,
+    artworkSnapshot,
+    serviceDate: serviceDate.date,
+  };
+  if (current) {
+    await db.update(orderItems).set(line).where(eq(orderItems.id, current.id));
+  } else {
+    await db.insert(orderItems).values({
+      id: crypto.randomUUID(),
+      orderId: order.id,
+      designId: null,
+      uploadId: upload.id,
+      position: existing.length,
+      templateId: null,
+      docSnapshot: null,
+      ...line,
+    });
+  }
+
+  const cart = await getCart(owner);
+  if (!cart) throw new Error("Basket vanished immediately after insert");
+  return cart;
+}
+
 async function getOwnedDraftItem(owner: Owner, itemId: string) {
   const order = await findDraftOrder(owner);
   if (!order) throw new CartError(404, "Basket item not found");
@@ -569,16 +769,29 @@ export async function updateCartItem(
   choice: LineChoice,
 ): Promise<Cart> {
   const { item } = await getOwnedDraftItem(owner, itemId);
-  const design = item.designId ? await getDesign(owner, item.designId) : null;
-  if (!design) {
-    throw new CartError(409, "That design has been removed — take it out of your basket");
+  // An artwork line's pages and paper were fixed by its file; a design
+  // line's follow the live design.
+  let spec: { productId: string; pages: string; paper: string; doc: DesignDoc | null };
+  if (item.artworkSnapshot) {
+    spec = {
+      productId: item.productId,
+      pages: item.pageCountOptionId ?? "",
+      paper: item.paperOptionId ?? "",
+      doc: null,
+    };
+  } else {
+    const design = item.designId ? await getDesign(owner, item.designId) : null;
+    if (!design) {
+      throw new CartError(409, "That design has been removed — take it out of your basket");
+    }
+    spec = { productId: design.productId, pages: design.pagesOptionId, paper: design.paperId, doc: design.doc };
   }
 
-  const pricing = await getPricingData(design.productId);
+  const pricing = await getPricingData(spec.productId);
   const selection: Selection = {
     quantity: choice.quantity ?? item.quantityOptionId ?? "",
-    pages: design.pagesOptionId,
-    paper: design.paperId,
+    pages: spec.pages,
+    paper: spec.paper,
     delivery: choice.delivery ?? item.deliveryOptionId ?? "",
   };
   const quote = assertLineChoiceValid(pricing, selection);
@@ -596,7 +809,7 @@ export async function updateCartItem(
       quantityCopies: quote.quantity.value,
       unitPricePence: quote.unitPricePence,
       lineTotalPence: quote.printCostPence,
-      docSnapshot: design.doc,
+      docSnapshot: spec.doc,
     })
     .where(eq(orderItems.id, item.id));
 
@@ -658,18 +871,71 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
   const details = detailsFrom(order);
   if (!details) return { ok: false, status: 400, error: "Please enter your delivery details" };
 
-  const [pricings, formats] = await Promise.all([pricingByProduct(items), getProductFormats()]);
+  const [pricings, formats, labels] = await Promise.all([
+    pricingByProduct(items),
+    getProductFormats(),
+    getProductLabels(),
+  ]);
 
   const frozenLines: {
     item: OrderItemRow;
     selection: Selection;
     quote: Quote;
-    doc: DesignDoc;
+    /** Null on an artwork line — its press file is the customer's own. */
+    doc: DesignDoc | null;
     format: ProductFormat;
     name: string;
   }[] = [];
 
   for (const item of items) {
+    if (item.artworkSnapshot) {
+      // Nothing live to re-read: the file and its checks were frozen when it
+      // was added. Only the price can have moved.
+      const selection: Selection = {
+        quantity: item.quantityOptionId ?? "",
+        pages: item.pageCountOptionId ?? "",
+        paper: item.paperOptionId ?? "",
+        delivery: item.deliveryOptionId ?? "",
+      };
+      const name = artworkName(item.artworkSnapshot);
+      const resolved = resolveSelectionStrict(pricings.get(item.productId)!, selection);
+      if (!resolved.ok) {
+        return {
+          ok: false,
+          status: 409,
+          error: `The ${resolved.invalid[0]} chosen for "${name}" is no longer available — please choose another`,
+          itemId: item.id,
+        };
+      }
+      // The file was checked against the page count (and, for a board, the
+      // print size) its option had when it was added. An admin edit to that
+      // option since would charge for one thing and print another, so the
+      // customer has to add the file again and see it checked afresh.
+      const format = formats.get(item.productId) ?? BOOKLET_FORMAT;
+      const checkedAgainst = item.quoteSnapshot.pages;
+      const printedSize = (option: { id: string; label: string }) => trimText(printTrim(format, option));
+      if (
+        resolved.quote.pages.pages !== checkedAgainst.pages ||
+        printedSize(resolved.quote.pages) !== printedSize(checkedAgainst)
+      ) {
+        return {
+          ok: false,
+          status: 409,
+          error: `The options for "${name}" have changed since it was checked — please take it out and add your file again`,
+          itemId: item.id,
+        };
+      }
+      frozenLines.push({
+        item,
+        selection,
+        quote: resolved.quote,
+        doc: null,
+        format,
+        name: `${labels.get(item.productId) ?? item.productId} — ${name}`,
+      });
+      continue;
+    }
+
     const design = item.designId ? await getDesign(owner, item.designId) : null;
     if (!design) {
       return {
@@ -826,7 +1092,7 @@ export async function finaliseOrder(
     fromStatus: "draft",
     toStatus: "awaiting_print",
     actor: "stripe",
-    note: `Paid via Stripe Checkout (${payment.sessionId})`,
+    note: "Paid via Stripe Checkout",
   });
   if (order && payment.amountTotal !== null && payment.amountTotal !== order.totalPence) {
     await insertEvent(orderId, {
@@ -886,7 +1152,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
   if (!order) return null;
 
   // Soft-deleted designs are joined on purpose: the order outlives the design.
-  const [itemRows, proofRows, eventRows, formats] = await Promise.all([
+  const [itemRows, proofRows, eventRows, formats, labels] = await Promise.all([
     db
       .select({ item: orderItems, designName: designs.name })
       .from(orderItems)
@@ -909,6 +1175,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       .where(eq(orderEvents.orderId, order.id))
       .orderBy(desc(orderEvents.createdAt), desc(orderEvents.id)),
     getProductFormats(),
+    getProductLabels(),
   ]);
 
   // Only worth a round trip once there is something to page through.
@@ -966,30 +1233,38 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       vatRate: Number(order.vatRate),
       totalPence: order.totalPence,
     },
-    items: itemRows.map(({ item, designName }) => ({
-      id: item.id,
-      designId: item.designId,
-      designName: designName ?? "Design",
-      productId: item.productId,
+    items: itemRows.map(({ item, designName }) => {
       // History reads the format the line was paid under; only a line paid
       // before that was snapshotted falls back to the live one.
-      format: item.formatSnapshot ?? formats.get(item.productId) ?? BOOKLET_FORMAT,
-      artworkTrim: docTrim(item.docSnapshot),
-      templateId: item.templateId,
-      pageCount: item.docSnapshot.pages.length,
-      quote: item.quoteSnapshot,
-      quantityCopies: item.quantityCopies,
-      unitPricePence: item.unitPricePence,
-      lineTotalPence: item.lineTotalPence,
-      // The snapshot columns are authoritative; the quote snapshot is only a
-      // fallback for a line frozen before they existed.
-      delivery: {
-        optionId: item.deliveryOptionId ?? item.quoteSnapshot.delivery.id,
-        label: item.deliveryLabel ?? item.quoteSnapshot.delivery.label,
-        pricePence: item.deliveryPricePence ?? item.quoteSnapshot.delivery.pricePence,
-      },
-      proofs: proofsByItem.get(item.id) ?? [],
-    })),
+      const format = item.formatSnapshot ?? formats.get(item.productId) ?? BOOKLET_FORMAT;
+      const artwork = item.artworkSnapshot;
+      return {
+        id: item.id,
+        designId: item.designId,
+        designName:
+          designName ??
+          (artwork ? `${labels.get(item.productId) ?? "Your own design"} — ${artworkName(artwork)}` : "Design"),
+        productId: item.productId,
+        format,
+        artworkTrim: item.docSnapshot ? docTrim(item.docSnapshot) : artwork?.trim ?? format.trim,
+        templateId: item.templateId,
+        artwork,
+        serviceDate: item.serviceDate,
+        pageCount: item.docSnapshot?.pages.length ?? artwork?.pageCount ?? item.quoteSnapshot.pages.pages,
+        quote: item.quoteSnapshot,
+        quantityCopies: item.quantityCopies,
+        unitPricePence: item.unitPricePence,
+        lineTotalPence: item.lineTotalPence,
+        // The snapshot columns are authoritative; the quote snapshot is only a
+        // fallback for a line frozen before they existed.
+        delivery: {
+          optionId: item.deliveryOptionId ?? item.quoteSnapshot.delivery.id,
+          label: item.deliveryLabel ?? item.quoteSnapshot.delivery.label,
+          pricePence: item.deliveryPricePence ?? item.quoteSnapshot.delivery.pricePence,
+        },
+        proofs: proofsByItem.get(item.id) ?? [],
+      };
+    }),
     events: eventRows.map((event) => ({
       id: event.id,
       type: event.type,

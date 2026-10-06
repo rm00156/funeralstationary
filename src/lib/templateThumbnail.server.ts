@@ -28,10 +28,12 @@ export async function renderTemplateThumbnail(
   seed = "template",
   /** The template's product's trim; a layout stores no size of its own. */
   trim?: PageTrim,
+  /** The template's admin-chosen stand-in portrait, if any. */
+  portrait?: string | null,
 ): Promise<Buffer> {
   const page0 = withPlaceholderPhotos(
     coverPage,
-    portraitRotationFor(coverPage, seed).map(placeholderPortraitUrl),
+    portraitRotationFor(coverPage, seed, portrait).map(placeholderPortraitUrl),
   );
   const browser = await launchHeadlessBrowser();
   try {

@@ -69,9 +69,10 @@ export const FEATURED_REVIEWS = [
 ] as const;
 
 /**
- * The two ways to order that aren't a product in the catalogue. Both are
- * handled by a person, so they lead to the contact page with the topic
- * already chosen (see CONTACT_TOPICS in contact.ts).
+ * The two ways to order that aren't a template in the catalogue. "We design
+ * it for you" is handled by a person, so it leads to the contact page with
+ * the topic already chosen (see CONTACT_TOPICS in contact.ts); "Upload your
+ * own design" is the /upload flow, which prints the customer's own PDF.
  */
 export const DESIGN_FOR_YOU_HREF = "/contact?topic=design-for-me";
-export const UPLOAD_DESIGN_HREF = "/contact?topic=upload";
+export const UPLOAD_DESIGN_HREF = "/upload";

@@ -451,6 +451,8 @@ export interface AdminTemplate {
   /** The product's format — the trim and page structure its layout is drawn on. */
   productFormat: ProductFormat;
   previewImageUrl: string;
+  /** Admin-chosen stand-in portrait id, or null for the automatic pick. */
+  placeholderPortrait: string | null;
   status: TemplateStatus;
   sortOrder: number;
   /** Category slugs in position order. */
@@ -488,6 +490,7 @@ const templateSelection = {
   productSlug: products.slug,
   ...productFormatColumns,
   previewImageUrl: templates.previewImageUrl,
+  placeholderPortrait: templates.placeholderPortrait,
   status: templates.status,
   sortOrder: templates.sortOrder,
   // Tested in SQL rather than selected: a listing only needs to know whether
@@ -508,6 +511,7 @@ type TemplateRow = {
   sizedByOption: boolean;
   paperLabel: string;
   previewImageUrl: string;
+  placeholderPortrait: string | null;
   status: TemplateStatus;
   sortOrder: number;
   hasDraftLayout: number;
@@ -686,6 +690,8 @@ export async function adminUpdateTemplate(
     name?: string;
     productSlug?: string;
     previewImageUrl?: string;
+    /** null clears the choice back to the automatic pick. */
+    placeholderPortrait?: string | null;
     status?: TemplateStatus;
     sortOrder?: number;
     categories?: string[];
@@ -710,6 +716,9 @@ export async function adminUpdateTemplate(
     ...(productId !== undefined ? { productId } : {}),
     ...(patch.previewImageUrl !== undefined
       ? { previewImageUrl: patch.previewImageUrl }
+      : {}),
+    ...(patch.placeholderPortrait !== undefined
+      ? { placeholderPortrait: patch.placeholderPortrait }
       : {}),
     ...(patch.status !== undefined ? { status: patch.status } : {}),
     ...(patch.sortOrder !== undefined ? { sortOrder: patch.sortOrder } : {}),

@@ -120,3 +120,18 @@ describe("withPlaceholderPhotos", () => {
     expect(filled.elements.some((el) => el.type === "image" && el.src === null)).toBe(false);
   });
 });
+
+describe("portraitRotationFor with an admin's pick", () => {
+  it("starts with the chosen portrait, from the set it belongs to", () => {
+    // A plain cover would be monochrome; a colour pick overrides that.
+    const rotation = portraitRotationFor(page([photo(null)]), "any", "portrait-7");
+    expect(rotation[0]).toBe("portrait-7");
+    expect([...rotation].sort()).toEqual([...COLOUR_PORTRAIT_IDS].sort());
+  });
+
+  it("falls back to the automatic pick for null or an unknown id", () => {
+    const cover = page([photo(null)]);
+    expect(portraitRotationFor(cover, "s", null)).toEqual(portraitRotationFor(cover, "s"));
+    expect(portraitRotationFor(cover, "s", "nope")).toEqual(portraitRotationFor(cover, "s"));
+  });
+});

@@ -36,6 +36,10 @@ export const PLACEHOLDER_PORTRAIT_IDS = [...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAI
 
 export type PlaceholderPortraitId = (typeof PLACEHOLDER_PORTRAIT_IDS)[number];
 
+export function isPlaceholderPortraitId(value: unknown): value is PlaceholderPortraitId {
+  return (PLACEHOLDER_PORTRAIT_IDS as readonly unknown[]).includes(value);
+}
+
 export function placeholderPortraitKey(id: PlaceholderPortraitId): string {
   return `templates/placeholders/${id}.webp`;
 }
@@ -97,9 +101,22 @@ export function withPlaceholderPhotos(
  * The portraits for a template's previews: the cover's set, ordered so
  * `seed`'s pick comes first. Every page of one template draws from its cover's
  * set, so the inside pages don't switch to a different kind of photograph.
+ *
+ * `chosen` is an admin's explicit pick (`templates.placeholder_portrait`). It
+ * wins over the automatic set, so the rotation comes from the set the pick
+ * belongs to and starts with it; null/unknown keeps the automatic behaviour.
  */
-export function portraitRotationFor(cover: DesignPage, seed: string): PlaceholderPortraitId[] {
-  const set = portraitSetForPage(cover);
-  const start = set.indexOf(portraitIdForSeed(seed, set));
+export function portraitRotationFor(
+  cover: DesignPage,
+  seed: string,
+  chosen?: string | null,
+): PlaceholderPortraitId[] {
+  const pick = isPlaceholderPortraitId(chosen) ? chosen : null;
+  const set = pick
+    ? (MONO_PORTRAIT_IDS as readonly PlaceholderPortraitId[]).includes(pick)
+      ? MONO_PORTRAIT_IDS
+      : COLOUR_PORTRAIT_IDS
+    : portraitSetForPage(cover);
+  const start = set.indexOf(pick ?? portraitIdForSeed(seed, set));
   return set.map((_, i) => set[(start + i) % set.length]);
 }

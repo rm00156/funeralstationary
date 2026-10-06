@@ -50,11 +50,13 @@ export function DesignForYouCard({ tall = false }: { tall?: boolean }) {
   );
 }
 
-export function UploadDesignCard({ tall = false }: { tall?: boolean }) {
+/** `productId` starts the upload flow on that product — set on its own page. */
+export function UploadDesignCard({ tall = false, productId }: { tall?: boolean; productId?: string }) {
+  const href = productId ? `${UPLOAD_DESIGN_HREF}?product=${encodeURIComponent(productId)}` : UPLOAD_DESIGN_HREF;
   if (!tall) {
     return (
       <Link
-        href={UPLOAD_DESIGN_HREF}
+        href={href}
         className="flex gap-5 rounded-xl border-[1.5px] border-dashed border-field-border bg-surface p-8 no-underline transition-colors hover:border-plum"
       >
         <Upload size={32} strokeWidth={1.5} aria-hidden className="shrink-0 text-plum" />
@@ -69,7 +71,7 @@ export function UploadDesignCard({ tall = false }: { tall?: boolean }) {
   }
   return (
     <Link
-      href={UPLOAD_DESIGN_HREF}
+      href={href}
       className="flex min-h-[380px] flex-col justify-between gap-6 rounded-xl border-[1.5px] border-dashed border-field-border bg-surface px-7 pb-7 pt-8 no-underline transition-colors hover:border-plum"
     >
       <div className="flex flex-col gap-3.5">

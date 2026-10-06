@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import { products, templateCategories, templateCategoryLinks, templates } from "./catalogue";
+import { artworkUploads } from "./artwork";
 import { designAssets, designs, designVersions } from "./designs";
 import { orderEvents, orderItems, orderProofPages, orderProofs, orders } from "./orders";
 import { deliveryOptions, pageCountOptions, paperOptions, quantityOptions } from "./pricing";
@@ -66,7 +67,13 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
 export const orderItemsRelations = relations(orderItems, ({ one, many }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   design: one(designs, { fields: [orderItems.designId], references: [designs.id] }),
+  upload: one(artworkUploads, { fields: [orderItems.uploadId], references: [artworkUploads.id] }),
   proofs: many(orderProofs),
+}));
+
+export const artworkUploadsRelations = relations(artworkUploads, ({ one, many }) => ({
+  user: one(users, { fields: [artworkUploads.userId], references: [users.id] }),
+  orderItems: many(orderItems),
 }));
 
 export const orderProofsRelations = relations(orderProofs, ({ one, many }) => ({
