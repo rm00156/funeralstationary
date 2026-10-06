@@ -10,6 +10,8 @@ import {
   adminListCategories,
   adminListProducts,
 } from "@/lib/adminCatalogue.server";
+import { placeholderPortraitUrl } from "@/lib/backgroundAssets.server";
+import { PLACEHOLDER_PORTRAIT_IDS } from "@/lib/placeholderPortraits";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +79,9 @@ export default async function AdminTemplatePage({
         template={template}
         products={products}
         categories={categories}
+        portraitUrls={Object.fromEntries(
+          PLACEHOLDER_PORTRAIT_IDS.map((id) => [id, placeholderPortraitUrl(id)]),
+        )}
       />
 
       <AdminTemplateDeleteButton slug={template.slug} name={template.name} />

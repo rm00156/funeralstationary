@@ -123,6 +123,7 @@ export async function POST(
           coverPage,
           slug,
           template?.productFormat.trim,
+          template?.placeholderPortrait,
         );
         const url = await uploadObject(
           `template-previews/${slug}-${Date.now()}.png`,

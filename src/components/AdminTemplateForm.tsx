@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, ImagePlus, X } from "lucide-react";
 
 import type { AdminCategory, AdminProduct, AdminTemplate } from "@/lib/adminCatalogue.server";
 import { adminMutate } from "@/lib/adminClient";
+import { COLOUR_PORTRAIT_IDS, MONO_PORTRAIT_IDS } from "@/lib/placeholderPortraits";
 
 const fieldInput =
   "rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 font-body text-sm focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15";
@@ -26,7 +27,10 @@ export default function AdminTemplateForm({
   template,
   products,
   categories,
+  portraitUrls,
 }: {
+  /** Image URL for each stand-in portrait id (resolved server-side). */
+  portraitUrls: Record<string, string>;
   template: AdminTemplate;
   products: AdminProduct[];
   categories: AdminCategory[];
@@ -37,6 +41,7 @@ export default function AdminTemplateForm({
   const [status, setStatus] = useState(template.status);
   const [sortOrder, setSortOrder] = useState(String(template.sortOrder));
   const [previewImageUrl, setPreviewImageUrl] = useState(template.previewImageUrl);
+  const [portrait, setPortrait] = useState<string | null>(template.placeholderPortrait);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     template.categories,
   );
@@ -106,6 +111,7 @@ export default function AdminTemplateForm({
       status,
       sortOrder: Number(sortOrder),
       previewImageUrl,
+      placeholderPortrait: portrait,
       categories: selectedCategories,
     });
     setSaving(false);
@@ -313,6 +319,51 @@ export default function AdminTemplateForm({
               ))}
             </select>
           )}
+        </div>
+
+        {/* stand-in portrait for previews */}
+        <div className="mt-6">
+          <FieldLabel htmlFor="template-portrait-auto">Preview stand-in portrait</FieldLabel>
+          <p className="mb-3 font-body text-sm text-on-surface-variant">
+            Shown in this design&apos;s empty photo windows on the shop and in its thumbnail —
+            never saved into the layout or printed. Saving a change redraws the thumbnail.
+          </p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Stand-in portrait">
+            <button
+              id="template-portrait-auto"
+              type="button"
+              role="radio"
+              aria-checked={portrait === null}
+              onClick={() => setPortrait(null)}
+              className={`flex h-24 w-20 items-center justify-center rounded-lg border-2 px-2 text-center font-body text-xs ${
+                portrait === null
+                  ? "border-primary-container text-primary"
+                  : "border-outline-variant/50 text-on-surface-variant"
+              }`}
+            >
+              Automatic
+            </button>
+            {[...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS].map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={portrait === id}
+                aria-label={id.replace("-", " ")}
+                onClick={() => setPortrait(id)}
+                className={`relative h-24 w-20 overflow-hidden rounded-lg border-2 ${
+                  portrait === id ? "border-primary-container" : "border-outline-variant/50"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={portraitUrls[id]}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
         </div>
 
         {error && (

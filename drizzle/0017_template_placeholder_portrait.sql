@@ -1,0 +1,1 @@
+ALTER TABLE `templates` ADD `placeholder_portrait` varchar(32);

@@ -67,6 +67,7 @@ async function main() {
         template.layout[0],
         entry.slug,
         template.productFormat.trim,
+        template.placeholderPortrait,
       );
       const url = await saveTemplateThumbnail(entry.slug, png);
       await adminUpdateTemplate(entry.slug, { previewImageUrl: url });

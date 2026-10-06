@@ -78,6 +78,12 @@ export const templates = mysqlTable("templates", {
     .references(() => products.id, { onDelete: "restrict" }),
   previewImageUrl: varchar("preview_image_url", { length: 1024 }).notNull(),
   /**
+   * An admin's chosen stand-in portrait (`portrait-1`…) for this template's
+   * previews. Null = pick automatically from the cover (see
+   * placeholderPortraits). Preview-only: never written into a layout.
+   */
+  placeholderPortrait: varchar("placeholder_portrait", { length: 32 }),
+  /**
    * The *published* per-template starter content — what customers actually
    * get. Null means "no layout authored yet": callers fall back to the
    * generic makeStarterDoc(), preserving the pre-authoring behaviour.
