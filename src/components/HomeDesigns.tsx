@@ -42,13 +42,14 @@ export default function HomeDesigns({
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-8">
-          {templates.map((template) => (
+          {templates.map((template, index) => (
             <TemplateCard
               trim={product.format.trim}
               key={template.id}
               href={`${productHref}/${template.id}`}
               name={template.name}
               image={template.image}
+              priority={index === 0}
               meta={from}
             />
           ))}
