@@ -62,6 +62,15 @@ export const getProductFormats = cache(async (): Promise<Map<string, ProductForm
   return new Map(rows.map(({ slug, ...format }) => [slug, toProductFormat(format)]));
 });
 
+/**
+ * Every product's label, active or not, by slug — for a basket or order line
+ * of the customer's own artwork, which has no design row to join it from.
+ */
+export const getProductLabels = cache(async (): Promise<Map<string, string>> => {
+  const rows = await db.select({ slug: products.slug, label: products.label }).from(products);
+  return new Map(rows.map((row) => [row.slug, row.label]));
+});
+
 export const getCategories = cache(async (): Promise<TemplateCategory[]> => {
   const rows = await db
     .select({ slug: templateCategories.slug, label: templateCategories.label })

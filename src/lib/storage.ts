@@ -9,7 +9,12 @@
  * 4.5MB, and print-resolution photographs routinely exceed it, so the bytes
  * must never pass through a Route Handler.
  */
-import { PutObjectCommand, S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /** Uploads larger than this are rejected before a presigned URL is issued. */
@@ -148,6 +153,28 @@ export async function uploadObject(
     }),
   );
   return publicUrlFor(storageKey);
+}
+
+/**
+ * Read a stored object back — the server checking a customer's uploaded PDF.
+ * Through the S3 API rather than the public URL, so it works whatever the
+ * bucket's read policy or CDN in front of it.
+ */
+export async function readObject(storageKey: string, maxBytes?: number): Promise<Uint8Array> {
+  const config = requireConfig();
+  const response = await getClient(config).send(
+    new GetObjectCommand({ Bucket: config.bucket, Key: storageKey }),
+  );
+  if (!response.Body) throw new Error(`Stored object ${storageKey} has no body`);
+  // A presigned PUT doesn't bind the size the client declared, so the cap is
+  // enforced here, before the body is read into memory.
+  if (maxBytes !== undefined && (response.ContentLength ?? 0) > maxBytes) {
+    (response.Body as { destroy?: () => void }).destroy?.();
+    const error = new Error(`Stored object ${storageKey} is larger than ${maxBytes} bytes`);
+    error.name = "ObjectTooLarge";
+    throw error;
+  }
+  return response.Body.transformToByteArray();
 }
 
 export async function deleteObject(storageKey: string): Promise<void> {

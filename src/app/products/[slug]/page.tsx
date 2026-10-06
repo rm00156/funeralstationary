@@ -225,7 +225,7 @@ export default async function ProductPage({
             <h2 className="type-sub">Can’t find the right design?</h2>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(380px,100%),1fr))] gap-6">
               <DesignForYouCard />
-              <UploadDesignCard />
+              <UploadDesignCard productId={product.id} />
             </div>
             <p className="text-base text-ink-2">
               Looking for something else?{" "}

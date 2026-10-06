@@ -1,5 +1,6 @@
 import {
   char,
+  date,
   decimal,
   int,
   json,
@@ -12,9 +13,11 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/mysql-core";
+import type { ArtworkSnapshot } from "@/lib/artwork";
 import type { DesignDoc, ProductFormat } from "@/lib/designEditor";
 import type { ReadinessIssue } from "@/lib/designReadiness";
 import type { Quote } from "@/lib/orderOfServicePricing";
+import { artworkUploads } from "./artwork";
 import { designs } from "./designs";
 import { users } from "./users";
 
@@ -105,14 +108,23 @@ export const orderItems = mysqlTable(
     orderId: char("order_id", { length: 36 })
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
-    /** The item outlives a deleted design. */
+    /**
+     * What is printed: an editor design, or the customer's own artwork
+     * (artwork_uploads, the /upload flow). Exactly one is set when the line
+     * is added — enforced in orders.server.ts, since MySQL can't express it
+     * alongside the SET NULLs. The item outlives either being deleted.
+     */
     designId: char("design_id", { length: 36 }).references(() => designs.id, {
+      onDelete: "set null",
+    }),
+    uploadId: char("upload_id", { length: 36 }).references(() => artworkUploads.id, {
       onDelete: "set null",
     }),
     position: smallint("position").notNull().default(0),
     // Snapshot columns — queryable, immune to catalogue changes. No FK.
     productId: varchar("product_id", { length: 64 }).notNull(),
-    templateId: varchar("template_id", { length: 64 }).notNull(),
+    /** Null on an uploaded-artwork line, which has no template. */
+    templateId: varchar("template_id", { length: 64 }),
     quantityOptionId: varchar("quantity_option_id", { length: 64 }),
     pageCountOptionId: varchar("page_count_option_id", { length: 64 }),
     paperOptionId: varchar("paper_option_id", { length: 64 }),
@@ -136,8 +148,23 @@ export const orderItems = mysqlTable(
     quantityCopies: int("quantity_copies").notNull(),
     unitPricePence: int("unit_price_pence").notNull(),
     lineTotalPence: int("line_total_pence").notNull(),
-    /** The exact DesignDoc sent to press — the design itself stays editable after ordering. */
-    docSnapshot: json("doc_snapshot").$type<DesignDoc>().notNull(),
+    /**
+     * The exact DesignDoc sent to press — the design itself stays editable
+     * after ordering. Null on an uploaded-artwork line: its press file is the
+     * customer's own PDF, recorded in artworkSnapshot instead.
+     */
+    docSnapshot: json("doc_snapshot").$type<DesignDoc>(),
+    /**
+     * An uploaded-artwork line's record: the file (or Canva link), the checks
+     * the customer was shown, and when they accepted any warnings and
+     * confirmed they had checked the wording. Written once, at add time — an
+     * upload is immutable, so unlike docSnapshot there is nothing live for the
+     * pay click to catch up with. Like defaultsAck it is the evidence for
+     * "you approved this", so nothing rewrites it.
+     */
+    artworkSnapshot: json("artwork_snapshot").$type<ArtworkSnapshot>(),
+    /** The date of the funeral, when the customer gave it — for planning the print run. */
+    serviceDate: date("service_date", { mode: "string" }),
     /**
      * The product's format at the pay click — its size label, axis names and
      * whether its page options are sizes — which is what the spec line on

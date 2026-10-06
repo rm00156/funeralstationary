@@ -9,8 +9,8 @@
  *   1. everything under the browser's guest token (designs, uploads, the
  *      basket), so work started as a guest is not stranded, and
  *   2. every paid order whose contact email is the one just proven, plus
- *      the designs on those orders, so an order placed as a guest is found
- *      again from any device.
+ *      the designs and uploaded artwork on those orders, so an order placed
+ *      as a guest is found again from any device.
  *
  * Nothing is ever attached to an account on the strength of an address
  * merely *typed* — at checkout or in the form — because typing someone
@@ -24,7 +24,15 @@ import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { cache } from "react";
 import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
-import { designAssets, designs, loginTokens, orderItems, orders, users } from "@/db/schema";
+import {
+  artworkUploads,
+  designAssets,
+  designs,
+  loginTokens,
+  orderItems,
+  orders,
+  users,
+} from "@/db/schema";
 import {
   LOGIN_LINK_TTL_SECONDS,
   generateLoginSecret,
@@ -182,7 +190,8 @@ async function findOrCreateUser(email: string, verifiedAt: Date): Promise<string
 /**
  * Attach to a freshly signed-in user everything they can be shown to own:
  * the rows under this browser's guest token, and the paid orders addressed
- * to the email they just proved (with the designs on them). Idempotent.
+ * to the email they just proved (with the designs and uploads on them).
+ * Idempotent.
  */
 export async function claimOwnership(input: {
   userId: string;
@@ -203,6 +212,10 @@ async function claimGuestRows(userId: string, guestToken: string): Promise<void>
     .update(designAssets)
     .set({ userId, guestToken: null })
     .where(and(eq(designAssets.guestToken, guestToken), isNull(designAssets.userId)));
+  await db
+    .update(artworkUploads)
+    .set({ userId, guestToken: null })
+    .where(and(eq(artworkUploads.guestToken, guestToken), isNull(artworkUploads.userId)));
 
   // Two baskets — the account's and this browser's — become one: the guest
   // basket's lines move onto the account's draft (skipping designs already
@@ -268,7 +281,7 @@ async function claimOrdersByEmail(userId: string, email: string): Promise<void> 
   const orderIds = placed.map((row) => row.id);
 
   const lines = await db
-    .select({ designId: orderItems.designId })
+    .select({ designId: orderItems.designId, uploadId: orderItems.uploadId })
     .from(orderItems)
     .where(inArray(orderItems.orderId, orderIds));
   const designIds = [...new Set(lines.flatMap((line) => (line.designId ? [line.designId] : [])))];
@@ -277,6 +290,13 @@ async function claimOrdersByEmail(userId: string, email: string): Promise<void> 
       .update(designs)
       .set({ userId, guestToken: null })
       .where(and(inArray(designs.id, designIds), isNull(designs.userId)));
+  }
+  const uploadIds = [...new Set(lines.flatMap((line) => (line.uploadId ? [line.uploadId] : [])))];
+  if (uploadIds.length > 0) {
+    await db
+      .update(artworkUploads)
+      .set({ userId, guestToken: null })
+      .where(and(inArray(artworkUploads.id, uploadIds), isNull(artworkUploads.userId)));
   }
   await db
     .update(orders)

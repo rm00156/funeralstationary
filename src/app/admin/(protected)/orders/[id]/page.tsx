@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, FileDown } from "lucide-react";
+import { ChevronRight, ExternalLink, FileDown } from "lucide-react";
 
 import AdminOrderProofActions from "@/components/AdminOrderProofActions";
 import AdminPrintPdfButton from "@/components/AdminPrintPdfButton";
@@ -8,10 +8,27 @@ import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { adminGetOrder } from "@/lib/adminOrders.server";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
+import { fileSizeText } from "@/lib/artwork";
 import { trimText } from "@/lib/designEditor";
 import { ORDER_STATUS_LABELS, lineSpec } from "@/lib/orders";
 
+/** Stripe's dashboard page for a payment; test-mode payments live under /test. */
+function stripePaymentUrl(paymentIntentId: string): string {
+  const mode = process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? "test/" : "";
+  return `https://dashboard.stripe.com/${mode}payments/${paymentIntentId}`;
+}
+
 export const dynamic = "force-dynamic";
+
+/** A YYYY-MM-DD service date, as "Tue 13 Oct 2026". */
+const formatServiceDate = (value: string) =>
+  new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
 
 const formatDateTime = (date: Date | null) =>
   date
@@ -77,9 +94,15 @@ export default async function AdminOrderPage({
                         {item.format.sizedByOption &&
                           ` — artwork drawn at ${trimText(item.artworkTrim)}; scale to the size ordered`}
                       </p>
+                      {item.serviceDate && (
+                        <p className="font-body text-sm font-medium text-on-surface">
+                          Service on {formatServiceDate(item.serviceDate)}
+                        </p>
+                      )}
                       <p className="font-body text-xs text-on-surface-variant">
                         {formatPence(item.unitPricePence)} each · {item.delivery.label} (
-                        {formatPence(item.delivery.pricePence)}) · template {item.templateId}
+                        {formatPence(item.delivery.pricePence)})
+                        {item.templateId ? ` · template ${item.templateId}` : " · customer’s own artwork"}
                         {item.designId && (
                           <>
                             {" · "}
@@ -93,47 +116,108 @@ export default async function AdminOrderPage({
                     <p className="font-display text-lg text-primary">{formatPence(item.lineTotalPence)}</p>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                    {item.proofs.length === 0 ? (
-                      <p className="font-body text-sm text-on-surface-variant">No proof yet.</p>
-                    ) : (
-                      <ul className="flex flex-wrap gap-2">
-                        {item.proofs.map((proof) => {
-                          const label = `v${proof.version}`;
-                          return (
-                            <li
-                              key={proof.id}
-                              className="flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5"
-                            >
-                              <span className="font-body text-xs font-medium text-on-surface">
-                                {label} · {proof.pages.length}pp
-                              </span>
-                              {/* The press file is rendered on demand, so a
-                                  version may not have one yet. */}
-                              {proof.pdfUrl ? (
-                                <a
-                                  href={proof.pdfUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center gap-1 font-body text-xs font-medium text-primary-container underline-offset-2 hover:underline"
-                                >
-                                  <FileDown size={12} aria-hidden />
-                                  print PDF
-                                </a>
-                              ) : (
-                                <AdminPrintPdfButton orderId={order.id} proofId={proof.id} />
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                    <AdminOrderProofActions
-                      orderId={order.id}
-                      itemId={item.id}
-                      hasProof={item.proofs.length > 0}
-                    />
-                  </div>
+                  {item.artwork ? (
+                    <div className="mt-3 rounded-lg bg-surface-container px-4 py-3 font-body text-sm">
+                      {item.artwork.source === "pdf" && item.artwork.url ? (
+                        <a
+                          href={item.artwork.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 font-medium text-primary-container underline-offset-2 hover:underline"
+                        >
+                          <FileDown size={14} aria-hidden />
+                          Customer’s PDF — {item.artwork.fileName}
+                          {item.artwork.byteSize ? ` (${fileSizeText(item.artwork.byteSize)})` : ""}
+                        </a>
+                      ) : (
+                        <>
+                          <a
+                            href={item.artwork.canvaUrl ?? "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 break-all font-medium text-primary-container underline-offset-2 hover:underline"
+                          >
+                            <ExternalLink size={14} aria-hidden />
+                            Canva design
+                          </a>
+                          <p className="mt-1 text-on-surface-variant">
+                            Not checked yet — download it as PDF Print with bleed, and check the size,
+                            pages, photos and fonts before it goes to press.
+                          </p>
+                        </>
+                      )}
+                      {item.artwork.pageCount !== null && (
+                        <p className="mt-1 text-on-surface-variant">
+                          {item.artwork.pageCount} {item.artwork.pageCount === 1 ? "page" : "pages"} in the file ·
+                          cut to {trimText(item.artwork.trim)}
+                        </p>
+                      )}
+                      {item.artwork.checks.some((check) => check.status !== "pass") && (
+                        <div className="mt-2">
+                          <p className="font-medium text-on-surface">
+                            Customer chose to print it as it is
+                            {item.artwork.warningsAcceptedAt &&
+                              `, ${formatDateTime(new Date(item.artwork.warningsAcceptedAt))}`}
+                            :
+                          </p>
+                          <ul className="mt-1 list-disc pl-5 text-on-surface-variant">
+                            {item.artwork.checks
+                              .filter((check) => check.status !== "pass")
+                              .map((check) => (
+                                <li key={check.id}>
+                                  {check.title}. {check.detail}
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
+                      )}
+                      <p className="mt-2 text-xs text-on-surface-variant">
+                        Wording confirmed by the customer {formatDateTime(new Date(item.artwork.confirmedAt))}.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                      {item.proofs.length === 0 ? (
+                        <p className="font-body text-sm text-on-surface-variant">No proof yet.</p>
+                      ) : (
+                        <ul className="flex flex-wrap gap-2">
+                          {item.proofs.map((proof) => {
+                            const label = `v${proof.version}`;
+                            return (
+                              <li
+                                key={proof.id}
+                                className="flex items-center gap-2 rounded-lg bg-surface-container px-3 py-1.5"
+                              >
+                                <span className="font-body text-xs font-medium text-on-surface">
+                                  {label} · {proof.pages.length}pp
+                                </span>
+                                {/* The press file is rendered on demand, so a
+                                    version may not have one yet. */}
+                                {proof.pdfUrl ? (
+                                  <a
+                                    href={proof.pdfUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 font-body text-xs font-medium text-primary-container underline-offset-2 hover:underline"
+                                  >
+                                    <FileDown size={12} aria-hidden />
+                                    print PDF
+                                  </a>
+                                ) : (
+                                  <AdminPrintPdfButton orderId={order.id} proofId={proof.id} />
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <AdminOrderProofActions
+                        orderId={order.id}
+                        itemId={item.id}
+                        hasProof={item.proofs.length > 0}
+                      />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -157,7 +241,7 @@ export default async function AdminOrderPage({
                       </span>
                       {event.actor && <span className="text-on-surface-variant"> · {event.actor}</span>}
                       {event.note && (
-                        <span className="block text-on-surface-variant">{event.note}</span>
+                        <span className="block text-on-surface-variant">{event.note.replace(/ \(cs_\w+\)$/, "")}</span>
                       )}
                     </span>
                   </li>
@@ -212,11 +296,17 @@ export default async function AdminOrderPage({
                 <dd className="text-primary">{formatPence(order.totals.totalPence)}</dd>
               </div>
             </dl>
-            <p className="mt-4 break-all font-body text-xs text-on-surface-variant">
-              Stripe session {order.stripe.checkoutSessionId ?? "—"}
-              <br />
-              Payment intent {order.stripe.paymentIntentId ?? "—"}
-            </p>
+            {order.stripe.paymentIntentId && (
+              <a
+                href={stripePaymentUrl(order.stripe.paymentIntentId)}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-1.5 font-body text-sm font-medium text-primary hover:underline"
+              >
+                <ExternalLink size={14} aria-hidden />
+                View payment in Stripe
+              </a>
+            )}
           </Section>
         </div>
       </div>
