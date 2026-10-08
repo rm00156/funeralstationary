@@ -6,6 +6,8 @@
  */
 import { Resend } from "resend";
 
+import type { EmailAttachment } from "@/lib/orderEmails";
+
 export function isEmailConfigured(): boolean {
   return !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM;
 }
@@ -24,6 +26,8 @@ export async function sendEmail(message: {
   html: string;
   /** Where a reply should go — the customer's address on a contact-form message. */
   replyTo?: string;
+  /** Inline images (the logo) the html references by `cid:`. */
+  attachments?: EmailAttachment[];
 }): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!isEmailConfigured() || !from) return false;
