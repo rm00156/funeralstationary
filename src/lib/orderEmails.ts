@@ -235,3 +235,54 @@ export function signInEmail(linkUrl: string): EmailContent {
 </div>`;
   return { subject, text, html };
 }
+
+/** An admin's one-time sign-in link to /admin. */
+export function adminSignInEmail(linkUrl: string): EmailContent {
+  const subject = "Admin sign-in link — The Funeral Stationery";
+  const text = [
+    "Hello,",
+    "",
+    "Use the link below to sign in to the admin area of The Funeral Stationery:",
+    linkUrl,
+    "",
+    "The link works once and expires in 15 minutes. If you did not ask for it, you can ignore this email — nobody can sign in without it.",
+  ].join("\n");
+  const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
+<p>Hello,</p>
+<p>Use the link below to sign in to the admin area of The Funeral Stationery.</p>
+<p><a href="${escapeHtml(linkUrl)}" style="display:inline-block;padding:12px 20px;background:#5c4b51;color:#ffffff;text-decoration:none;border-radius:8px">Sign in to admin</a></p>
+<p style="color:#6b6560;font-size:13px">The link works once and expires in 15 minutes. If you did not ask for it, you can ignore this email — nobody can sign in without it.</p>
+</div>`;
+  return { subject, text, html };
+}
+
+/**
+ * Sent when an admin grants someone access. It links to the sign-in page
+ * (address filled in), not a sign-in link: an invitation can sit unread for
+ * days, and a long-lived link that signs whoever holds it in would be a key
+ * left lying in an inbox.
+ */
+export function adminInviteEmail({
+  signInPageUrl,
+  invitedBy,
+}: {
+  signInPageUrl: string;
+  invitedBy: string;
+}): EmailContent {
+  const subject = "You've been given admin access — The Funeral Stationery";
+  const text = [
+    "Hello,",
+    "",
+    `${invitedBy} has given this email address access to the admin area of The Funeral Stationery.`,
+    "",
+    "To sign in, open the page below and ask for a sign-in link. We'll email you a link that signs you in — there is no password.",
+    signInPageUrl,
+  ].join("\n");
+  const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
+<p>Hello,</p>
+<p>${escapeHtml(invitedBy)} has given this email address access to the admin area of The Funeral Stationery.</p>
+<p>To sign in, open the page below and ask for a sign-in link. We&rsquo;ll email you a link that signs you in — there is no password.</p>
+<p><a href="${escapeHtml(signInPageUrl)}" style="display:inline-block;padding:12px 20px;background:#5c4b51;color:#ffffff;text-decoration:none;border-radius:8px">Go to admin sign-in</a></p>
+</div>`;
+  return { subject, text, html };
+}

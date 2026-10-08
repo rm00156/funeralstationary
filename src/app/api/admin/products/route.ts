@@ -4,7 +4,7 @@ import {
   adminListProducts,
   isDuplicateKeyError,
 } from "@/lib/adminCatalogue.server";
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import { parseLabel, parseSlug, parseSortOrder } from "@/lib/adminValidation";
 
 export const runtime = "nodejs";

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import { AlreadySubscribedError, billingConfigured, startSubscriptionCheckout } from "@/lib/siteBilling.server";
 import { resolveRequestOrigin } from "@/lib/stripe.server";
 

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { db } from "@/db";
 import { designAssets } from "@/db/schema";
-import { isAdmin } from "@/lib/adminSession";
+import { isAdmin } from "@/lib/adminAuth.server";
 import { getOrCreateOwner, ownerKey } from "@/lib/session";
 import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 import {

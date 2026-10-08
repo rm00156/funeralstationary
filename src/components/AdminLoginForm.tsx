@@ -1,12 +1,18 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Lock } from "lucide-react";
+import { MailCheck, Send } from "lucide-react";
 
-export default function AdminLoginForm() {
-  const router = useRouter();
-  const [password, setPassword] = useState("");
+/**
+ * Admin sign-in by emailed link. The server answers the same for every
+ * address, so "check your email" is shown whether or not one was sent — only
+ * an address with admin access actually receives a link.
+ */
+export default function AdminLoginForm({ initialEmail = "" }: { initialEmail?: string }) {
+  const [email, setEmail] = useState(initialEmail);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  /** Development without email set up: any link was printed in the server's terminal. */
+  const [linkInTerminal, setLinkInTerminal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -18,23 +24,55 @@ export default function AdminLoginForm() {
       const response = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email }),
       });
-      if (response.ok) {
-        router.push("/admin");
-        router.refresh();
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        linkInTerminal?: boolean;
+      };
+      if (!response.ok) {
+        setError(body.error ?? "We couldn't send your link just now — please try again.");
         return;
       }
-      const { error: message } = (await response.json().catch(() => ({}))) as {
-        error?: string;
-      };
-      setError(message ?? "Could not sign in — please try again");
+      setLinkInTerminal(body.linkInTerminal === true);
+      setSentTo(email.trim());
     } catch {
-      setError("Could not sign in — please try again");
+      setError("We couldn't send your link just now — please try again.");
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (sentTo) {
+    return (
+      <div
+        role="status"
+        className="flex items-start gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-8 ambient-shadow"
+      >
+        <MailCheck size={22} aria-hidden className="mt-0.5 shrink-0 text-secondary" />
+        <div>
+          <p className="font-display text-xl text-primary">Check your email</p>
+          <p className="mt-1 font-body text-sm text-on-surface-variant">
+            If <strong className="text-on-surface">{sentTo}</strong> has admin access, we have sent it a
+            sign-in link. It works once and expires in 15 minutes.
+          </p>
+          {linkInTerminal && (
+            <p className="mt-3 rounded-lg bg-surface-container-low px-4 py-3 font-body text-sm text-on-surface-variant">
+              Email isn&apos;t set up on this computer, so nothing was sent. If the address has access, the
+              sign-in link is in the terminal running the server.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => setSentTo(null)}
+            className="mt-3 min-h-11 font-body text-sm text-primary underline-offset-2 hover:underline"
+          >
+            Use a different email
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form
@@ -42,33 +80,34 @@ export default function AdminLoginForm() {
       className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-8 ambient-shadow"
     >
       <label
-        htmlFor="admin-password"
-        className="block font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary mb-2"
+        htmlFor="admin-email"
+        className="mb-2 block font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary"
       >
-        Admin password
+        Your email address
       </label>
       <input
-        id="admin-password"
-        type="password"
-        autoComplete="current-password"
+        id="admin-email"
+        type="email"
+        inputMode="email"
+        autoComplete="email"
         autoFocus
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        className="w-full rounded-lg bg-surface-container-low px-4 py-3 font-body text-base text-on-surface border border-outline-variant transition-colors duration-300 focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15"
+        required
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        className="field min-h-11 text-base"
       />
       {error && (
         <p role="alert" className="mt-3 font-body text-sm text-primary">
           {error}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={submitting || !password}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary-container px-5 py-3 font-body font-medium tracking-wide text-white transition-colors duration-300 hover:bg-primary disabled:opacity-60"
-      >
-        <Lock size={16} aria-hidden />
-        {submitting ? "Signing in…" : "Sign in"}
+      <button type="submit" disabled={submitting || !email} className="btn btn-primary mt-6 min-h-11 w-full">
+        <Send size={16} aria-hidden />
+        {submitting ? "Sending…" : "Email me a sign-in link"}
       </button>
+      <p className="mt-4 font-body text-xs text-on-surface-variant">
+        No password — we email you a link, and clicking it signs you in.
+      </p>
     </form>
   );
 }

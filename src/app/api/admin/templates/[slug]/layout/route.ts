@@ -7,7 +7,7 @@ import {
   adminSaveTemplateDraftLayout,
   adminUpdateTemplate,
 } from "@/lib/adminCatalogue.server";
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { parseLayoutAction, parseLayoutPages } from "@/lib/adminValidation";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";

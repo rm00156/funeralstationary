@@ -9,6 +9,7 @@ import {
   LayoutTemplate,
   List,
   Package,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const SECTIONS: { href: string; label: string; icon: LucideIcon; badge?: "orders
   { href: "/admin/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/admin/categories", label: "Categories", icon: List },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
+  { href: "/admin/access", label: "Access", icon: ShieldCheck },
 ];
 
 /**

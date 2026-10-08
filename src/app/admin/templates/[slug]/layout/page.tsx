@@ -6,7 +6,7 @@ import {
   adminGetTemplate,
   adminListCategories,
 } from "@/lib/adminCatalogue.server";
-import { requireAdmin } from "@/lib/adminSession";
+import { requireAdmin } from "@/lib/adminAuth.server";
 import { getPricingData } from "@/lib/pricing.server";
 import type { Template } from "@/lib/templates";
 

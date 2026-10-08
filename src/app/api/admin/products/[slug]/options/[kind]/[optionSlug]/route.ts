@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { adminGetProduct, adminUpdateOption, isOptionKind } from "@/lib/adminCatalogue.server";
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import { pageCountFormatError, parseOptionPatch } from "@/lib/adminValidation";
 import type { TemplatePageCount } from "@/lib/designEditor";
 

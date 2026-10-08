@@ -6,7 +6,7 @@ import {
   isDuplicateKeyError,
   isOptionKind,
 } from "@/lib/adminCatalogue.server";
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import { pageCountFormatError, parseOptionInput } from "@/lib/adminValidation";
 import type { TemplatePageCount } from "@/lib/designEditor";
 

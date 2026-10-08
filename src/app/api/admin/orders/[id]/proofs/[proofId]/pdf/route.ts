@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { generateOrderItemPrintPdf } from "@/lib/orderFulfilment.server";
 import { isStorageConfigured } from "@/lib/storage";

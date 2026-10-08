@@ -5,7 +5,7 @@ import { ArrowUpRight } from "lucide-react";
 import AdminLogoutButton from "@/components/AdminLogoutButton";
 import AdminNav from "@/components/AdminNav";
 import { adminOrderCounts } from "@/lib/adminDashboard.server";
-import { requireAdmin } from "@/lib/adminSession";
+import { requireAdmin } from "@/lib/adminAuth.server";
 import { SITE_NAME } from "@/lib/site";
 import { billingNotice } from "@/lib/siteAccess";
 import { getSiteAccess, subscriptionRequired } from "@/lib/siteBilling.server";
@@ -30,7 +30,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   // With the switch off nothing can close, so the billing table isn't read.
   const [notice, counts] = await Promise.all([
     subscriptionRequired() ? getSiteAccess().then(billingNotice) : null,
@@ -52,6 +52,9 @@ export default async function AdminLayout({
           <AdminNav openOrders={counts.awaiting_print + counts.in_production} />
         </div>
         <div className="hidden border-t border-white/10 px-3 py-4 lg:block">
+          <p className="truncate px-3 pb-2 font-body text-xs text-on-plum-muted" title={admin.email}>
+            Signed in as {admin.email}
+          </p>
           <Link href="/" className={SIDEBAR_LINK}>
             <ArrowUpRight size={18} aria-hidden />
             View site
