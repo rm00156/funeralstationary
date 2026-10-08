@@ -81,6 +81,18 @@ export function parseUkPostcode(value: unknown): string | null {
 
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
+/**
+ * The review-request opt-out (src/lib/reviewRequest.ts): true when the
+ * customer unticked "Email me once after the funeral". Absent —
+ * a form from before the question, still open in a tab — is undefined, which
+ * leaves the order as it was: never asked, so never sent the email.
+ */
+export function parseReviewOptOut(value: unknown): Parsed<boolean | undefined> {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (typeof value === "boolean") return { ok: true, value };
+  return { ok: false, error: "Invalid email preference" };
+}
+
 /** The whole checkout form; the first invalid field names itself in the error. */
 export function parseCheckoutDetails(body: unknown): Parsed<CheckoutDetails> {
   const raw = (body ?? {}) as Record<string, unknown>;

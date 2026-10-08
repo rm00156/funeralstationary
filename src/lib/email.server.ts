@@ -28,6 +28,7 @@ export async function sendEmail(message: {
   replyTo?: string;
   /** Inline images (the logo) the html references by `cid:`. */
   attachments?: EmailAttachment[];
+  headers?: Record<string, string>;
 }): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!isEmailConfigured() || !from) return false;

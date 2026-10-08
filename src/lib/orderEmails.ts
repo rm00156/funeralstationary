@@ -56,6 +56,8 @@ export interface EmailContent {
   /** Where a reply goes: the shop's inbox for a customer, the customer for staff. */
   replyTo?: string;
   attachments?: EmailAttachment[];
+  /** Extra mail headers — List-Unsubscribe on the review request. */
+  headers?: Record<string, string>;
 }
 
 const escapeHtml = (value: string) =>
@@ -506,4 +508,69 @@ export function adminInviteEmail({
     buttonUrl: signInPageUrl,
   });
   return { subject, text, html, attachments: brandedAttachments() };
+}
+
+/**
+ * The one email asking a family how we did, about two weeks after the
+ * funeral (src/lib/reviewRequest.ts). Worded for someone grieving: thanks
+ * first, one ask framed as helping other families, no obligation, never
+ * "five stars". `optOutUrl` is the page that stops these for this address;
+ * `oneClickUrl` is the same, for mail clients' own unsubscribe button
+ * (RFC 8058), which POSTs to it directly.
+ */
+export function reviewRequestEmail({
+  contactName,
+  reviewUrl,
+  optOutUrl,
+  oneClickUrl,
+}: {
+  contactName: string;
+  reviewUrl: string;
+  optOutUrl: string;
+  oneClickUrl: string;
+}): EmailContent {
+  const subject = `Thank you from ${SITE_NAME}`;
+  const thanks =
+    "Thank you for trusting us with the stationery for your loved one’s funeral. We hope everything was just as you wished on the day.";
+  const ask =
+    "If you feel comfortable sharing your experience, a few words on Google would help other families who are looking for someone to trust at a difficult time.";
+  const noObligation = "There’s no obligation at all. We’re simply grateful we could help.";
+  const onlyOne = "This is the only email we’ll send about your order.";
+  const text = [
+    `Dear ${contactName},`,
+    "",
+    thanks,
+    "",
+    ask,
+    noObligation,
+    "",
+    reviewUrl,
+    "",
+    "With warm wishes,",
+    SITE_NAME,
+    "",
+    `${onlyOne} To stop emails like this one: ${optOutUrl}`,
+  ].join("\n");
+  const html = brandedEmailHtml({
+    preheader: "Thank you for letting us help. We hope everything was as you wished.",
+    heading: "Thank you",
+    body: `${paragraph(`Dear ${escapeHtml(contactName)},`)}
+${paragraph(escapeHtml(thanks))}
+${paragraph(escapeHtml(ask))}
+${paragraph(escapeHtml(noObligation))}
+${button("Share your experience on Google", reviewUrl)}
+${signOff("With warm wishes,")}
+${finePrint(`${escapeHtml(onlyOne)} <a href="${escapeHtml(optOutUrl)}" style="color:${LABEL}">Stop emails like this one</a>.`)}`,
+  });
+  return {
+    subject,
+    text,
+    html,
+    replyTo: EMAIL,
+    attachments: brandedAttachments(),
+    headers: {
+      "List-Unsubscribe": `<${oneClickUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  };
 }

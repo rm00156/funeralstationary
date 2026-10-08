@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseCheckoutDetails,
+  parseReviewOptOut,
   parseEmail,
   parseName,
   parseOptionalAddressLine,
@@ -99,5 +100,17 @@ describe("parseCheckoutDetails", () => {
       error: "Please enter a valid UK postcode",
     });
     expect(parseCheckoutDetails(null).ok).toBe(false);
+  });
+});
+
+describe("parseReviewOptOut", () => {
+  it("takes a tick or no tick, and leaves the order alone when the field is absent", () => {
+    expect(parseReviewOptOut(true)).toEqual({ ok: true, value: true });
+    expect(parseReviewOptOut(false)).toEqual({ ok: true, value: false });
+    expect(parseReviewOptOut(undefined)).toEqual({ ok: true, value: undefined });
+  });
+
+  it("refuses anything else rather than guessing", () => {
+    for (const bad of [null, "true", 1, {}]) expect(parseReviewOptOut(bad).ok).toBe(false);
   });
 });

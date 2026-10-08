@@ -60,6 +60,9 @@ export default function CheckoutForm({
     postcode: cart.details?.postcode ?? "",
     serviceDate: cart.serviceDate ?? "",
   });
+  // The review request (reviewRequest.ts). Ticked by default; unticking it is the
+  // customer's way to say no, which is all the soft opt-in asks for.
+  const [reviewEmail, setReviewEmail] = useState(!(cart.reviewOptOut ?? false));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,7 +77,11 @@ export default function CheckoutForm({
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, serviceDate: form.serviceDate || null }),
+        body: JSON.stringify({
+          ...form,
+          serviceDate: form.serviceDate || null,
+          reviewOptOut: !reviewEmail,
+        }),
       });
       const payload = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!response.ok || !payload.url) {
@@ -170,6 +177,16 @@ export default function CheckoutForm({
             {error}
           </p>
         )}
+
+        <label className="-mb-3 flex min-h-11 cursor-pointer items-center gap-2.5 self-start font-body text-sm text-on-surface-variant">
+          <input
+            type="checkbox"
+            checked={reviewEmail}
+            onChange={(event) => setReviewEmail(event.target.checked)}
+            className="size-4 shrink-0 accent-plum"
+          />
+          Email me once after the funeral to ask how we did
+        </label>
 
         <button
           type="submit"

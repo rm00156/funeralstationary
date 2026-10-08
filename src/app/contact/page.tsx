@@ -97,15 +97,12 @@ export default async function ContactPage({ searchParams }: PageProps<"/contact"
                 <div className="flex gap-[18px] p-7">
                   <MapPin size={28} strokeWidth={1.6} aria-hidden className="shrink-0 text-plum" />
                   <div className="flex flex-col gap-1">
-                    <h2 className={CARD_HEADING}>Visit us, by appointment</h2>
+                    <h2 className={CARD_HEADING}>Where we are</h2>
                     <address className="text-base not-italic text-ink-2">
                       {COMPANY_NAME}, {ADDRESS_LINES[0]}
                       <br />
                       {ADDRESS_LINES[1]}
                     </address>
-                    <p className="mt-1 text-base text-ink-2">
-                      Please call ahead to book a time before popping in.
-                    </p>
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${MAP_QUERY}`}
                       target="_blank"

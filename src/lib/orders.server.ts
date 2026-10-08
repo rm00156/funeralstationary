@@ -184,6 +184,8 @@ export interface Cart {
    * carries (an upload asks for it in its own flow), null when none does.
    */
   serviceDate: string | null;
+  /** True when checkout's "Email me once after the funeral" box was unticked; null until checkout asks. */
+  reviewOptOut: boolean | null;
   /** `deliveryPence` is Σ of the lines' delivery charges. */
   totals: OrderTotals;
   /** Everything prices and nothing is missing — checkout may proceed. */
@@ -563,6 +565,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     items,
     details: detailsFrom(order),
     serviceDate: earliestServiceDate(items.map((item) => item.serviceDate)),
+    reviewOptOut: order.reviewRequestOptOut,
     totals,
     ready,
   };
@@ -888,12 +891,14 @@ export async function removeCartItem(owner: Owner, itemId: string): Promise<Cart
  * Saves the checkout form. `serviceDate` — the date of the funeral — goes
  * onto every line, since a basket is one family's order for one service; it
  * replaces a date given in the upload step, which the form showed prefilled.
- * Undefined leaves the lines alone (a details-only PATCH).
+ * Undefined leaves the lines alone (a details-only PATCH). `reviewOptOut` is
+ * true when the customer unticked the review-email box; undefined leaves it as it was.
  */
 export async function setCheckoutDetails(
   owner: Owner,
   details: CheckoutDetails,
   serviceDate?: string | null,
+  reviewOptOut?: boolean,
 ): Promise<Cart> {
   const order = await findDraftOrder(owner);
   if (!order) throw new CartError(404, "Your basket is empty");
@@ -913,6 +918,7 @@ export async function setCheckoutDetails(
         city: details.city,
         postcode: details.postcode,
         country: "GB",
+        ...(reviewOptOut === undefined ? {} : { reviewRequestOptOut: reviewOptOut }),
       })
       .where(eq(orders.id, order.id));
   });

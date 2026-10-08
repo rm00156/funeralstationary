@@ -26,15 +26,14 @@ import {
 
 export type NavProduct = Pick<Product, "id" | "label"> & { occasion: ProductOccasion };
 
-const NAV_LINKS = [
-  { label: "Reviews", href: "/reviews" },
-  { label: "Contact", href: "/contact" },
+/** The two ways to order that aren't catalogue products; on the bar itself, and grouped in the mobile menu. */
+const OTHER_WAYS = [
+  { label: "Upload your design", href: UPLOAD_DESIGN_HREF },
+  { label: "We design it for you", href: DESIGN_FOR_YOU_HREF },
 ];
 
-const OTHER_WAYS = [
-  { label: "We design it for you", href: DESIGN_FOR_YOU_HREF },
-  { label: "Upload your own design", href: UPLOAD_DESIGN_HREF },
-];
+/** The rest of the bar after Shop. */
+const NAV_LINKS = [...OTHER_WAYS, { label: "Contact", href: "/contact" }];
 
 const productHref = (product: NavProduct) => `/products/${product.id}`;
 
@@ -66,8 +65,9 @@ const MENU_ITEM =
  * and the signed-in customer. The utility bar and the header scroll away with
  * the page (nothing here is sticky — the product page's filter bar is).
  *
- * The shop menu is grouped by products.occasion, then the two ways to order
- * that aren't catalogue products. Signed in: "My account" opens a menu with
+ * The shop menu is grouped by products.occasion; the two ways to order that
+ * aren't catalogue products sit on the bar beside it (and in their own group
+ * in the mobile menu). Signed in: "My account" opens a menu with
  * the account page and Sign out. Signed out: "Sign in" goes to /account,
  * which is the sign-in form above whatever this browser has saved.
  */
@@ -98,7 +98,7 @@ export default function HeaderNav({
   })).filter((group) => group.products.length > 0);
 
   const linkClass = (active: boolean) =>
-    `flex min-h-11 items-center border-b-2 no-underline transition-colors hover:text-plum ${
+    `flex min-h-11 items-center whitespace-nowrap border-b-2 no-underline transition-colors hover:text-plum ${
       active ? "border-plum text-plum" : "border-transparent text-ink"
     }`;
 
@@ -129,7 +129,7 @@ export default function HeaderNav({
       </div>
 
       <header className="relative border-b border-line bg-surface">
-        <div className="site-container flex items-center justify-between gap-x-4 py-4 lg:gap-x-10">
+        <div className="site-container flex items-center justify-between gap-x-4 py-4 xl:gap-x-8">
           <Link href="/" aria-label="The Funeral Stationery – home" className="flex min-w-0">
             <Image
               src="/logo.webp"
@@ -141,7 +141,7 @@ export default function HeaderNav({
             />
           </Link>
 
-          <nav aria-label="Main" className="hidden items-center gap-9 text-base font-medium lg:flex">
+          <nav aria-label="Main" className="hidden items-center gap-8 text-base font-medium xl:flex">
             <div ref={shopRef} className="relative">
               <button
                 type="button"
@@ -181,19 +181,6 @@ export default function HeaderNav({
                       ))}
                     </div>
                   ))}
-                  <div className={groups.length > 0 ? "mt-2 border-t border-line pt-3.5" : "pt-2"}>
-                    <p className={GROUP_HEADING}>Other ways to order</p>
-                    {OTHER_WAYS.map((way) => (
-                      <Link
-                        key={way.href}
-                        href={way.href}
-                        onClick={() => setShopOpen(false)}
-                        className={MENU_ITEM}
-                      >
-                        {way.label}
-                      </Link>
-                    ))}
-                  </div>
                   <Link
                     href="/shop"
                     onClick={() => setShopOpen(false)}
@@ -219,7 +206,7 @@ export default function HeaderNav({
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {user ? (
-              <div ref={accountRef} className="relative hidden lg:block">
+              <div ref={accountRef} className="relative hidden xl:block">
                 <button
                   type="button"
                   onClick={() => setAccountOpen((open) => !open)}
@@ -260,7 +247,7 @@ export default function HeaderNav({
             ) : (
               <Link
                 href="/account"
-                className="btn btn-ghost hidden min-h-11 gap-2 px-4 text-base lg:inline-flex"
+                className="btn btn-ghost hidden min-h-11 gap-2 px-4 text-base xl:inline-flex"
               >
                 <CircleUserRound size={18} strokeWidth={1.8} aria-hidden />
                 Sign in
@@ -269,7 +256,7 @@ export default function HeaderNav({
             <CartLink />
             <button
               type="button"
-              className="btn btn-ghost min-h-11 px-2.5 text-plum lg:hidden"
+              className="btn btn-ghost min-h-11 px-2.5 text-plum xl:hidden"
               onClick={() => setMenuOpen((open) => !open)}
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
@@ -284,7 +271,7 @@ export default function HeaderNav({
           <nav
             id="mobile-menu"
             aria-label="Main"
-            className="flex flex-col border-t border-line bg-surface px-margin-mobile py-4 text-[17px] sm:px-gutter lg:hidden"
+            className="flex flex-col border-t border-line bg-surface px-margin-mobile py-4 text-[17px] sm:px-gutter xl:hidden"
           >
             {groups.map((group) => (
               <div key={group.occasion} className="border-b border-line py-2">
@@ -316,7 +303,10 @@ export default function HeaderNav({
               ))}
             </div>
             <div className="py-2 font-medium">
-              {[{ label: "See everything in the shop", href: "/shop" }, ...NAV_LINKS].map((link) => (
+              {[
+                { label: "See everything in the shop", href: "/shop" },
+                ...NAV_LINKS.filter((link) => !OTHER_WAYS.includes(link)),
+              ].map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}

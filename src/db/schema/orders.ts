@@ -1,4 +1,5 @@
 import {
+  boolean,
   char,
   date,
   decimal,
@@ -102,6 +103,16 @@ export const orders = mysqlTable(
     /** Set when Thintent reports the job dispatched — shown to the customer. */
     shippedCourier: varchar("shipped_courier", { length: 120 }),
     trackingRef: varchar("tracking_ref", { length: 120 }),
+    /**
+     * True when the customer unticked checkout's pre-ticked "Email me once after
+     * the funeral" box (src/lib/reviewRequest.ts).
+     * Null = never asked — a draft not yet checked out, or an order placed
+     * before the question existed — and an order is only ever sent the
+     * review request on an explicit false.
+     */
+    reviewRequestOptOut: boolean("review_request_opt_out"),
+    /** When the one review request went out; claimed before sending, so it never goes twice. */
+    reviewRequestedAt: timestamp("review_requested_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },
@@ -309,3 +320,13 @@ export const orderRefunds = mysqlTable(
   },
   (t) => [index("order_refunds_order_idx").on(t.orderId, t.refundedAt)],
 );
+
+/**
+ * Addresses that asked, from the link in a review request, never to be sent
+ * another. Keyed on the lowercased email rather than an order or account, so
+ * it holds for the next order too, signed in or not.
+ */
+export const reviewRequestOptOuts = mysqlTable("review_request_opt_outs", {
+  email: varchar("email", { length: 255 }).primaryKey(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
