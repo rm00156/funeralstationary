@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  billingEventCustomerId,
   billingNotice,
+  holdsSubscription,
+  oldestUnpaidSince,
   PAST_DUE_GRACE_DAYS,
   pickSubscription,
   siteAccessFor,
@@ -149,5 +152,86 @@ describe("billingNotice", () => {
     expect(
       billingNotice(siteAccessFor(state("active", { cancelAtPeriodEnd: true, currentPeriodEnd: end }), true)),
     ).toMatch(/closes on 8 November 2026/);
+  });
+});
+
+describe("holdsSubscription", () => {
+  it("refuses a second subscription while one is good or still being paid", () => {
+    // past_due however long — an overdue one is settled in the portal, not replaced.
+    for (const status of ["active", "trialing", "past_due"]) expect(holdsSubscription(status)).toBe(true);
+  });
+
+  it("lets the site subscribe again once the old one is over or never got going", () => {
+    for (const status of ["canceled", "unpaid", "paused", "incomplete", "incomplete_expired", "something_new"]) {
+      expect(holdsSubscription(status)).toBe(false);
+    }
+  });
+});
+
+describe("oldestUnpaidSince", () => {
+  const invoice = (created: number, finalizedAt: number | null = null) => ({
+    created,
+    status_transitions: { finalized_at: finalizedAt },
+  });
+
+  it("starts the grace at the oldest open invoice, so next month's renewal can't restart it", () => {
+    const september = Date.UTC(2026, 8, 1) / 1000;
+    const october = Date.UTC(2026, 9, 1) / 1000;
+    expect(oldestUnpaidSince([invoice(october), invoice(september)])).toEqual(new Date(september * 1000));
+  });
+
+  it("moves on to the next invoice once the oldest is paid (it drops out of the open list)", () => {
+    const october = Date.UTC(2026, 9, 1) / 1000;
+    expect(oldestUnpaidSince([invoice(october)])).toEqual(new Date(october * 1000));
+  });
+
+  it("reads when the invoice was finalised over when its draft was made", () => {
+    const drafted = Date.UTC(2026, 9, 1) / 1000;
+    const finalised = Date.UTC(2026, 9, 2) / 1000;
+    expect(oldestUnpaidSince([invoice(drafted, finalised)])).toEqual(new Date(finalised * 1000));
+  });
+
+  it("is null with nothing open", () => {
+    expect(oldestUnpaidSince([])).toBeNull();
+  });
+});
+
+describe("billingEventCustomerId", () => {
+  const event = (type: string, object: Record<string, unknown>) => ({ type, data: { object } });
+
+  it("acts on every subscription and invoice event that can change access", () => {
+    for (const type of [
+      "customer.subscription.created",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+      "customer.subscription.paused",
+      "customer.subscription.resumed",
+      "invoice.paid",
+      "invoice.payment_failed",
+      "invoice.voided",
+      "invoice.marked_uncollectible",
+    ]) {
+      expect(billingEventCustomerId(event(type, { customer: "cus_1" }))).toBe("cus_1");
+    }
+  });
+
+  it("reads an expanded customer as well as an id", () => {
+    expect(billingEventCustomerId(event("invoice.paid", { customer: { id: "cus_1" } }))).toBe("cus_1");
+    expect(billingEventCustomerId(event("invoice.paid", { customer: null }))).toBeNull();
+  });
+
+  it("acts on a completed checkout only when it was a subscription", () => {
+    expect(
+      billingEventCustomerId(event("checkout.session.completed", { mode: "subscription", customer: "cus_1" })),
+    ).toBe("cus_1");
+    expect(
+      billingEventCustomerId(event("checkout.session.completed", { mode: "payment", customer: "cus_1" })),
+    ).toBeUndefined();
+  });
+
+  it("leaves every other event alone", () => {
+    for (const type of ["invoice.created", "customer.updated", "payment_intent.succeeded"]) {
+      expect(billingEventCustomerId(event(type, { customer: "cus_1" }))).toBeUndefined();
+    }
   });
 });

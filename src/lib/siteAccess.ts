@@ -152,6 +152,56 @@ export function subscriptionStateFrom(sub: StripeSubscriptionLike): Subscription
   };
 }
 
+/** The bits of a Stripe invoice oldestUnpaidSince reads. */
+export type StripeInvoiceLike = {
+  created: number;
+  status_transitions: { finalized_at?: number | null };
+};
+
+/**
+ * When the oldest of a subscription's open invoices fell due — the start of
+ * the past-due grace. The oldest, not the latest: left past-due, Stripe raises
+ * next month's renewal on top, and that must not restart the grace.
+ */
+export function oldestUnpaidSince(openInvoices: readonly StripeInvoiceLike[]): Date | null {
+  const dueAt = openInvoices.map((invoice) => invoice.status_transitions.finalized_at ?? invoice.created);
+  return dueAt.length ? new Date(Math.min(...dueAt) * 1000) : null;
+}
+
+/** The bits of a Stripe event billingEventCustomerId reads. */
+export type BillingEventLike = { type: string; data: { object: unknown } };
+
+/**
+ * The customer a billing webhook event is about, or undefined for an event
+ * that can't change the subscription (the route answers it 200 untouched).
+ */
+export function billingEventCustomerId(event: BillingEventLike): string | null | undefined {
+  const object = event.data.object as { customer?: string | { id: string } | null; mode?: string | null };
+  switch (event.type) {
+    case "checkout.session.completed":
+      // The shared account also takes one-off payments; only a subscription checkout counts.
+      return object.mode === "subscription" ? idOf(object.customer) : undefined;
+    case "customer.subscription.created":
+    case "customer.subscription.updated":
+    case "customer.subscription.deleted":
+    case "customer.subscription.paused":
+    case "customer.subscription.resumed":
+    // Paying one of two open invoices changes when the grace started without
+    // changing the subscription's status, so no subscription event says so.
+    case "invoice.paid":
+    case "invoice.payment_failed":
+    case "invoice.voided":
+    case "invoice.marked_uncollectible":
+      return idOf(object.customer);
+    default:
+      return undefined;
+  }
+}
+
+function idOf(ref: string | { id: string } | null | undefined): string | null {
+  return typeof ref === "string" ? ref : (ref?.id ?? null);
+}
+
 /** "8 November 2026", in the shop's own time zone. */
 export function formatBillingDate(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "Europe/London" }).format(date);

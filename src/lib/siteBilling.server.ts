@@ -21,6 +21,7 @@ import { siteBilling } from "@/db/schema";
 import { COMPANY_NAME, EMAIL, SITE_NAME } from "@/lib/site";
 import {
   holdsSubscription,
+  oldestUnpaidSince,
   pickSubscription,
   siteAccessFor,
   subscriptionStateFrom,
@@ -247,16 +248,14 @@ export async function syncSiteSubscription(): Promise<void> {
 }
 
 /**
- * When the subscription's oldest unpaid invoice fell due. The oldest, not the
- * latest: left past-due, Stripe raises next month's renewal on top, and that
- * must not restart the grace. Paying the oldest of two leaves the status
- * past_due, so no subscription event fires — the webhook listens to invoice
- * events too, so the clock moves on to the next one.
+ * When the subscription's oldest unpaid invoice fell due (oldestUnpaidSince).
+ * Paying the oldest of two leaves the status past_due, so no subscription
+ * event fires — the webhook listens to invoice events too, so the clock moves
+ * on to the next one.
  */
 async function oldestUnpaidInvoiceDate(subscriptionId: string): Promise<Date | null> {
   const open = await billingStripe().invoices.list({ subscription: subscriptionId, status: "open", limit: 100 });
-  const dueAt = open.data.map((invoice) => invoice.status_transitions.finalized_at ?? invoice.created);
-  return dueAt.length ? new Date(Math.min(...dueAt) * 1000) : null;
+  return oldestUnpaidSince(open.data);
 }
 
 /** Whether a billing event is about this site's customer — the account may be shared. */

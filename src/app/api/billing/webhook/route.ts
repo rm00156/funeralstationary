@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import type Stripe from "stripe";
 
+import { billingEventCustomerId } from "@/lib/siteAccess";
 import {
   constructBillingWebhookEvent,
   isSiteBillingCustomer,
@@ -32,41 +33,11 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: message }, { status });
   }
 
-  const customerId = eventCustomerId(event);
+  const customerId = billingEventCustomerId(event);
   if (customerId === undefined) return Response.json({ received: true });
   if (!(await isSiteBillingCustomer(customerId))) {
     return Response.json({ received: true, ignored: "another customer" });
   }
   await syncSiteSubscription();
   return Response.json({ received: true, synced: true });
-}
-
-/** The customer a subscription event is about; undefined for an event this route doesn't handle. */
-function eventCustomerId(event: Stripe.Event): string | null | undefined {
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object;
-      if (session.mode !== "subscription") return undefined;
-      return idOf(session.customer);
-    }
-    case "customer.subscription.created":
-    case "customer.subscription.updated":
-    case "customer.subscription.deleted":
-    case "customer.subscription.paused":
-    case "customer.subscription.resumed":
-      return idOf(event.data.object.customer);
-    // Paying one of two open invoices changes when the grace started without
-    // changing the subscription's status, so no subscription event says so.
-    case "invoice.paid":
-    case "invoice.payment_failed":
-    case "invoice.voided":
-    case "invoice.marked_uncollectible":
-      return idOf(event.data.object.customer);
-    default:
-      return undefined;
-  }
-}
-
-function idOf(ref: string | { id: string } | null): string | null {
-  return typeof ref === "string" ? ref : (ref?.id ?? null);
 }
