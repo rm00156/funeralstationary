@@ -32,8 +32,10 @@ const OTHER_WAYS = [
   { label: "We design it for you", href: DESIGN_FOR_YOU_HREF },
 ];
 
+const CONTACT_LINK = { label: "Contact", href: "/contact" };
+
 /** The rest of the bar after Shop. */
-const NAV_LINKS = [...OTHER_WAYS, { label: "Contact", href: "/contact" }];
+const NAV_LINKS = [...OTHER_WAYS, CONTACT_LINK];
 
 const productHref = (product: NavProduct) => `/products/${product.id}`;
 
@@ -305,7 +307,7 @@ export default function HeaderNav({
             <div className="py-2 font-medium">
               {[
                 { label: "See everything in the shop", href: "/shop" },
-                ...NAV_LINKS.filter((link) => !OTHER_WAYS.includes(link)),
+                CONTACT_LINK,
               ].map((link) => (
                 <Link
                   key={link.href}

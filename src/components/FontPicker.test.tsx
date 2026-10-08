@@ -88,6 +88,20 @@ describe("FontPicker", () => {
     fireEvent.keyDown(list, { key: "Enter" });
     expect(onChange).toHaveBeenCalledWith("meaCulpa");
   });
+
+  it("reads a space mid-search as part of the name, not a choice", () => {
+    const { button, onChange } = setup("display");
+    fireEvent.click(button);
+    const list = screen.getByRole("listbox");
+    for (const key of "petit f") fireEvent.keyDown(list, { key });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    // A pause, then Space chooses.
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 1000);
+    fireEvent.keyDown(list, { key: " " });
+    expect(onChange).toHaveBeenCalledWith("petitFormalScript");
+    vi.restoreAllMocks();
+  });
 });
 
 describe("findByPrefix", () => {

@@ -180,10 +180,10 @@ function ReviewCarousel({
     const card = element?.firstElementChild as HTMLElement | null;
     if (!element || !card || !card.offsetWidth) return;
     const step = card.offsetWidth + CARD_GAP;
-    setView({
-      first: Math.round(element.scrollLeft / step),
-      perPage: Math.max(1, Math.round((element.clientWidth + CARD_GAP) / step)),
-    });
+    const first = Math.round(element.scrollLeft / step);
+    const perPage = Math.max(1, Math.round((element.clientWidth + CARD_GAP) / step));
+    // Scroll fires every frame of a swipe; re-render only when the page changes.
+    setView((seen) => (seen.first === first && seen.perPage === perPage ? seen : { first, perPage }));
   }, []);
 
   useEffect(() => {
@@ -247,9 +247,10 @@ function ReviewCarousel({
         onScroll={measure}
         className="-mx-4 flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-px-4 px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {reviews.map((review) => (
+        {reviews.map((review, index) => (
           <div
-            key={`${review.authorName}-${review.relativeTime}`}
+            // Google's own order and nothing re-sorts it; names and "a year ago" repeat.
+            key={index}
             className="shrink-0 basis-[88%] snap-start md:basis-[calc((100%-24px)/2)] lg:basis-[calc((100%-48px)/3)]"
           >
             <ReviewCard review={review} />

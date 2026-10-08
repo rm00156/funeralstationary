@@ -711,8 +711,9 @@ export default function DesignEditor({
         target.tagName === "TEXTAREA" ||
         target.tagName === "INPUT" ||
         target.tagName === "SELECT" ||
-        // The font picker's open list (FontPicker), a select in all but tag.
-        target.closest('[role="listbox"]') !== null ||
+        // The font picker (FontPicker), a select in all but tag: its open
+        // list, and its button, which keeps focus after a choice.
+        target.closest('[role="listbox"], [aria-haspopup="listbox"]') !== null ||
         target.isContentEditable;
       if (event.key === "Escape") {
         // First Escape just finishes repositioning a photo.

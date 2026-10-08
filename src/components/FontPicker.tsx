@@ -73,7 +73,7 @@ export function FontPicker({
   useLayoutEffect(() => {
     if (!open) return;
     listRef.current?.focus();
-    optionElement(listRef.current, active)?.scrollIntoView?.({ block: "center" });
+    optionElement(listId, active)?.scrollIntoView?.({ block: "center" });
     // Only on open — keyboard moves scroll themselves below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -104,10 +104,23 @@ export function FontPicker({
   const move = (index: number) => {
     const next = Math.min(FONT_OPTIONS.length - 1, Math.max(0, index));
     setActive(next);
-    optionElement(listRef.current, next)?.scrollIntoView?.({ block: "nearest" });
+    optionElement(listId, next)?.scrollIntoView?.({ block: "nearest" });
   };
 
   const onListKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      const now = Date.now();
+      const searching = now - typeAhead.current.at <= TYPE_AHEAD_MS;
+      // Mid-search a space is part of the name ("Mrs Saint…"); otherwise it chooses, below.
+      if (event.key !== " " || searching) {
+        event.preventDefault();
+        const typed = searching ? typeAhead.current.text + event.key : event.key;
+        typeAhead.current = { text: typed, at: now };
+        const match = findByPrefix(typed, active);
+        if (match >= 0) move(match);
+        return;
+      }
+    }
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -145,13 +158,6 @@ export function FontPicker({
       case "Tab":
         close(false);
         return;
-    }
-    if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
-      const now = Date.now();
-      const typed = now - typeAhead.current.at > 700 ? event.key : typeAhead.current.text + event.key;
-      typeAhead.current = { text: typed, at: now };
-      const match = findByPrefix(typed, active);
-      if (match >= 0) move(match);
     }
   };
 
@@ -246,9 +252,12 @@ function indexOf(id: FontFamilyId): number {
   return index < 0 ? 0 : index;
 }
 
-function optionElement(list: HTMLElement | null, index: number): HTMLElement | null {
-  return list?.querySelectorAll<HTMLElement>('[role="option"]')[index] ?? null;
+function optionElement(listId: string, index: number): HTMLElement | null {
+  return document.getElementById(`${listId}-${index}`);
 }
+
+/** How long after a keystroke the next one still adds to the search. */
+const TYPE_AHEAD_MS = 700;
 
 /**
  * The next font whose name starts with `typed`, searching on from the active

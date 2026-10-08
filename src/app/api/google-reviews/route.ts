@@ -6,7 +6,10 @@ import { clientKey, createRateLimiter } from "@/lib/rateLimit";
 export const runtime = "nodejs";
 
 // Each call is a paid Places request, so one visitor can't run up the bill.
-const limiter = createRateLimiter({ limit: 10, windowMs: 60 * 60 * 1000 });
+// Loose enough for many visitors behind one address (a mobile carrier, an
+// office); the hard ceiling is the key's daily quota in Google Cloud, since
+// this limiter is in memory and per instance.
+const limiter = createRateLimiter({ limit: 60, windowMs: 60 * 60 * 1000 });
 
 /**
  * GET /api/google-reviews — the business's Google reviews for the home page,

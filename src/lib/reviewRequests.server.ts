@@ -40,24 +40,21 @@ export interface ReviewRequestRun {
   failed: number;
 }
 
+/**
+ * Stop starting sends this long into a run, well inside the cron route's
+ * 60s maxDuration: a send killed mid-flight would leave its order claimed
+ * with no email. What's left goes on the next weekday run, within its window.
+ */
+const RUN_BUDGET_MS = 40_000;
+
 /** Send every request due today. One at a time — a handful a day at most. */
 export async function sendDueReviewRequests(siteOrigin: string, now = new Date()): Promise<ReviewRequestRun> {
   const secret = authSecret();
   if (!isEmailConfigured() || !secret) return { considered: 0, sent: 0, failed: 0 };
+  const startedAt = Date.now();
 
-  const since = new Date(now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
-  const completions = await db
-    .select({ orderId: orderEvents.orderId, createdAt: orderEvents.createdAt })
-    .from(orderEvents)
-    .where(and(eq(orderEvents.toStatus, "delivered"), gte(orderEvents.createdAt, since)));
-  // The latest move to delivered, should an order have made it twice.
-  const completedAt = new Map<string, Date>();
-  for (const row of completions) {
-    const seen = completedAt.get(row.orderId);
-    if (!seen || row.createdAt > seen) completedAt.set(row.orderId, row.createdAt);
-  }
-  if (!completedAt.size) return { considered: 0, sent: 0, failed: 0 };
-
+  // From the delivered orders (indexed on status), not from order_events,
+  // which has no index on to_status and grows with every event.
   const candidates = await db
     .select({
       id: orders.id,
@@ -71,7 +68,6 @@ export async function sendDueReviewRequests(siteOrigin: string, now = new Date()
     .from(orders)
     .where(
       and(
-        inArray(orders.id, [...completedAt.keys()]),
         eq(orders.status, "delivered"),
         eq(orders.reviewRequestOptOut, false),
         isNull(orders.reviewRequestedAt),
@@ -80,8 +76,13 @@ export async function sendDueReviewRequests(siteOrigin: string, now = new Date()
   if (!candidates.length) return { considered: 0, sent: 0, failed: 0 };
 
   const ids = candidates.map((order) => order.id);
+  const since = new Date(now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
   const emails = [...new Set(candidates.flatMap((order) => (order.contactEmail ? [order.contactEmail.toLowerCase()] : [])))];
-  const [items, refunds, optedOut] = await Promise.all([
+  const [completions, items, refunds, optedOut] = await Promise.all([
+    db
+      .select({ orderId: orderEvents.orderId, createdAt: orderEvents.createdAt })
+      .from(orderEvents)
+      .where(and(inArray(orderEvents.orderId, ids), eq(orderEvents.toStatus, "delivered"), gte(orderEvents.createdAt, since))),
     db.select({ orderId: orderItems.orderId, serviceDate: orderItems.serviceDate }).from(orderItems).where(inArray(orderItems.orderId, ids)),
     db
       .select({ orderId: orderRefunds.orderId, amountPence: orderRefunds.amountPence, status: orderRefunds.status })
@@ -91,11 +92,20 @@ export async function sendDueReviewRequests(siteOrigin: string, now = new Date()
       ? db.select({ email: reviewRequestOptOuts.email }).from(reviewRequestOptOuts).where(inArray(reviewRequestOptOuts.email, emails))
       : Promise.resolve([]),
   ]);
+  // The latest move to delivered, should an order have made it twice.
+  const completedAt = new Map<string, Date>();
+  for (const row of completions) {
+    const seen = completedAt.get(row.orderId);
+    if (!seen || row.createdAt > seen) completedAt.set(row.orderId, row.createdAt);
+  }
   const optedOutEmails = new Set(optedOut.map((row) => row.email));
 
   const today = shopDate(now);
   const run: ReviewRequestRun = { considered: candidates.length, sent: 0, failed: 0 };
   for (const order of candidates) {
+    const completed = completedAt.get(order.id);
+    // Completed before the lookback: too late to ask.
+    if (!completed) continue;
     const email = order.contactEmail?.toLowerCase() ?? null;
     const decision = reviewRequestDecision(
       {
@@ -105,12 +115,13 @@ export async function sendDueReviewRequests(siteOrigin: string, now = new Date()
         contactEmail: email,
         requestedAt: order.requestedAt,
         refunded: refundedPence(refunds.filter((refund) => refund.orderId === order.id)) > 0,
-        completedOn: shopDate(completedAt.get(order.id)!),
+        completedOn: shopDate(completed),
         serviceDates: items.filter((item) => item.orderId === order.id).map((item) => item.serviceDate),
       },
       today,
     );
     if (decision.action !== "send" || !email) continue;
+    if (Date.now() - startedAt > RUN_BUDGET_MS) break;
     if (await sendReviewRequest(order, email, siteOrigin, secret)) run.sent += 1;
     else run.failed += 1;
   }
@@ -131,8 +142,9 @@ async function sendReviewRequest(
   if (claim.affectedRows === 0) return false;
 
   const token = encodeURIComponent(reviewOptOutToken(email, secret));
+  let failure: unknown = null;
   try {
-    await sendEmail({
+    const sent = await sendEmail({
       to: email,
       ...reviewRequestEmail({
         contactName: order.contactName ?? "there",
@@ -141,18 +153,27 @@ async function sendReviewRequest(
         oneClickUrl: `${siteOrigin}/api/email/unsubscribe?t=${token}`,
       }),
     });
-    await addOrderEvent(order.id, { type: "review_requested", note: `Review request sent to ${email}` });
-    return true;
+    if (!sent) failure = new Error("Email is not configured");
   } catch (error) {
-    console.error(`Review request failed for order ${order.orderNumber}`, error);
-    // Release the claim so the next run tries again, within the window.
+    failure = error;
+  }
+
+  if (failure) {
+    console.error(`Review request failed for order ${order.orderNumber}`, failure);
+    // Nothing went out: release the claim so the next run tries again, within the window.
     await db.update(orders).set({ reviewRequestedAt: null }).where(eq(orders.id, order.id)).catch(() => undefined);
     await addOrderEvent(order.id, {
       type: "email_failed",
-      note: `review request: ${error instanceof Error ? error.message : String(error)}`,
+      note: `review request: ${failure instanceof Error ? failure.message : String(failure)}`,
     }).catch(() => undefined);
     return false;
   }
+  // The email went: the claim stands even if the event can't be written, or
+  // the family would be asked twice.
+  await addOrderEvent(order.id, { type: "review_requested", note: `Review request sent to ${email}` }).catch((error) =>
+    console.error(`Review request sent for order ${order.orderNumber}, but its event wasn't recorded`, error),
+  );
+  return true;
 }
 
 /** Record an address that asked for no more. Idempotent. */
