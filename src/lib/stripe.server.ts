@@ -12,26 +12,29 @@ import Stripe from "stripe";
 
 import { buildStripeLineItems, sumLineItems, type OrderRefund } from "@/lib/orders";
 import type { FrozenOrder } from "@/lib/orders.server";
+import { siteOrigin } from "@/lib/siteOrigin";
 
 export function isStripeConfigured(): boolean {
   return !!process.env.STRIPE_SECRET_KEY;
 }
 
 /**
- * The origin Stripe should redirect back to. Prefers `x-forwarded-host` /
- * `x-forwarded-proto` — the headers a reverse proxy (ngrok, Vercel's edge)
- * sets to the request's *original* host/scheme — over `request.url`, which
- * only ever reflects what this server process itself is bound to
- * (`localhost:3000` in dev, even when reached through a tunnel). This is the
- * same header pair Next.js itself trusts to fill in `x-forwarded-host` when
- * absent (see `base-server.js`), so it self-adjusts to whatever ngrok URL is
- * fronting the dev server that request — no env var to keep in sync.
+ * The origin every link the site hands out is built on — Stripe's return
+ * URLs, sign-in emails, invitations, Thintent links. SITE_URL (or, on a
+ * Vercel production deploy, Vercel's production domain) wins over the
+ * request's host headers, which the sender controls; see siteOrigin.ts.
+ * Without either it follows the request, so an ngrok tunnel in front of the
+ * dev server needs no env var to keep in sync.
  */
 export function resolveRequestOrigin(request: Request): string {
-  const forwardedHost = request.headers.get("x-forwarded-host");
-  if (!forwardedHost) return new URL(request.url).origin;
-  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  return `${forwardedProto ?? "https"}://${forwardedHost}`;
+  return siteOrigin({
+    siteUrl: process.env.SITE_URL,
+    vercelEnv: process.env.VERCEL_ENV,
+    vercelProductionHost: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    requestUrl: request.url,
+    forwardedHost: request.headers.get("x-forwarded-host"),
+    forwardedProto: request.headers.get("x-forwarded-proto"),
+  });
 }
 
 let client: Stripe | undefined;
