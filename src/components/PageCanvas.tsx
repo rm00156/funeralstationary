@@ -6,7 +6,14 @@
  * DesignEditor.tsx imports it from here like everyone else.
  */
 
-import { createContext, useContext, type ComponentType } from "react";
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentType,
+} from "react";
 import {
   Bird,
   Cross,
@@ -35,6 +42,9 @@ import {
   frameDepth,
   frameRings,
   photoBorderRadius,
+  photoCrop,
+  photoCropRect,
+  photoCropStyle,
   photoInnerBorderRadius,
   type CanvasElement,
   type ClipartElement,
@@ -92,6 +102,9 @@ export interface CanvasGuides {
  * so the press PDF is a screenshot of exactly what the customer saw — no
  * separate PDF-layout implementation to keep in sync.
  */
+/** What a drag on an element does: move it, resize, rotate, or pan its photo. */
+export type DragMode = "move" | "resize" | "rotate" | "pan";
+
 export function PageCanvas({
   page,
   trim = A5_TRIM,
@@ -101,6 +114,7 @@ export function PageCanvas({
   guides,
   selectedId,
   editingId,
+  adjustingId = null,
   onSelect,
   onStartDrag,
   onStartEdit,
@@ -124,11 +138,13 @@ export function PageCanvas({
   guides?: CanvasGuides;
   selectedId: string | null;
   editingId: string | null;
+  /** The photo being repositioned inside its window — a drag pans the photo. */
+  adjustingId?: string | null;
   onSelect: (id: string) => void;
   onStartDrag: (
     event: React.PointerEvent,
     element: CanvasElement,
-    mode: "move" | "resize" | "rotate",
+    mode: DragMode,
     handle?: ResizeHandle,
   ) => void;
   onStartEdit: (element: CanvasElement) => void;
@@ -180,6 +196,7 @@ export function PageCanvas({
                 locked={!!element.locked && !editLocked}
                 selected={element.id === selectedId}
                 editing={element.id === editingId}
+                adjusting={element.id === adjustingId}
                 onSelect={() => onSelect(element.id)}
                 onStartDrag={onStartDrag}
                 onStartEdit={() => onStartEdit(element)}
@@ -259,6 +276,7 @@ function ElementView({
   locked,
   selected,
   editing,
+  adjusting,
   onSelect,
   onStartDrag,
   onStartEdit,
@@ -269,11 +287,12 @@ function ElementView({
   locked: boolean;
   selected: boolean;
   editing: boolean;
+  adjusting: boolean;
   onSelect: () => void;
   onStartDrag: (
     event: React.PointerEvent,
     element: CanvasElement,
-    mode: "move" | "resize" | "rotate",
+    mode: DragMode,
     handle?: ResizeHandle,
   ) => void;
   onStartEdit: () => void;
@@ -310,9 +329,9 @@ function ElementView({
         selected
           ? "outline outline-2 outline-offset-1 outline-[#6b2d6a]"
           : "outline outline-1 outline-transparent hover:outline-[#d3c2cd]"
-      } ${editing ? "cursor-text" : "cursor-move"}`}
+      } ${editing ? "cursor-text" : adjusting ? "cursor-grab active:cursor-grabbing" : "cursor-move"}`}
       style={baseStyle}
-      onPointerDown={(event) => onStartDrag(event, element, "move")}
+      onPointerDown={(event) => onStartDrag(event, element, adjusting ? "pan" : "move")}
       onDoubleClick={(event) => {
         event.stopPropagation();
         onSelect();
@@ -322,12 +341,14 @@ function ElementView({
       <ElementContent
         element={element}
         editing={editing}
+        adjusting={adjusting}
         onEditText={onEditText}
         onEndEdit={onEndEdit}
       />
 
       {selected &&
         !editing &&
+        !adjusting &&
         RESIZE_HANDLES.map((handle) => (
           <div
             key={handle}
@@ -338,7 +359,7 @@ function ElementView({
           />
         ))}
 
-      {selected && !editing && (
+      {selected && !editing && !adjusting && (
         <div
           role="presentation"
           aria-label="Rotate"
@@ -355,18 +376,22 @@ function ElementView({
 function ElementContent({
   element,
   editing,
+  adjusting = false,
   onEditText,
   onEndEdit,
 }: {
   element: CanvasElement;
   editing: boolean;
+  adjusting?: boolean;
   onEditText: (text: string) => void;
   onEndEdit: () => void;
 }) {
   if (element.type === "text") {
     return <TextContent element={element} editing={editing} onEditText={onEditText} onEndEdit={onEndEdit} />;
   }
-  if (element.type === "image") return <ImageContent element={element} />;
+  if (element.type === "image") {
+    return <ImageContent element={element} adjusting={adjusting} />;
+  }
   if (element.type === "shape") return <ShapeContent element={element} />;
   if (element.type === "clipart") {
     return <ClipartContent element={element} />;
@@ -421,49 +446,119 @@ function TextContent({
   );
 }
 
-function ImageContent({ element }: { element: ImageElement }) {
+function ImageContent({
+  element,
+  adjusting = false,
+}: {
+  element: ImageElement;
+  adjusting?: boolean;
+}) {
   const pageW = useContext(PageWidthContext);
   const border = element.border;
   const inset = border ? frameDepth(border) : 0;
   const innerRadius = border ? photoInnerBorderRadius(element, inset, pageW) : undefined;
+  const cover = element.fit !== "contain";
+  const crop = photoCrop(element);
   return (
-    <div
-      className={`relative h-full w-full overflow-hidden ${
-        element.src || border ? "" : "border-2 border-dashed border-[#d3c2cd]"
-      } ${element.src ? "" : "bg-[#faf6f8]"}`}
-      style={{ borderRadius: photoBorderRadius(element, pageW), padding: inset }}
-    >
+    <>
+      {adjusting && cover && element.src && (
+        <CroppedAwayPhoto element={element} inset={inset} />
+      )}
       <div
-        className="h-full w-full overflow-hidden"
-        style={{ borderRadius: innerRadius ?? photoBorderRadius(element, pageW) }}
+        className={`relative h-full w-full overflow-hidden ${
+          element.src || border ? "" : "border-2 border-dashed border-[#d3c2cd]"
+        } ${element.src ? "" : "bg-[#faf6f8]"}`}
+        style={{ borderRadius: photoBorderRadius(element, pageW), padding: inset }}
       >
-        {element.src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={element.src}
-            alt=""
-            draggable={false}
-            className={`h-full w-full ${
-              element.fit === "contain" ? "object-contain" : "object-cover"
-            }`}
-          />
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[#81737d]">
-            <ImagePlus size={22} aria-hidden />
-            <span className="px-3 text-center font-body text-[10px]">
-              Double-click to add a photo
-            </span>
+        <div
+          data-photo-window
+          className="relative h-full w-full overflow-hidden"
+          style={{ borderRadius: innerRadius ?? photoBorderRadius(element, pageW) }}
+        >
+          {element.src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={element.src}
+              alt=""
+              draggable={false}
+              data-photo
+              className={`h-full w-full max-w-none ${cover ? "object-cover" : "object-contain"}`}
+              style={cover ? photoCropStyle(crop) : undefined}
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-[#81737d]">
+              <ImagePlus size={22} aria-hidden />
+              <span className="px-3 text-center font-body text-[10px]">
+                Double-click to add a photo
+              </span>
+            </div>
+          )}
+        </div>
+        {border && (
+          <div className="pointer-events-none absolute inset-0">
+            <FrameRings
+              variant={border}
+              color={element.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR}
+              radiusAt={(offset) => photoInnerBorderRadius(element, offset, pageW)}
+            />
           </div>
         )}
       </div>
-      {border && (
-        <div className="pointer-events-none absolute inset-0">
-          <FrameRings
-            variant={border}
-            color={element.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR}
-            radiusAt={(offset) => photoInnerBorderRadius(element, offset, pageW)}
-          />
-        </div>
+    </>
+  );
+}
+
+/**
+ * The whole photo, faint, behind its window while the customer repositions
+ * it — so they can see what the window is cutting off and drag the part they
+ * want into it. Editor-only: it's drawn only in adjust mode, never on a
+ * proof.
+ */
+function CroppedAwayPhoto({ element, inset }: { element: ImageElement; inset: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{
+    window: { w: number; h: number };
+    natural: { w: number; h: number };
+  } | null>(null);
+  const src = element.src;
+
+  // The window's size in base px (offsetWidth ignores the canvas zoom), and
+  // the photo's own size once it has loaded.
+  useLayoutEffect(() => {
+    const box = ref.current;
+    if (!box || !src) return;
+    const img = new window.Image();
+    let cancelled = false;
+    img.onload = () => {
+      if (cancelled) return;
+      setSize({
+        window: { w: box.offsetWidth, h: box.offsetHeight },
+        natural: { w: img.naturalWidth, h: img.naturalHeight },
+      });
+    };
+    img.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src, element.w, element.h, inset]);
+
+  const rect = size ? photoCropRect(photoCrop(element), size.window, size.natural) : null;
+  return (
+    <div
+      ref={ref}
+      aria-hidden
+      className="pointer-events-none absolute"
+      style={{ inset }}
+    >
+      {rect && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src ?? undefined}
+          alt=""
+          draggable={false}
+          className="absolute max-w-none opacity-35 outline-1 outline-dashed outline-[#6b2d6a]"
+          style={rect}
+        />
       )}
     </div>
   );

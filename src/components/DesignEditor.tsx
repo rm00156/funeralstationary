@@ -27,6 +27,7 @@ import {
   Circle,
   ClipboardPaste,
   Copy,
+  Crop,
   Eye,
   FileDown,
   Home,
@@ -61,7 +62,10 @@ import {
 
 import {
   FONT_OPTIONS,
+  MAX_PHOTO_ZOOM,
   imageShape,
+  panPhotoCrop,
+  photoCrop,
   DEFAULT_PHOTO_BORDER_COLOR,
   FRAME_VARIANTS,
   INK_PALETTE,
@@ -96,6 +100,7 @@ import {
   PageCanvas,
   StaticPage,
   type CanvasGuides,
+  type DragMode,
 } from "@/components/PageCanvas";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
 import PreOrderCheckDialog, {
@@ -137,6 +142,18 @@ const TABS: { id: TabId; label: string; Icon: ComponentType<{ size?: number | st
   { id: "elements", label: "Elements", Icon: Shapes },
   { id: "layers", label: "Layers", Icon: Layers },
 ];
+
+/** Keys that move a range input — each is one undo step. */
+const SLIDER_KEYS = new Set([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+]);
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -346,6 +363,16 @@ export default function DesignEditor({
   const page = doc.pages[Math.min(pageIndex, doc.pages.length - 1)];
   const selected =
     page?.elements.find((element) => element.id === selectedId) ?? null;
+
+  /**
+   * The photo being repositioned inside its window: while set, dragging it
+   * pans the photo rather than moving the frame. Only ever the selected
+   * photo, so selecting anything else (or nothing) ends it.
+   */
+  const [adjustingId, setAdjustingId] = useState<string | null>(null);
+  if (adjustingId && adjustingId !== selectedId) setAdjustingId(null);
+  const adjusting =
+    selected?.type === "image" && selected.id === adjustingId ? selected : null;
 
   // Authoring a template hides the picker — applying a template on top of the
   // layout being authored would overwrite the very thing being made.
@@ -687,6 +714,11 @@ export default function DesignEditor({
         target.tagName === "SELECT" ||
         target.isContentEditable;
       if (event.key === "Escape") {
+        // First Escape just finishes repositioning a photo.
+        if (adjustingId) {
+          setAdjustingId(null);
+          return;
+        }
         setEditingId(null);
         if (!typing) setSelectedId(null);
         setPreview(false);
@@ -710,7 +742,7 @@ export default function DesignEditor({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo, copySelected, pasteClipboard, deleteSelected, selectedId]);
+  }, [undo, redo, copySelected, pasteClipboard, deleteSelected, selectedId, adjustingId]);
 
   // The document's own size — what it was made on, so a saved design keeps
   // rendering at its trim whatever its product says today.
@@ -723,7 +755,7 @@ export default function DesignEditor({
   const startDrag = (
     event: React.PointerEvent,
     element: CanvasElement,
-    mode: "move" | "resize" | "rotate",
+    mode: DragMode,
     handle: ResizeHandle = "se",
   ) => {
     if (editingId === element.id) return;
@@ -738,6 +770,46 @@ export default function DesignEditor({
 
     // The zoom level cannot change mid-drag, so capturing it here is safe.
     const dragZoom = zoom;
+
+    if (mode === "pan") {
+      if (element.type !== "image") return;
+      const box = (event.currentTarget as HTMLElement).querySelector<HTMLElement>(
+        "[data-photo-window]",
+      );
+      const img = box?.querySelector<HTMLImageElement>("img[data-photo]");
+      if (!box || !img?.naturalWidth) return;
+      // offsetWidth is layout px — the base page's, before the canvas zoom.
+      const frame = { w: box.offsetWidth, h: box.offsetHeight };
+      const natural = { w: img.naturalWidth, h: img.naturalHeight };
+      const startCrop = photoCrop(element);
+      // A rotated frame pans along its own axes, so turn the pointer's
+      // movement back by the frame's rotation.
+      const radians = (-(element.rotation ?? 0) * Math.PI) / 180;
+      const onPanMove = (move: PointerEvent) => {
+        if (!moved) {
+          if (Math.hypot(move.clientX - startX, move.clientY - startY) < 3) return;
+          moved = true;
+          snapshot();
+        }
+        const sx = (move.clientX - startX) / dragZoom;
+        const sy = (move.clientY - startY) / dragZoom;
+        const dx = sx * Math.cos(radians) - sy * Math.sin(radians);
+        const dy = sx * Math.sin(radians) + sy * Math.cos(radians);
+        const crop = panPhotoCrop(startCrop, dx, dy, frame, natural);
+        setDoc((current) =>
+          patchElement(current, activePage, element.id, (el) =>
+            el.type === "image" ? { ...el, crop } : el,
+          ),
+        );
+      };
+      const onPanUp = () => {
+        window.removeEventListener("pointermove", onPanMove);
+        window.removeEventListener("pointerup", onPanUp);
+      };
+      window.addEventListener("pointermove", onPanMove);
+      window.addEventListener("pointerup", onPanUp);
+      return;
+    }
 
     if (mode === "rotate") {
       // Center of the element on screen — stays fixed for the whole drag,
@@ -899,8 +971,10 @@ export default function DesignEditor({
         if (!first) return;
         if (targetId) {
           commit(
+            // A new photo starts centred: the old crop was chosen for
+            // a different picture.
             patchElement(doc, pageIndex, targetId, (el) =>
-              el.type === "image" ? { ...el, src: first } : el,
+              el.type === "image" ? { ...el, src: first, crop: undefined } : el,
             ),
           );
         } else {
@@ -1336,7 +1410,51 @@ export default function DesignEditor({
             </div>
           )}
 
-          {selected.type === "image" && (
+          {adjusting && (
+            <>
+              <span className="font-body text-sm text-on-surface-variant">
+                Drag the photo to choose what shows
+              </span>
+              <label className="flex items-center gap-2 font-body text-sm text-on-surface-variant">
+                Zoom
+                <input
+                  type="range"
+                  min={1}
+                  max={MAX_PHOTO_ZOOM}
+                  step={0.01}
+                  value={photoCrop(adjusting).zoom}
+                  onPointerDown={() => snapshot()}
+                  onKeyDown={(event) => {
+                    if (SLIDER_KEYS.has(event.key)) snapshot();
+                  }}
+                  onChange={(event) =>
+                    updateSelected(
+                      { crop: { ...photoCrop(adjusting), zoom: Number(event.target.value) } },
+                      { commit: false },
+                    )
+                  }
+                  className="w-32 accent-primary"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => updateSelected({ crop: undefined })}
+                disabled={!adjusting.crop}
+                className="rounded-md px-2.5 py-1.5 font-body text-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary disabled:opacity-40"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdjustingId(null)}
+                className="rounded-lg bg-primary-container px-4 py-1.5 font-body text-sm font-medium text-white transition-colors hover:bg-primary"
+              >
+                Done
+              </button>
+            </>
+          )}
+
+          {selected.type === "image" && !adjusting && (
             <>
               <button
                 type="button"
@@ -1346,6 +1464,16 @@ export default function DesignEditor({
                 <ImagePlus size={15} aria-hidden />
                 {selected.src ? "Replace photo" : "Upload photo"}
               </button>
+              {selected.src && selected.fit !== "contain" && (
+                <button
+                  type="button"
+                  onClick={() => setAdjustingId(selected.id)}
+                  className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-body text-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
+                >
+                  <Crop size={15} aria-hidden />
+                  Adjust photo
+                </button>
+              )}
               {PHOTO_SHAPE_OPTIONS.map(({ id, label, Icon }) => (
                 <ToolbarButton
                   key={id}
@@ -2256,6 +2384,7 @@ export default function DesignEditor({
               guides={guides}
               selectedId={selectedId}
               editingId={editingId}
+              adjustingId={adjusting?.id ?? null}
               editLocked={authoring}
               onSelect={setSelectedId}
               onStartDrag={startDrag}
@@ -2264,7 +2393,11 @@ export default function DesignEditor({
                   snapshot();
                   setEditingId(element.id);
                 } else if (element.type === "image") {
-                  openPhotoPicker(element.id);
+                  // A filled photo is repositioned; an empty one asks for
+                  // a photo. A cutout is shown whole, so there is nothing
+                  // to reposition.
+                  if (element.src && element.fit !== "contain") setAdjustingId(element.id);
+                  else openPhotoPicker(element.id);
                 }
               }}
               onEditText={(id, text) =>
@@ -2290,6 +2423,7 @@ export default function DesignEditor({
                 <p>— Double-click text to edit the wording</p>
                 <p>— Drag to move, corner handles to resize</p>
                 <p>— Double-click a photo frame to upload</p>
+                <p>— Double-click a photo to move or zoom it in its frame</p>
               </div>
               <button
                 type="button"
