@@ -34,6 +34,8 @@ const nextConfig: NextConfig = {
       // My Designs and My Orders became sections of the one account page.
       { source: "/designs", destination: "/account", permanent: true },
       { source: "/orders", destination: "/account", permanent: true },
+      // Reviews became the home page's section: the free Trustpilot plan has no feed to fill a page.
+      { source: "/reviews", destination: "/#reviews", permanent: true },
     ];
   },
   images: {

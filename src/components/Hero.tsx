@@ -2,10 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
-import Stars from "@/components/Stars";
+import TrustpilotBadge from "@/components/TrustpilotBadge";
 import { coverWidthFactor, sizeText, trimAspect } from "@/lib/designEditor";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
-import { ORDER_CUTOFF, TRUSTPILOT, UPLOAD_DESIGN_HREF } from "@/lib/site";
+import { ORDER_CUTOFF, UPLOAD_DESIGN_HREF } from "@/lib/site";
 import type { ProductShowcase, Template } from "@/lib/templates";
 
 /**
@@ -67,12 +67,8 @@ export default function Hero({
               Upload your own design
             </Link>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2.5 border-t border-line pt-6 text-[15px] text-ink-2">
-            <Stars label={`Rated ${TRUSTPILOT.rating} out of 5`} />
-            <span>
-              <strong className="font-semibold text-ink">{TRUSTPILOT.rating} out of 5</strong> from{" "}
-              {TRUSTPILOT.reviewCount} reviews on Trustpilot
-            </span>
+          <div className="mt-1 border-t border-line pt-6 text-[15px]">
+            <TrustpilotBadge />
           </div>
         </div>
 

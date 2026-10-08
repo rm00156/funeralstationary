@@ -63,9 +63,6 @@ export default async function Footer() {
             <Link href="/shop" className={LINK}>
               Shop
             </Link>
-            <Link href="/reviews" className={LINK}>
-              Reviews
-            </Link>
             <Link href="/contact" className={LINK}>
               Contact
             </Link>
@@ -88,8 +85,6 @@ export default async function Footer() {
               {ADDRESS_LINES[0]}
               <br />
               {ADDRESS_LINES[1]}
-              <br />
-              Visits by appointment
             </address>
           </div>
         </div>
@@ -98,6 +93,9 @@ export default async function Footer() {
           <span>
             &copy; {SITE_NAME} · {COMPANY_NAME}
           </span>
+          <Link href="/privacy" className={LINK}>
+            Privacy and cookies
+          </Link>
         </div>
       </div>
     </footer>

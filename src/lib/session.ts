@@ -15,7 +15,7 @@ import { cookies } from "next/headers";
 import { readUserId } from "@/lib/userSession";
 
 export const GUEST_COOKIE = "tfs_guest";
-const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+export const GUEST_COOKIE_SECONDS = 60 * 60 * 24 * 365;
 
 export type Owner =
   | {
@@ -55,7 +55,7 @@ export async function getOrCreateOwner(): Promise<Owner> {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: ONE_YEAR_SECONDS,
+    maxAge: GUEST_COOKIE_SECONDS,
   });
   return { userId: null, guestToken };
 }

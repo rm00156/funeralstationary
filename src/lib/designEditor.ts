@@ -270,71 +270,81 @@ export type FontFamilyId =
   | "satisfy"
   | "kristi";
 
+export type FontGroup = "serif" | "sans" | "script";
+
 export interface FontOption {
   id: FontFamilyId;
   label: string;
   css: string;
+  group: FontGroup;
 }
+
+/** The picker's headings, in the order its groups appear. */
+export const FONT_GROUP_LABELS: Record<FontGroup, string> = {
+  serif: "Serif",
+  sans: "Sans serif",
+  script: "Script",
+};
 
 /** ~50 Google Fonts grouped serif / sans / script to match the picker's layout. */
 export const FONT_OPTIONS: FontOption[] = [
   // Serif / display
   // Its own variable, not --font-display: the site's heading face is now
   // Newsreader, and a saved design must keep printing in Source Serif.
-  { id: "display", label: "Source Serif", css: "var(--font-source-serif), serif" },
-  { id: "playfair", label: "Playfair Display", css: "var(--font-playfair), serif" },
-  { id: "cormorant", label: "Cormorant Garamond", css: "var(--font-cormorant), serif" },
-  { id: "lora", label: "Lora", css: "var(--font-lora), serif" },
-  { id: "ebGaramond", label: "EB Garamond", css: "var(--font-eb-garamond), serif" },
-  { id: "cormorantAlt", label: "Cormorant", css: "var(--font-cormorant-alt), serif" },
-  { id: "libreBaskerville", label: "Libre Baskerville", css: "var(--font-libre-baskerville), serif" },
-  { id: "marcellus", label: "Marcellus", css: "var(--font-marcellus), serif" },
-  { id: "prata", label: "Prata", css: "var(--font-prata), serif" },
-  { id: "spectral", label: "Spectral", css: "var(--font-spectral), serif" },
-  { id: "vollkorn", label: "Vollkorn", css: "var(--font-vollkorn), serif" },
-  { id: "domine", label: "Domine", css: "var(--font-domine), serif" },
-  { id: "ptSerif", label: "PT Serif", css: "var(--font-pt-serif), serif" },
-  { id: "merriweather", label: "Merriweather", css: "var(--font-merriweather), serif" },
-  { id: "cardo", label: "Cardo", css: "var(--font-cardo), serif" },
-  { id: "alegreya", label: "Alegreya", css: "var(--font-alegreya), serif" },
+  { id: "display", label: "Source Serif", css: "var(--font-source-serif), serif", group: "serif" },
+  { id: "playfair", label: "Playfair Display", css: "var(--font-playfair), serif", group: "serif" },
+  { id: "cormorant", label: "Cormorant Garamond", css: "var(--font-cormorant), serif", group: "serif" },
+  { id: "lora", label: "Lora", css: "var(--font-lora), serif", group: "serif" },
+  { id: "ebGaramond", label: "EB Garamond", css: "var(--font-eb-garamond), serif", group: "serif" },
+  { id: "cormorantAlt", label: "Cormorant", css: "var(--font-cormorant-alt), serif", group: "serif" },
+  { id: "libreBaskerville", label: "Libre Baskerville", css: "var(--font-libre-baskerville), serif", group: "serif" },
+  { id: "marcellus", label: "Marcellus", css: "var(--font-marcellus), serif", group: "serif" },
+  { id: "prata", label: "Prata", css: "var(--font-prata), serif", group: "serif" },
+  { id: "spectral", label: "Spectral", css: "var(--font-spectral), serif", group: "serif" },
+  { id: "vollkorn", label: "Vollkorn", css: "var(--font-vollkorn), serif", group: "serif" },
+  { id: "domine", label: "Domine", css: "var(--font-domine), serif", group: "serif" },
+  { id: "ptSerif", label: "PT Serif", css: "var(--font-pt-serif), serif", group: "serif" },
+  { id: "merriweather", label: "Merriweather", css: "var(--font-merriweather), serif", group: "serif" },
+  { id: "cardo", label: "Cardo", css: "var(--font-cardo), serif", group: "serif" },
+  { id: "alegreya", label: "Alegreya", css: "var(--font-alegreya), serif", group: "serif" },
 
   // Sans body
-  { id: "body", label: "Work Sans", css: "var(--font-body)" },
-  { id: "inter", label: "Inter", css: "var(--font-inter), sans-serif" },
-  { id: "lato", label: "Lato", css: "var(--font-lato), sans-serif" },
-  { id: "karla", label: "Karla", css: "var(--font-karla), sans-serif" },
-  { id: "nunitoSans", label: "Nunito Sans", css: "var(--font-nunito-sans), sans-serif" },
-  { id: "raleway", label: "Raleway", css: "var(--font-raleway), sans-serif" },
-  { id: "josefinSans", label: "Josefin Sans", css: "var(--font-josefin-sans), sans-serif" },
-  { id: "cabin", label: "Cabin", css: "var(--font-cabin), sans-serif" },
-  { id: "quicksand", label: "Quicksand", css: "var(--font-quicksand), sans-serif" },
-  { id: "mulish", label: "Mulish", css: "var(--font-mulish), sans-serif" },
+  { id: "body", label: "Work Sans", css: "var(--font-body)", group: "sans" },
+  { id: "inter", label: "Inter", css: "var(--font-inter), sans-serif", group: "sans" },
+  { id: "lato", label: "Lato", css: "var(--font-lato), sans-serif", group: "sans" },
+  { id: "karla", label: "Karla", css: "var(--font-karla), sans-serif", group: "sans" },
+  { id: "nunitoSans", label: "Nunito Sans", css: "var(--font-nunito-sans), sans-serif", group: "sans" },
+  { id: "raleway", label: "Raleway", css: "var(--font-raleway), sans-serif", group: "sans" },
+  { id: "josefinSans", label: "Josefin Sans", css: "var(--font-josefin-sans), sans-serif", group: "sans" },
+  { id: "cabin", label: "Cabin", css: "var(--font-cabin), sans-serif", group: "sans" },
+  { id: "quicksand", label: "Quicksand", css: "var(--font-quicksand), sans-serif", group: "sans" },
+  { id: "mulish", label: "Mulish", css: "var(--font-mulish), sans-serif", group: "sans" },
 
   // Script / decorative
-  { id: "script", label: "Script", css: "var(--font-script), cursive" },
-  { id: "dancing", label: "Dancing Script", css: "var(--font-dancing), cursive" },
-  { id: "alexBrush", label: "Alex Brush", css: "var(--font-alex-brush), cursive" },
-  { id: "tangerine", label: "Tangerine", css: "var(--font-tangerine), cursive" },
-  { id: "sacramento", label: "Sacramento", css: "var(--font-sacramento), cursive" },
-  { id: "parisienne", label: "Parisienne", css: "var(--font-parisienne), cursive" },
-  { id: "allura", label: "Allura", css: "var(--font-allura), cursive" },
-  { id: "petitFormalScript", label: "Petit Formal Script", css: "var(--font-petit-formal-script), cursive" },
-  { id: "mrsSaintDelafield", label: "Mrs Saint Delafield", css: "var(--font-mrs-saint-delafield), cursive" },
-  { id: "pinyonScript", label: "Pinyon Script", css: "var(--font-pinyon-script), cursive" },
-  { id: "italianno", label: "Italianno", css: "var(--font-italianno), cursive" },
-  { id: "meddon", label: "Meddon", css: "var(--font-meddon), cursive" },
-  { id: "herrVonMuellerhoff", label: "Herr Von Muellerhoff", css: "var(--font-herr-von-muellerhoff), cursive" },
-  { id: "meaCulpa", label: "Mea Culpa", css: "var(--font-mea-culpa), cursive" },
-  { id: "windsong", label: "WindSong", css: "var(--font-windsong), cursive" },
-  { id: "marckScript", label: "Marck Script", css: "var(--font-marck-script), cursive" },
-  { id: "yesteryear", label: "Yesteryear", css: "var(--font-yesteryear), cursive" },
-  { id: "leagueScript", label: "League Script", css: "var(--font-league-script), cursive" },
-  { id: "rougeScript", label: "Rouge Script", css: "var(--font-rouge-script), cursive" },
-  { id: "ballet", label: "Ballet", css: "var(--font-ballet), cursive" },
-  { id: "laBelleAurore", label: "La Belle Aurore", css: "var(--font-la-belle-aurore), cursive" },
-  { id: "courgette", label: "Courgette", css: "var(--font-courgette), cursive" },
-  { id: "satisfy", label: "Satisfy", css: "var(--font-satisfy), cursive" },
-  { id: "kristi", label: "Kristi", css: "var(--font-kristi), cursive" },
+  { id: "script", label: "Script", css: "var(--font-script), cursive", group: "script" },
+  { id: "dancing", label: "Dancing Script", css: "var(--font-dancing), cursive", group: "script" },
+  { id: "alexBrush", label: "Alex Brush", css: "var(--font-alex-brush), cursive", group: "script" },
+  { id: "tangerine", label: "Tangerine", css: "var(--font-tangerine), cursive", group: "script" },
+  { id: "sacramento", label: "Sacramento", css: "var(--font-sacramento), cursive", group: "script" },
+  { id: "parisienne", label: "Parisienne", css: "var(--font-parisienne), cursive", group: "script" },
+  { id: "allura", label: "Allura", css: "var(--font-allura), cursive", group: "script" },
+  { id: "petitFormalScript", label: "Petit Formal Script", css: "var(--font-petit-formal-script), cursive", group: "script" },
+  { id: "mrsSaintDelafield", label: "Mrs Saint Delafield", css: "var(--font-mrs-saint-delafield), cursive", group: "script" },
+  { id: "pinyonScript", label: "Pinyon Script", css: "var(--font-pinyon-script), cursive", group: "script" },
+  { id: "italianno", label: "Italianno", css: "var(--font-italianno), cursive", group: "script" },
+  { id: "meddon", label: "Meddon", css: "var(--font-meddon), cursive", group: "script" },
+  { id: "herrVonMuellerhoff", label: "Herr Von Muellerhoff", css: "var(--font-herr-von-muellerhoff), cursive", group: "script" },
+  { id: "meaCulpa", label: "Mea Culpa", css: "var(--font-mea-culpa), cursive", group: "script" },
+  { id: "windsong", label: "WindSong", css: "var(--font-windsong), cursive", group: "script" },
+  { id: "marckScript", label: "Marck Script", css: "var(--font-marck-script), cursive", group: "script" },
+  { id: "yesteryear", label: "Yesteryear", css: "var(--font-yesteryear), cursive", group: "script" },
+  { id: "leagueScript", label: "League Script", css: "var(--font-league-script), cursive", group: "script" },
+  { id: "rougeScript", label: "Rouge Script", css: "var(--font-rouge-script), cursive", group: "script" },
+  { id: "ballet", label: "Ballet", css: "var(--font-ballet), cursive", group: "script" },
+  { id: "laBelleAurore", label: "La Belle Aurore", css: "var(--font-la-belle-aurore), cursive", group: "script" },
+  { id: "courgette", label: "Courgette", css: "var(--font-courgette), cursive", group: "script" },
+  { id: "satisfy", label: "Satisfy", css: "var(--font-satisfy), cursive", group: "script" },
+  { id: "kristi", label: "Kristi", css: "var(--font-kristi), cursive", group: "script" },
 ];
 
 /** Muted ink palette for on-page content ("Serene Legacy" friendly). */

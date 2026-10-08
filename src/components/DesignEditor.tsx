@@ -61,7 +61,6 @@ import {
 } from "lucide-react";
 
 import {
-  FONT_OPTIONS,
   MAX_PHOTO_ZOOM,
   imageShape,
   panPhotoCrop,
@@ -86,7 +85,6 @@ import {
   type CanvasElement,
   type DesignDoc,
   type DesignPage,
-  type FontFamilyId,
   type FrameVariant,
   type PhotoShape,
   type ProductFormat,
@@ -103,6 +101,7 @@ import {
   type DragMode,
 } from "@/components/PageCanvas";
 import { useConfirmDialog } from "@/components/ConfirmDialog";
+import { FontPicker } from "@/components/FontPicker";
 import PreOrderCheckDialog, {
   parsePreOrderCheck,
   type PreOrderCheck,
@@ -712,6 +711,9 @@ export default function DesignEditor({
         target.tagName === "TEXTAREA" ||
         target.tagName === "INPUT" ||
         target.tagName === "SELECT" ||
+        // The font picker (FontPicker), a select in all but tag: its open
+        // list, and its button, which keeps focus after a choice.
+        target.closest('[role="listbox"], [aria-haspopup="listbox"]') !== null ||
         target.isContentEditable;
       if (event.key === "Escape") {
         // First Escape just finishes repositioning a photo.
@@ -1315,20 +1317,10 @@ export default function DesignEditor({
         <div className="flex items-center gap-1 overflow-x-auto border-b border-outline-variant/40 bg-surface-container-lowest px-3 py-1.5">
           {selected.type === "text" && (
             <>
-              <select
-                aria-label="Font"
+              <FontPicker
                 value={selected.fontFamily}
-                onChange={(event) =>
-                  updateSelected({ fontFamily: event.target.value as FontFamilyId })
-                }
-                className="rounded-md border border-outline-variant/60 bg-surface-container-lowest px-2 py-1.5 font-body text-sm"
-              >
-                {FONT_OPTIONS.map((font) => (
-                  <option key={font.id} value={font.id}>
-                    {font.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(fontFamily) => updateSelected({ fontFamily })}
+              />
               <ToolbarButton
                 label="Smaller text"
                 onClick={() =>

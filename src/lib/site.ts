@@ -29,11 +29,15 @@ export const ORDER_CUTOFF = "10am";
 export const STANDARD_TURNAROUND = "24–72 hours";
 
 /**
- * Trustpilot summary. These are a snapshot, not a live feed — update them
- * when the profile moves, or replace them with the official widget.
+ * The Trustpilot profile. There is deliberately no TrustScore here: on the
+ * free plan Trustpilot's brand guidelines allow it only through their own
+ * badge (TrustpilotBadge.tsx), never typed. The review count is the badge's
+ * fallback text, for when Trustpilot's script is blocked — update it when the
+ * profile moves.
  */
 export const TRUSTPILOT = {
-  rating: "4.8",
+  /** The profile's id, which Trustpilot's badge (Testimonials) is drawn for. */
+  businessUnitId: "5c8eb780df266400012deb11",
   reviewCount: 164,
   profileUrl: "https://uk.trustpilot.com/review/thefuneralstationery.co.uk",
   writeReviewUrl: "https://uk.trustpilot.com/evaluate/thefuneralstationery.co.uk",
@@ -46,27 +50,11 @@ export const TRUSTPILOT = {
  */
 const GOOGLE_PLACE_ID = "ChIJTTwk2_IDdkgRuLe1ni5HoQQ";
 export const GOOGLE_REVIEWS = {
+  /** What the home page's live Google reviews are fetched for (googleReviews.server.ts). */
+  placeId: GOOGLE_PLACE_ID,
   profileUrl: `https://www.google.com/maps/place/?q=place_id:${GOOGLE_PLACE_ID}`,
   writeReviewUrl: `https://search.google.com/local/writereview?placeid=${GOOGLE_PLACE_ID}`,
 } as const;
-
-/** Real reviews carried over from the current site. Never invent more. */
-export const FEATURED_REVIEWS = [
-  {
-    title: "Excellent service from start to finish",
-    body: "The quality of the Order of Service was outstanding and delivered exactly when promised. Highly recommended during such a difficult time.",
-    initials: "SP",
-    name: "Sarah Pat",
-    detail: "Verified buyer · Order of Service",
-  },
-  {
-    title: "Very compassionate and professional",
-    body: "The templates were easy to use, and the final print quality exceeded our expectations. A beautiful tribute for our loved one.",
-    initials: "AK",
-    name: "Alastair Kenward",
-    detail: "Verified buyer",
-  },
-] as const;
 
 /**
  * The two ways to order that aren't a template in the catalogue. "We design

@@ -5,6 +5,7 @@ import {
   orderCancelledNotificationEmail,
   orderConfirmationEmail,
   orderNotificationEmail,
+  reviewRequestEmail,
   adminInviteEmail,
   adminSignInEmail,
   signInEmail,
@@ -198,5 +199,42 @@ describe("adminInviteEmail", () => {
     expect(html).toContain("&lt;owner&gt;@example.com");
     expect(html).toContain('href="https://tfs.example/admin/login?email=jo%40example.com"');
     expect(text).not.toContain("/admin/verify");
+  });
+});
+
+describe("reviewRequestEmail", () => {
+  const email = reviewRequestEmail({
+    contactName: "Jane <Doe>",
+    reviewUrl: "https://search.google.com/local/writereview?placeid=abc",
+    optOutUrl: "https://shop.example/email/unsubscribe?t=tok",
+    oneClickUrl: "https://shop.example/api/email/unsubscribe?t=tok",
+  });
+
+  it("asks once, gently, and never for a star rating", () => {
+    expect(email.subject).toBe("Thank you from The Funeral Stationery");
+    expect(email.text).toContain("If you feel comfortable");
+    expect(email.text).toContain("no obligation");
+    expect(`${email.text}${email.html}`).not.toMatch(/five|5[- ]star/i);
+    expect(email.html).toContain("Share your experience on Google");
+    expect(email.html).toContain('href="https://search.google.com/local/writereview?placeid=abc"');
+  });
+
+  it("escapes the customer's name", () => {
+    expect(email.html).toContain("Dear Jane &lt;Doe&gt;,");
+    expect(email.html).not.toContain("<Doe>");
+  });
+
+  it("carries a way to stop them, in the body and for the mail client's own button", () => {
+    expect(email.text).toContain("https://shop.example/email/unsubscribe?t=tok");
+    expect(email.html).toContain("Stop emails like this one");
+    expect(email.headers).toEqual({
+      "List-Unsubscribe": "<https://shop.example/api/email/unsubscribe?t=tok>",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    });
+  });
+
+  it("is a reply to the shop, with the logo attached", () => {
+    expect(email.replyTo).toBe("info@thefuneralstationery.co.uk");
+    expect(email.attachments).toHaveLength(1);
   });
 });

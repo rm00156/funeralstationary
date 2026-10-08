@@ -1,31 +1,18 @@
-import Link from "next/link";
+import ReviewsShowcase from "@/components/ReviewsShowcase";
 
-import ReviewCard from "@/components/ReviewCard";
-import Stars from "@/components/Stars";
-import { FEATURED_REVIEWS, TRUSTPILOT } from "@/lib/site";
-
-/** The home page's reviews: the Trustpilot summary beside two real reviews. */
+/**
+ * The home page's reviews section; ReviewsShowcase lays out Trustpilot's
+ * badge and the business's live Google reviews. No
+ * typed TrustScore or stars — Trustpilot's brand guidelines let a free
+ * account show its score only through Trustpilot's own widgets.
+ * It is the site's only reviews section (there is no /reviews page; that URL
+ * redirects here), so it carries the `reviews` anchor.
+ */
 export default function Testimonials() {
   return (
-    <section className="bg-paper">
-      <div className="site-container grid grid-cols-[repeat(auto-fit,minmax(min(320px,100%),1fr))] items-start gap-10 py-20 md:py-24">
-        <div className="flex flex-col gap-4">
-          <h2 className="type-section">From families we’ve helped</h2>
-          <div className="flex items-baseline gap-3 pt-2">
-            <span className="font-display text-[64px] leading-none text-ink">
-              {TRUSTPILOT.rating}
-            </span>
-            <span className="text-ink-2">out of 5</span>
-          </div>
-          <Stars label={`Rated ${TRUSTPILOT.rating} out of 5`} size={22} />
-          <p className="text-ink-2">Based on {TRUSTPILOT.reviewCount} reviews on Trustpilot</p>
-          <Link href="/reviews" className="link flex min-h-11 items-center font-medium">
-            Read all reviews
-          </Link>
-        </div>
-        {FEATURED_REVIEWS.map((review) => (
-          <ReviewCard key={review.name} review={review} />
-        ))}
+    <section id="reviews" className="scroll-mt-6 bg-paper">
+      <div className="site-container py-20 md:py-24">
+        <ReviewsShowcase />
       </div>
     </section>
   );
