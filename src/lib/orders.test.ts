@@ -12,6 +12,7 @@ import {
   makeOrderNumber,
   parseOrderStatus,
   refundStatusEffect,
+  earliestServiceDate,
   refundedPence,
   resolveSelectionStrict,
   sumLineItems,
@@ -233,5 +234,13 @@ describe("refunds", () => {
     expect(refundStatusEffect("shipped", 5000, 5000)).toBe("none");
     expect(refundStatusEffect("refunded", 5000, 5000)).toBe("none");
     expect(refundStatusEffect("draft", 0, 0)).toBe("none");
+  });
+});
+
+describe("earliestServiceDate", () => {
+  it("takes the earliest date given, ignoring lines without one", () => {
+    expect(earliestServiceDate([null, "2026-10-12", "2026-10-09"])).toBe("2026-10-09");
+    expect(earliestServiceDate([null, null])).toBeNull();
+    expect(earliestServiceDate([])).toBeNull();
   });
 });

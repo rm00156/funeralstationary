@@ -70,6 +70,7 @@ import { checkDocReadiness } from "@/lib/designReadiness.server";
 import type { OrderEmailSummary } from "@/lib/orderEmails";
 import {
   computeOrderTotals,
+  earliestServiceDate,
   lineSpec,
   makeOrderNumber,
   resolveSelectionStrict,
@@ -163,6 +164,8 @@ export interface CartItem {
   quantityCopies: number;
   unitPricePence: number;
   lineTotalPence: number;
+  /** The date of the funeral, from the upload step or the checkout form. */
+  serviceDate: string | null;
 }
 
 export interface CartDelivery {
@@ -176,6 +179,11 @@ export interface Cart {
   orderNumber: string;
   items: CartItem[];
   details: CheckoutDetails | null;
+  /**
+   * The date of the funeral the checkout form shows: the earliest any line
+   * carries (an upload asks for it in its own flow), null when none does.
+   */
+  serviceDate: string | null;
   /** `deliveryPence` is Σ of the lines' delivery charges. */
   totals: OrderTotals;
   /** Everything prices and nothing is missing — checkout may proceed. */
@@ -499,6 +507,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
         quantityCopies: quote?.quantity.value ?? item.quantityCopies,
         unitPricePence: quote?.unitPricePence ?? item.unitPricePence,
         lineTotalPence: quote?.printCostPence ?? item.lineTotalPence,
+        serviceDate: item.serviceDate,
       };
     }
 
@@ -532,6 +541,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
       quantityCopies: quote?.quantity.value ?? item.quantityCopies,
       unitPricePence: quote?.unitPricePence ?? item.unitPricePence,
       lineTotalPence: quote?.printCostPence ?? item.lineTotalPence,
+      serviceDate: item.serviceDate,
     };
   });
 
@@ -552,6 +562,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     orderNumber: order.orderNumber,
     items,
     details: detailsFrom(order),
+    serviceDate: earliestServiceDate(items.map((item) => item.serviceDate)),
     totals,
     ready,
   };
@@ -873,23 +884,38 @@ export async function removeCartItem(owner: Owner, itemId: string): Promise<Cart
   return cart;
 }
 
-export async function setCheckoutDetails(owner: Owner, details: CheckoutDetails): Promise<Cart> {
+/**
+ * Saves the checkout form. `serviceDate` — the date of the funeral — goes
+ * onto every line, since a basket is one family's order for one service; it
+ * replaces a date given in the upload step, which the form showed prefilled.
+ * Undefined leaves the lines alone (a details-only PATCH).
+ */
+export async function setCheckoutDetails(
+  owner: Owner,
+  details: CheckoutDetails,
+  serviceDate?: string | null,
+): Promise<Cart> {
   const order = await findDraftOrder(owner);
   if (!order) throw new CartError(404, "Your basket is empty");
-  await db
-    .update(orders)
-    .set({
-      contactName: details.contactName,
-      contactEmail: details.contactEmail,
-      contactPhone: details.contactPhone,
-      guestEmail: owner.userId ? null : details.contactEmail,
-      addressLine1: details.addressLine1,
-      addressLine2: details.addressLine2,
-      city: details.city,
-      postcode: details.postcode,
-      country: "GB",
-    })
-    .where(eq(orders.id, order.id));
+  await db.transaction(async (tx) => {
+    if (serviceDate !== undefined) {
+      await tx.update(orderItems).set({ serviceDate }).where(eq(orderItems.orderId, order.id));
+    }
+    await tx
+      .update(orders)
+      .set({
+        contactName: details.contactName,
+        contactEmail: details.contactEmail,
+        contactPhone: details.contactPhone,
+        guestEmail: owner.userId ? null : details.contactEmail,
+        addressLine1: details.addressLine1,
+        addressLine2: details.addressLine2,
+        city: details.city,
+        postcode: details.postcode,
+        country: "GB",
+      })
+      .where(eq(orders.id, order.id));
+  });
   const cart = await getCart(owner);
   if (!cart) throw new Error("Basket vanished");
   return cart;
