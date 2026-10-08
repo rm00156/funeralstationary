@@ -39,7 +39,7 @@ The `/design` editor (`src/components/DesignEditor.tsx`) builds a `DesignDoc` (s
 
 This exists specifically so the PDF is guaranteed pixel-identical to what the customer saw on screen — never reimplement the layout/font-rendering logic as a second renderer (e.g. drawing shapes/text directly with `pdf-lib`); always route new export formats through screenshotting the real component.
 
-**Local vs production Chromium:** `puppeteer` (devDependency, downloads a real Chromium locally) is used when `process.env.VERCEL` is unset; `puppeteer-core` + `@sparticuz/chromium` (Linux-only) is used on Vercel. `next.config.ts`'s `outputFileTracingExcludes` keeps the dev-only package out of the deployed function. **Requires Vercel Pro or higher** — the route's `maxDuration` exceeds the Hobby plan's 10s ceiling.
+**Local vs production Chromium:** `puppeteer` (devDependency, downloads a real Chromium locally) is used when `process.env.VERCEL` is unset; `puppeteer-core` + `@sparticuz/chromium` (Linux-only) is used on Vercel. `next.config.ts`'s `outputFileTracingExcludes` keeps the dev-only package out of the deployed function, and its `outputFileTracingIncludes` adds `@sparticuz/chromium/bin` (the compressed browser, which the tracer can't see) to every route in `CHROMIUM_ROUTES` (`src/lib/chromiumRoutes.ts`) — a new route that reaches `launchHeadlessBrowser` must be added there, and `chromiumRoutes.test.ts` fails until it is. **Requires Vercel Pro or higher** — the route's `maxDuration` exceeds the Hobby plan's 10s ceiling.
 
 ## Data Layer
 
