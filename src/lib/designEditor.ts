@@ -419,6 +419,13 @@ export interface ImageElement extends ElementBase {
    */
   fit?: "cover" | "contain";
   /**
+   * Where the photo sits inside its window, so the customer can choose which
+   * part a round or arched window keeps. Only meaningful with "cover"; a
+   * contained cutout is never cropped. Undefined means centred, unzoomed —
+   * every design saved before this existed.
+   */
+  crop?: PhotoCrop;
+  /**
    * Optional line border drawn around the photo window, using the same
    * single/double/triple line pattern as a page `FrameElement`. It follows the
    * window shape, so an oval photo gets an oval border and an arch an arched
@@ -427,6 +434,119 @@ export interface ImageElement extends ElementBase {
   border?: FrameVariant;
   /** Border colour; only meaningful when `border` is set. */
   borderColor?: string;
+}
+
+/**
+ * A photo's crop inside its window. `x`/`y` are CSS object-position
+ * percentages (0 = the photo's left/top edge against the window's, 100 = its
+ * right/bottom edge), so the photo can never be panned off and leave a gap.
+ * `zoom` scales the photo beyond the size that just fills the window.
+ */
+export interface PhotoCrop {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+export const DEFAULT_PHOTO_CROP: PhotoCrop = { x: 50, y: 50, zoom: 1 };
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+export const MAX_PHOTO_ZOOM = 4;
+
+/** The element's crop, defaulted and clamped — a saved doc is untrusted. */
+export function photoCrop(el: ImageElement): PhotoCrop {
+  const crop = el.crop;
+  if (!crop) return DEFAULT_PHOTO_CROP;
+  const finite = (value: unknown, fallback: number) =>
+    typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return {
+    x: clamp(finite(crop.x, 50), 0, 100),
+    y: clamp(finite(crop.y, 50), 0, 100),
+    zoom: clamp(finite(crop.zoom, 1), 1, MAX_PHOTO_ZOOM),
+  };
+}
+
+/**
+ * The style placing a "cover" photo inside its window at its crop. The img is
+ * enlarged by `zoom` and shifted so the point at x%/y% of the window stays
+ * put, then object-position picks the same point of the photo — so the
+ * rendered offset is x% of (window − photo), the same as object-position
+ * alone on a photo `zoom` times larger. Pure layout, no transform, so the
+ * press PDF prints the photo exactly as the editor shows it. At the default
+ * crop it is the plain centred cover every older design was drawn with.
+ */
+export function photoCropStyle(crop: PhotoCrop): {
+  position: "absolute";
+  left: string;
+  top: string;
+  width: string;
+  height: string;
+  objectPosition: string;
+} {
+  const grow = crop.zoom - 1;
+  return {
+    position: "absolute",
+    left: `${-grow * crop.x}%`,
+    top: `${-grow * crop.y}%`,
+    width: `${crop.zoom * 100}%`,
+    height: `${crop.zoom * 100}%`,
+    objectPosition: `${crop.x}% ${crop.y}%`,
+  };
+}
+
+interface Size {
+  w: number;
+  h: number;
+}
+
+/** How far a cover-fitted photo at `zoom` overhangs its window, per axis. */
+export function photoOverflow(box: Size, natural: Size, zoom: number): Size {
+  if (natural.w <= 0 || natural.h <= 0) return { w: 0, h: 0 };
+  const scale = Math.max(box.w / natural.w, box.h / natural.h) * zoom;
+  return {
+    w: Math.max(0, natural.w * scale - box.w),
+    h: Math.max(0, natural.h * scale - box.h),
+  };
+}
+
+/**
+ * Pan a crop by a pointer drag of `dx`/`dy` px: the photo follows the
+ * pointer, and stops at its own edge. An axis the photo doesn't overhang
+ * (a portrait photo's width in a portrait window, unzoomed) can't move.
+ */
+export function panPhotoCrop(
+  crop: PhotoCrop,
+  dx: number,
+  dy: number,
+  box: Size,
+  natural: Size,
+): PhotoCrop {
+  const overflow = photoOverflow(box, natural, crop.zoom);
+  return {
+    ...crop,
+    x: overflow.w > 0 ? clamp(crop.x - (dx / overflow.w) * 100, 0, 100) : crop.x,
+    y: overflow.h > 0 ? clamp(crop.y - (dy / overflow.h) * 100, 0, 100) : crop.y,
+  };
+}
+
+/**
+ * The whole photo's box relative to its window, in px — for showing
+ * the cropped-away part faintly while the customer adjusts it.
+ */
+export function photoCropRect(
+  crop: PhotoCrop,
+  box: Size,
+  natural: Size,
+): { left: number; top: number; width: number; height: number } {
+  const overflow = photoOverflow(box, natural, crop.zoom);
+  return {
+    left: 0 - (crop.x / 100) * overflow.w,
+    top: 0 - (crop.y / 100) * overflow.h,
+    width: box.w + overflow.w,
+    height: box.h + overflow.h,
+  };
 }
 
 export type FrameVariant = "single" | "double" | "triple";

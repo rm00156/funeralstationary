@@ -10,6 +10,13 @@ import {
   frameDepth,
   frameRings,
   photoBorderRadius,
+  photoCrop,
+  photoCropRect,
+  photoCropStyle,
+  photoOverflow,
+  panPhotoCrop,
+  DEFAULT_PHOTO_CROP,
+  MAX_PHOTO_ZOOM,
   pageMetrics,
   photoInnerBorderRadius,
   resizeBox,
@@ -89,6 +96,87 @@ describe("photoBorderRadius", () => {
 
   it("leaves a rectangular window unclipped", () => {
     expect(photoBorderRadius(makeImage())).toBeUndefined();
+  });
+});
+
+describe("photo crop", () => {
+  // A 300×200 landscape photo in a 100×100 square window: cover scales it to
+  // 150×100, so it overhangs by 50px across and not at all down.
+  const square = { w: 100, h: 100 };
+  const landscape = { w: 300, h: 200 };
+
+  it("defaults to centred and unzoomed, as every older design was drawn", () => {
+    expect(photoCrop(makeImage())).toEqual(DEFAULT_PHOTO_CROP);
+    expect(photoCropStyle(DEFAULT_PHOTO_CROP)).toEqual({
+      position: "absolute",
+      left: "0%",
+      top: "0%",
+      width: "100%",
+      height: "100%",
+      objectPosition: "50% 50%",
+    });
+  });
+
+  it("clamps a saved crop it can't trust", () => {
+    expect(photoCrop(makeImage({ crop: { x: -20, y: 140, zoom: 99 } }))).toEqual({
+      x: 0,
+      y: 100,
+      zoom: MAX_PHOTO_ZOOM,
+    });
+    expect(
+      photoCrop(makeImage({ crop: { x: Number.NaN, y: 30, zoom: 0.2 } })),
+    ).toEqual({ x: 50, y: 30, zoom: 1 });
+  });
+
+  it("enlarges the photo around the crop point", () => {
+    expect(photoCropStyle({ x: 25, y: 100, zoom: 2 })).toMatchObject({
+      left: "-25%",
+      top: "-100%",
+      width: "200%",
+      height: "200%",
+      objectPosition: "25% 100%",
+    });
+  });
+
+  it("measures how far a cover-fitted photo overhangs its window", () => {
+    expect(photoOverflow(square, landscape, 1)).toEqual({ w: 50, h: 0 });
+    expect(photoOverflow(square, landscape, 2)).toEqual({ w: 200, h: 100 });
+    expect(photoOverflow(square, { w: 0, h: 0 }, 1)).toEqual({ w: 0, h: 0 });
+  });
+
+  it("moves the photo with the pointer", () => {
+    // Dragging right by half the overhang shows the photo's left side.
+    expect(panPhotoCrop(DEFAULT_PHOTO_CROP, 25, 0, square, landscape)).toEqual({
+      x: 0,
+      y: 50,
+      zoom: 1,
+    });
+    expect(panPhotoCrop(DEFAULT_PHOTO_CROP, -10, 0, square, landscape).x).toBeCloseTo(70);
+  });
+
+  it("stops at the photo's edge and leaves an axis without overhang alone", () => {
+    const panned = panPhotoCrop(DEFAULT_PHOTO_CROP, 500, 40, square, landscape);
+    expect(panned).toEqual({ x: 0, y: 50, zoom: 1 });
+  });
+
+  it("pans further down once zoomed", () => {
+    const zoomed = { x: 50, y: 50, zoom: 2 };
+    expect(panPhotoCrop(zoomed, 0, -25, square, landscape).y).toBe(75);
+  });
+
+  it("places the whole photo where the crop draws it", () => {
+    expect(photoCropRect(DEFAULT_PHOTO_CROP, square, landscape)).toEqual({
+      left: -25,
+      top: 0,
+      width: 150,
+      height: 100,
+    });
+    expect(photoCropRect({ x: 100, y: 0, zoom: 2 }, square, landscape)).toEqual({
+      left: -200,
+      top: 0,
+      width: 300,
+      height: 200,
+    });
   });
 });
 
