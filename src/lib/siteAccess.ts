@@ -7,7 +7,9 @@
  * The rule follows Thintent's (lib/entitlement.ts there) with one fix: a
  * subscription Stripe has ended is closed at once, whatever period end it
  * last reported. Only a portal cancellation (`cancel_at_period_end`, or a
- * `cancel_at` date), which Stripe leaves `active` until the date, runs on.
+ * `cancel_at` date), which Stripe leaves `active` until the date, runs on —
+ * and it closes on that date by the clock, not when the `deleted` event
+ * arrives, so a missed webhook can't keep a cancelled shop open.
  *
  * A failed payment keeps the shop open for PAST_DUE_GRACE_DAYS, not for as
  * long as Stripe says `past_due`: what Stripe does when its retries run out is
@@ -63,6 +65,14 @@ export type SiteAccess = {
 /** The statuses that keep the shop open. Anything else Stripe reports — including statuses added later — closes it. */
 const ENTITLED_STATUSES = new Set(["active", "trialing", "past_due"]);
 
+/**
+ * Whether a subscription in this status is one to pay or manage rather than
+ * replace — good standing, or past due however long (settled in the portal).
+ */
+export function holdsSubscription(status: string): boolean {
+  return ENTITLED_STATUSES.has(status);
+}
+
 /** When a failed payment's grace runs out, or null when nothing is overdue. */
 export function pastDueClosesAt(state: SubscriptionState | null): Date | null {
   if (state?.status !== "past_due" || !state.pastDueSince) return null;
@@ -76,7 +86,8 @@ export function subscriptionReason(state: SubscriptionState | null, now: Date = 
       return "never_subscribed";
     case "active":
     case "trialing":
-      return state?.cancelAtPeriodEnd ? "cancelling" : "subscribed";
+      if (!state?.cancelAtPeriodEnd) return "subscribed";
+      return state.currentPeriodEnd && now >= state.currentPeriodEnd ? "lapsed" : "cancelling";
     case "past_due": {
       const closesAt = pastDueClosesAt(state);
       return closesAt && now >= closesAt ? "overdue" : "past_due";
@@ -94,7 +105,7 @@ export function siteAccessFor(
   now: Date = new Date(),
 ): SiteAccess {
   const reason = subscriptionReason(state, now);
-  const entitled = ENTITLED_STATUSES.has(state?.status ?? "") && reason !== "overdue";
+  const entitled = ENTITLED_STATUSES.has(state?.status ?? "") && reason !== "overdue" && reason !== "lapsed";
   return {
     open: !required || entitled,
     entitled,

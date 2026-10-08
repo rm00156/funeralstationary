@@ -4,7 +4,7 @@ import Link from "next/link";
 import AdminLogoutButton from "@/components/AdminLogoutButton";
 import { requireAdmin } from "@/lib/adminSession";
 import { billingNotice } from "@/lib/siteAccess";
-import { getSiteAccess } from "@/lib/siteBilling.server";
+import { getSiteAccess, subscriptionRequired } from "@/lib/siteBilling.server";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -24,7 +24,8 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   await requireAdmin();
-  const notice = billingNotice(await getSiteAccess());
+  // With the switch off nothing can close, so the billing table isn't read.
+  const notice = subscriptionRequired() ? billingNotice(await getSiteAccess()) : null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-paper">

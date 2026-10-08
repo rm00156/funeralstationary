@@ -677,6 +677,10 @@ export default function DesignEditor({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
+      // A modal question is open (apply template, pre-order check): its keys
+      // are its own, or Backspace on a focused button would delete the
+      // selected element behind it.
+      if (target.closest("dialog[open]")) return;
       const typing =
         target.tagName === "TEXTAREA" ||
         target.tagName === "INPUT" ||

@@ -56,10 +56,12 @@ export default async function CartPage() {
               delivered. The price updates as you go.
             </p>
 
-            {shopOpen ? (
-              <CartView initialCart={cart} pricingByProduct={pricingByProduct} />
-            ) : (
-              <ShopClosedNotice />
+            {!shopOpen && <ShopClosedNotice />}
+            {/* Closed, the basket stays readable and removable — only changing it and paying are refused. */}
+            {(shopOpen || (cart && cart.items.length > 0)) && (
+              <div className={shopOpen ? undefined : "mt-10"}>
+                <CartView initialCart={cart} pricingByProduct={pricingByProduct} closed={!shopOpen} />
+              </div>
             )}
           </div>
         </section>

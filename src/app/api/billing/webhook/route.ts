@@ -55,6 +55,13 @@ function eventCustomerId(event: Stripe.Event): string | null | undefined {
     case "customer.subscription.paused":
     case "customer.subscription.resumed":
       return idOf(event.data.object.customer);
+    // Paying one of two open invoices changes when the grace started without
+    // changing the subscription's status, so no subscription event says so.
+    case "invoice.paid":
+    case "invoice.payment_failed":
+    case "invoice.voided":
+    case "invoice.marked_uncollectible":
+      return idOf(event.data.object.customer);
     default:
       return undefined;
   }

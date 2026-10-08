@@ -1,6 +1,11 @@
 import { formatPence } from "@/lib/orderOfServicePricing";
 import { formatBillingDate, type SiteAccess, type SiteAccessReason } from "@/lib/siteAccess";
-import { billingConfigured, getSiteAccess, getSubscriptionPrice } from "@/lib/siteBilling.server";
+import {
+  billingConfigured,
+  getSubscriptionPrice,
+  readSiteAccess,
+  syncSiteSubscription,
+} from "@/lib/siteBilling.server";
 
 export const dynamic = "force-dynamic";
 
@@ -38,27 +43,30 @@ function detail(access: SiteAccess): string {
   }
 }
 
-const BUTTON =
-  "rounded-lg bg-primary-container px-5 py-3 font-body font-medium text-white transition-colors duration-300 hover:bg-primary";
-const OUTLINE_BUTTON =
-  "rounded-lg border border-outline-variant px-5 py-3 font-body font-medium text-primary transition-colors duration-300 hover:bg-surface-container";
-
 /**
  * The site's own subscription — what keeps the online shop open (see
  * src/lib/siteAccess.ts). Subscribing and managing both happen on Stripe's
  * hosted pages; they come back through /api/admin/billing/return, which
- * re-reads the subscription before landing here.
+ * re-reads the subscription before landing here. Opening the page re-reads it
+ * too, so a missed webhook is put right by looking.
  */
 export default async function AdminBillingPage({ searchParams }: PageProps<"/admin/billing">) {
   const { subscribed, error } = await searchParams;
-  const [access, price] = await Promise.all([getSiteAccess(), getSubscriptionPrice()]);
+  try {
+    await syncSiteSubscription();
+  } catch (error) {
+    // Stripe unreachable: show what's stored rather than no page at all.
+    console.error("Billing: couldn't sync the subscription on the billing page", error);
+  }
+  // Read now, not request-cached: the layout may already have read the row before the sync.
+  const [access, price] = await Promise.all([readSiteAccess(), getSubscriptionPrice()]);
   const configured = billingConfigured();
   // An overdue subscription is settled in the portal, not replaced by a second one.
   const canSubscribe = !access.entitled && access.reason !== "overdue";
 
   return (
     <>
-      <h1 className="mb-8 font-display text-3xl font-medium text-primary">Billing</h1>
+      <h1 className="mb-8 font-display text-3xl font-medium text-plum">Billing</h1>
 
       {typeof error === "string" && (
         <p role="alert" className="mb-6 rounded-lg bg-warn-bg px-4 py-3 font-body text-warn-text">
@@ -66,22 +74,22 @@ export default async function AdminBillingPage({ searchParams }: PageProps<"/adm
         </p>
       )}
       {subscribed === "1" && access.entitled && (
-        <p role="status" className="mb-6 rounded-lg bg-surface-container px-4 py-3 font-body text-on-surface">
+        <p role="status" className="mb-6 rounded-lg border border-success-border bg-success-bg px-4 py-3 font-body text-success-text">
           Thank you — the subscription is set up.
         </p>
       )}
 
-      <section className="max-w-[720px] rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6 ambient-shadow md:p-8">
-        <p className="font-body text-sm uppercase tracking-wide text-on-surface-variant">Website subscription</p>
-        <h2 className="mt-2 font-display text-2xl text-on-surface">{STATUS[access.reason]}</h2>
-        <p className="mt-3 font-body text-on-surface-variant">{detail(access)}</p>
+      <section className="max-w-[720px] rounded-xl border border-line bg-surface p-6 shadow-cover md:p-8">
+        <p className="eyebrow">Website subscription</p>
+        <h2 className="mt-2 font-display text-2xl text-ink">{STATUS[access.reason]}</h2>
+        <p className="mt-3 font-body text-ink-2">{detail(access)}</p>
         {price && (
-          <p className="mt-4 font-body text-on-surface">
+          <p className="mt-4 font-body text-ink">
             <span className="font-display text-xl">{formatPence(price.amountPence)}</span> a {price.interval}
           </p>
         )}
 
-        <p className="mt-6 border-t border-outline-variant/30 pt-6 font-body text-on-surface-variant">
+        <p className="mt-6 border-t border-line pt-6 font-body text-ink-2">
           {!access.required
             ? "The online shop is open."
             : access.open
@@ -93,26 +101,26 @@ export default async function AdminBillingPage({ searchParams }: PageProps<"/adm
           <div className="mt-6 flex flex-wrap gap-3">
             {canSubscribe && (
               <form action="/api/admin/billing/checkout" method="post">
-                <button type="submit" className={BUTTON}>
+                <button type="submit" className="btn btn-primary">
                   {access.reason === "never_subscribed" ? "Subscribe" : "Subscribe again"}
                 </button>
               </form>
             )}
             {access.reason !== "never_subscribed" && (
               <form action="/api/admin/billing/portal" method="post">
-                <button type="submit" className={canSubscribe ? OUTLINE_BUTTON : BUTTON}>
+                <button type="submit" className={canSubscribe ? "btn btn-outline" : "btn btn-primary"}>
                   Manage billing
                 </button>
               </form>
             )}
           </div>
         ) : (
-          <p className="mt-6 font-body text-sm text-on-surface-variant">
+          <p className="mt-6 font-body text-sm text-ink-3">
             Online billing isn’t set up on this site yet.
           </p>
         )}
         {configured && (
-          <p className="mt-4 font-body text-sm text-on-surface-variant">
+          <p className="mt-4 font-body text-sm text-ink-3">
             Payments, card changes, cancelling and invoices are handled securely by Stripe.
           </p>
         )}

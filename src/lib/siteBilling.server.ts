@@ -20,6 +20,7 @@ import { db } from "@/db";
 import { siteBilling } from "@/db/schema";
 import { COMPANY_NAME, EMAIL, SITE_NAME } from "@/lib/site";
 import {
+  holdsSubscription,
   pickSubscription,
   siteAccessFor,
   subscriptionStateFrom,
@@ -65,10 +66,13 @@ function stateOf(row: BillingRow | null): SubscriptionState | null {
   };
 }
 
-/** The full picture, for /admin. Request-cached. */
-export const getSiteAccess = cache(async (): Promise<SiteAccess> => {
+/** The full picture, read now — for /admin/billing, straight after it re-syncs. */
+export async function readSiteAccess(): Promise<SiteAccess> {
   return siteAccessFor(stateOf(await readRow()), subscriptionRequired());
-});
+}
+
+/** The same, request-cached, for the gated pages and the admin layout. */
+export const getSiteAccess = cache(readSiteAccess);
 
 /**
  * Whether customers may design, upload and buy. With the switch off this
@@ -147,12 +151,37 @@ async function customerExists(id: string): Promise<boolean> {
   }
 }
 
-/** Hosted Checkout for the monthly subscription. Returns the URL to send the admin to. */
+/** Subscribe was pressed while the site already has a subscription to pay or manage. */
+export class AlreadySubscribedError extends Error {
+  constructor() {
+    super("The site already has a subscription");
+  }
+}
+
+/**
+ * Hosted Checkout for the monthly subscription. Returns the URL to send the
+ * admin to.
+ *
+ * The page hides Subscribe once there's a subscription, but a second tab or a
+ * page loaded before the webhook landed still shows it, so this asks Stripe
+ * itself: a subscription in good standing (or past due — that's settled in
+ * the portal, not replaced) refuses. Any Checkout still open from an earlier
+ * click is expired first, so two tabs can't both be paid.
+ */
 export async function startSubscriptionCheckout(origin: string): Promise<string> {
   const price = process.env.BILLING_STRIPE_PRICE_ID;
   if (!price) throw new Error("BILLING_STRIPE_PRICE_ID is not set");
   const customer = await ensureBillingCustomer();
-  const session = await billingStripe().checkout.sessions.create({
+  const stripe = billingStripe();
+
+  const existing = await stripe.subscriptions.list({ customer, status: "all", limit: 20 });
+  const current = pickSubscription(existing.data);
+  if (current && holdsSubscription(current.status)) throw new AlreadySubscribedError();
+
+  const open = await stripe.checkout.sessions.list({ customer, status: "open", limit: 20 });
+  await Promise.all(open.data.map((earlier) => stripe.checkout.sessions.expire(earlier.id)));
+
+  const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer,
     line_items: [{ price, quantity: 1 }],
@@ -182,36 +211,47 @@ export async function openBillingPortal(origin: string): Promise<string> {
  * decides access (pickSubscription). Every path — the webhook, the return
  * from Checkout, opening /admin/billing — goes through here, so a late or
  * repeated event can't leave a stale state behind.
+ *
+ * One sync at a time: the row is locked across the Stripe read, so the
+ * events Checkout fires together (`created` while incomplete, `updated` once
+ * paid) can't have the one that read older state write last. Each sync reads
+ * Stripe after the one before it has stored, so the last write is the newest.
+ * Readers aren't blocked — a plain SELECT doesn't wait on the lock.
  */
 export async function syncSiteSubscription(): Promise<void> {
-  const row = await readRow();
-  if (!row?.stripeCustomerId || !billingConfigured()) return;
-  const list = await billingStripe().subscriptions.list({
-    customer: row.stripeCustomerId,
-    status: "all",
-    limit: 20,
+  if (!billingConfigured()) return;
+  await db.transaction(async (tx) => {
+    const [row] = await tx.select().from(siteBilling).where(eq(siteBilling.id, ROW_ID)).for("update");
+    if (!row?.stripeCustomerId) return;
+    const list = await billingStripe().subscriptions.list({
+      customer: row.stripeCustomerId,
+      status: "all",
+      limit: 20,
+    });
+    const sub = pickSubscription(list.data);
+    if (!sub) return;
+    const state = subscriptionStateFrom(sub);
+    const pastDueSince =
+      state.status === "past_due" ? ((await oldestUnpaidInvoiceDate(sub.id)) ?? row.pastDueSince ?? new Date()) : null;
+    await tx
+      .update(siteBilling)
+      .set({
+        stripeSubscriptionId: state.subscriptionId,
+        subscriptionStatus: state.status,
+        cancelAtPeriodEnd: state.cancelAtPeriodEnd,
+        currentPeriodEnd: state.currentPeriodEnd,
+        pastDueSince,
+      })
+      .where(eq(siteBilling.id, ROW_ID));
   });
-  const sub = pickSubscription(list.data);
-  if (!sub) return;
-  const state = subscriptionStateFrom(sub);
-  const pastDueSince =
-    state.status === "past_due" ? ((await oldestUnpaidInvoiceDate(sub.id)) ?? row.pastDueSince ?? new Date()) : null;
-  await db
-    .update(siteBilling)
-    .set({
-      stripeSubscriptionId: state.subscriptionId,
-      subscriptionStatus: state.status,
-      cancelAtPeriodEnd: state.cancelAtPeriodEnd,
-      currentPeriodEnd: state.currentPeriodEnd,
-      pastDueSince,
-    })
-    .where(eq(siteBilling.id, ROW_ID));
 }
 
 /**
  * When the subscription's oldest unpaid invoice fell due. The oldest, not the
  * latest: left past-due, Stripe raises next month's renewal on top, and that
- * must not restart the grace.
+ * must not restart the grace. Paying the oldest of two leaves the status
+ * past_due, so no subscription event fires — the webhook listens to invoice
+ * events too, so the clock moves on to the next one.
  */
 async function oldestUnpaidInvoiceDate(subscriptionId: string): Promise<Date | null> {
   const open = await billingStripe().invoices.list({ subscription: subscriptionId, status: "open", limit: 100 });

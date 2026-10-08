@@ -24,10 +24,17 @@ const AXIS_LABELS: Record<LineAxis, string> = {
 export default function CartView({
   initialCart,
   pricingByProduct,
+  closed = false,
 }: {
   initialCart: Cart | null;
   /** Option lists keyed by product slug, for every product in the basket. */
   pricingByProduct: Record<string, PricingData>;
+  /**
+   * The online shop is closed (unpaid site subscription): the basket can be
+   * looked at and emptied, but copies, delivery and checkout are refused
+   * server-side, so they're switched off here too.
+   */
+  closed?: boolean;
 }) {
   const [cart, setCart] = useState<Cart | null>(initialCart);
   const [busy, setBusy] = useState<string | null>(null);
@@ -85,6 +92,7 @@ export default function CartView({
               item={item}
               pricing={pricingByProduct[item.productId] ?? null}
               busy={busy === item.id}
+              locked={closed}
               onChange={(axis, value) =>
                 mutate(item.id, `/api/cart/items/${item.id}`, "PATCH", { [axis]: value })
               }
@@ -119,7 +127,11 @@ export default function CartView({
           {vatIncludedText(totals.vatPence)}
         </p>
 
-        {cart.ready ? (
+        {closed ? (
+          <p className="mt-6 font-body text-sm text-on-surface-variant">
+            We’re not taking orders online just now — please call or email us to order.
+          </p>
+        ) : cart.ready ? (
           <Link
             href="/checkout"
             className="mt-6 block rounded-lg bg-primary-container px-6 py-3.5 text-center font-body text-base font-medium tracking-wide text-white transition-colors duration-300 hover:bg-primary"
@@ -152,12 +164,15 @@ function CartLine({
   item,
   pricing,
   busy,
+  locked,
   onChange,
   onRemove,
 }: {
   item: CartItem;
   pricing: PricingData | null;
   busy: boolean;
+  /** Choices can't be changed (the shop is closed); Remove still works. */
+  locked: boolean;
   onChange: (axis: LineAxis, value: string) => void;
   onRemove: () => void;
 }) {
@@ -244,7 +259,7 @@ function CartLine({
               id={`${item.id}-${axis}`}
               label={AXIS_LABELS[axis]}
               value={stale ? "" : item.selection[axis]}
-              disabled={busy || item.designMissing}
+              disabled={busy || locked || item.designMissing}
               options={stale ? [{ id: "", label: "Choose…" }, ...options] : options}
               onChange={(value) => value && onChange(axis, value)}
               note={

@@ -63,15 +63,23 @@ describe("siteAccessFor", () => {
     expect(siteAccessFor(pastDue, false, closesAt)).toMatchObject({ open: true, reason: "overdue" });
   });
 
-  it("keeps a portal cancellation open until its date", () => {
+  it("keeps a portal cancellation open until its date, then closes it without waiting for Stripe", () => {
     const end = new Date("2026-11-08T00:00:00Z");
-    expect(siteAccessFor(state("active", { cancelAtPeriodEnd: true, currentPeriodEnd: end }), true)).toEqual({
+    const cancelling = state("active", { cancelAtPeriodEnd: true, currentPeriodEnd: end });
+    expect(siteAccessFor(cancelling, true, new Date(end.getTime() - 1))).toEqual({
       open: true,
       entitled: true,
       required: true,
       reason: "cancelling",
       currentPeriodEnd: end,
       closesAt: null,
+    });
+    // The `deleted` event never arrived: the stored status still says active.
+    expect(siteAccessFor(cancelling, true, end)).toMatchObject({ open: false, entitled: false, reason: "lapsed" });
+    // A plain renewal date in the past is only a missed renewal event, not a reason to close.
+    expect(siteAccessFor(state("active", { currentPeriodEnd: end }), true, new Date("2027-01-01"))).toMatchObject({
+      open: true,
+      reason: "subscribed",
     });
   });
 

@@ -4,8 +4,8 @@ import { Phone } from "lucide-react";
 import { EMAIL, EMAIL_HREF, OPENING_HOURS, PHONE_DISPLAY, PHONE_HREF } from "@/lib/site";
 
 /**
- * Shown in place of the editor, the upload flow, the basket and checkout
- * while the site's subscription is unpaid (see src/lib/siteAccess.ts).
+ * Shown in place of the editor and the upload flow, and above a read-only
+ * basket, while the site's subscription is unpaid (see src/lib/siteAccess.ts).
  * The designs stay browsable; this sends the customer to a person instead.
  */
 export default function ShopClosedNotice({ title = "We’re not taking orders online just now" }: { title?: string }) {

@@ -25,9 +25,15 @@ export interface PromptOptions extends ConfirmOptions {
   defaultValue?: string;
 }
 
-type Request =
+type Request = { id: number } & (
   | { kind: "confirm"; options: ConfirmOptions; resolve: (ok: boolean) => void }
-  | { kind: "prompt"; options: PromptOptions; resolve: (value: string | null) => void };
+  | { kind: "prompt"; options: PromptOptions; resolve: (value: string | null) => void }
+);
+
+function answer(request: Request, value: string | null) {
+  if (request.kind === "confirm") request.resolve(value !== null);
+  else request.resolve(value);
+}
 
 /**
  * `const { confirm, prompt, dialog } = useConfirmDialog()` — render `dialog`
@@ -36,27 +42,39 @@ type Request =
  */
 export function useConfirmDialog() {
   const [request, setRequest] = useState<Request | null>(null);
+  const pending = useRef<Request | null>(null);
+  const nextId = useRef(0);
+
+  // A second question replaces the first, which is answered as cancelled
+  // rather than left awaiting for good.
+  const ask = useCallback((next: Request) => {
+    if (pending.current) answer(pending.current, null);
+    pending.current = next;
+    setRequest(next);
+  }, []);
 
   const confirm = useCallback(
     (options: ConfirmOptions) =>
-      new Promise<boolean>((resolve) => setRequest({ kind: "confirm", options, resolve })),
-    [],
+      new Promise<boolean>((resolve) => ask({ id: ++nextId.current, kind: "confirm", options, resolve })),
+    [ask],
   );
   const prompt = useCallback(
     (options: PromptOptions) =>
-      new Promise<string | null>((resolve) => setRequest({ kind: "prompt", options, resolve })),
-    [],
+      new Promise<string | null>((resolve) => ask({ id: ++nextId.current, kind: "prompt", options, resolve })),
+    [ask],
   );
 
   const settle = (value: string | null) => {
-    if (!request) return;
-    if (request.kind === "confirm") request.resolve(value !== null);
-    else request.resolve(value);
+    if (!request || pending.current !== request) return;
+    answer(request, value);
+    pending.current = null;
     setRequest(null);
   };
 
   const dialog = request ? (
     <ConfirmDialog
+      // A fresh dialog per question, so a prompt's field starts from its own default.
+      key={request.id}
       {...request.options}
       field={
         request.kind === "prompt"

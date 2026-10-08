@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { isAdmin, unauthorised } from "@/lib/adminSession";
-import { billingConfigured, startSubscriptionCheckout } from "@/lib/siteBilling.server";
+import { AlreadySubscribedError, billingConfigured, startSubscriptionCheckout } from "@/lib/siteBilling.server";
 import { resolveRequestOrigin } from "@/lib/stripe.server";
 
 export const runtime = "nodejs";
@@ -18,6 +18,9 @@ export async function POST(request: NextRequest) {
   try {
     return Response.redirect(await startSubscriptionCheckout(origin), 303);
   } catch (error) {
+    if (error instanceof AlreadySubscribedError) {
+      return backWithError(origin, "The site is already subscribed — use “Manage billing” to change or settle it.");
+    }
     console.error("Billing: couldn't start the subscription checkout", error);
     return backWithError(origin, "We couldn’t reach Stripe. Please try again.");
   }
