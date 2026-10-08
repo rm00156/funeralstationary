@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { chromiumTracingIncludes } from "./src/lib/chromiumRoutes";
 
 /**
  * next/image hard-errors on hosts it doesn't know, so the object-storage
@@ -56,6 +57,9 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "/**": ["./node_modules/puppeteer/**"],
   },
+  // …and @sparticuz/chromium's browser binary must be added to them by hand:
+  // the tracer can't see it (see chromiumRoutes.ts).
+  outputFileTracingIncludes: chromiumTracingIncludes(),
 };
 
 export default nextConfig;
