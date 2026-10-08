@@ -7,6 +7,8 @@ import AdminPrintPdfButton from "@/components/AdminPrintPdfButton";
 import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
 import AdminThintentButton from "@/components/AdminThintentButton";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
+import { customerHref } from "@/lib/adminCustomers";
+import { adminOrderCustomerEmail } from "@/lib/adminCustomers.server";
 import { adminGetOrder } from "@/lib/adminOrders.server";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { fileSizeText } from "@/lib/artwork";
@@ -58,7 +60,7 @@ export default async function AdminOrderPage({
   params,
 }: PageProps<"/admin/orders/[id]">) {
   const { id } = await params;
-  const order = await adminGetOrder(id);
+  const [order, customerEmail] = await Promise.all([adminGetOrder(id), adminOrderCustomerEmail(id)]);
   if (!order) notFound();
   const refunded = refundedPence(order.refunds);
   const refundsNotInThintent = order.thintent
@@ -342,6 +344,11 @@ export default async function AdminOrderPage({
             <p className="font-body text-sm text-on-surface-variant">{order.contact.email ?? "—"}</p>
             {order.contact.phone && (
               <p className="font-body text-sm text-on-surface-variant">{order.contact.phone}</p>
+            )}
+            {customerEmail && order.status !== "draft" && (
+              <Link href={customerHref(customerEmail)} className="link mt-2 inline-block font-body text-sm">
+                All their orders
+              </Link>
             )}
             <address className="mt-3 font-body text-sm not-italic leading-relaxed text-on-surface-variant">
               {order.address.line1}

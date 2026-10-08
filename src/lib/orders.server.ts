@@ -163,6 +163,8 @@ export interface CartItem {
   quantityCopies: number;
   unitPricePence: number;
   lineTotalPence: number;
+  /** The date of the funeral, from the upload step or the checkout form. */
+  serviceDate: string | null;
 }
 
 export interface CartDelivery {
@@ -176,6 +178,11 @@ export interface Cart {
   orderNumber: string;
   items: CartItem[];
   details: CheckoutDetails | null;
+  /**
+   * The date of the funeral the checkout form shows: the earliest any line
+   * carries (an upload asks for it in its own flow), null when none does.
+   */
+  serviceDate: string | null;
   /** `deliveryPence` is Σ of the lines' delivery charges. */
   totals: OrderTotals;
   /** Everything prices and nothing is missing — checkout may proceed. */
@@ -499,6 +506,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
         quantityCopies: quote?.quantity.value ?? item.quantityCopies,
         unitPricePence: quote?.unitPricePence ?? item.unitPricePence,
         lineTotalPence: quote?.printCostPence ?? item.lineTotalPence,
+        serviceDate: item.serviceDate,
       };
     }
 
@@ -532,6 +540,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
       quantityCopies: quote?.quantity.value ?? item.quantityCopies,
       unitPricePence: quote?.unitPricePence ?? item.unitPricePence,
       lineTotalPence: quote?.printCostPence ?? item.lineTotalPence,
+      serviceDate: item.serviceDate,
     };
   });
 
@@ -552,6 +561,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     orderNumber: order.orderNumber,
     items,
     details: detailsFrom(order),
+    serviceDate: items.map((item) => item.serviceDate).filter((date): date is string => !!date).sort()[0] ?? null,
     totals,
     ready,
   };
@@ -873,9 +883,22 @@ export async function removeCartItem(owner: Owner, itemId: string): Promise<Cart
   return cart;
 }
 
-export async function setCheckoutDetails(owner: Owner, details: CheckoutDetails): Promise<Cart> {
+/**
+ * Saves the checkout form. `serviceDate` — the date of the funeral — goes
+ * onto every line, since a basket is one family's order for one service; it
+ * replaces a date given in the upload step, which the form showed prefilled.
+ * Undefined leaves the lines alone (a details-only PATCH).
+ */
+export async function setCheckoutDetails(
+  owner: Owner,
+  details: CheckoutDetails,
+  serviceDate?: string | null,
+): Promise<Cart> {
   const order = await findDraftOrder(owner);
   if (!order) throw new CartError(404, "Your basket is empty");
+  if (serviceDate !== undefined) {
+    await db.update(orderItems).set({ serviceDate }).where(eq(orderItems.orderId, order.id));
+  }
   await db
     .update(orders)
     .set({

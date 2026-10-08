@@ -4,9 +4,11 @@
  * snapshots (those are history), and drives status through the pure
  * transition table so an order can't skip steps.
  */
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, like, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { orderItems, orders } from "@/db/schema";
+import { orderItems, orders, users } from "@/db/schema";
+import { likeContains } from "@/lib/adminDashboard";
+import { getProductLabels } from "@/lib/catalogue.server";
 import { canTransition, type OrderStatus } from "@/lib/orders";
 import { addOrderEvent, loadOrderDetail, type OrderDetail } from "@/lib/orders.server";
 
@@ -28,10 +30,47 @@ export interface AdminOrderSummary {
   contactEmail: string | null;
   totalPence: number;
   itemCount: number;
+  /** Product labels on the order, in line order without repeats. */
+  products: string[];
+  /** The email its customer page is keyed on — the account's when it has one. */
+  customerEmail: string | null;
 }
 
-/** Placed orders, newest first. Drafts (baskets) only when asked for by status. */
-export async function adminListOrders(filter: { status?: OrderStatus } = {}): Promise<AdminOrderSummary[]> {
+/** How many orders the list shows; a search narrows it down. */
+export const ORDER_LIST_LIMIT = 200;
+
+/**
+ * What the orders search box looks in: the order number, the customer's
+ * name, email, phone and postcode, the Thintent job, and the email of the
+ * account it was placed on.
+ */
+function orderSearch(query: string): SQL {
+  const pattern = likeContains(query);
+  const conditions = [
+    like(orders.orderNumber, pattern),
+    like(orders.contactName, pattern),
+    like(orders.contactEmail, pattern),
+    like(orders.postcode, pattern),
+    like(orders.thintentJobRef, pattern),
+    like(users.email, pattern),
+  ];
+  // Phone numbers are stored as typed: "07700 900123" should match "07700900123".
+  const phoneDigits = query.replace(/\D/g, "");
+  if (phoneDigits.length >= 4) {
+    conditions.push(like(sql`replace(replace(${orders.contactPhone}, ' ', ''), '-', '')`, likeContains(phoneDigits)));
+  }
+  // A postcode typed without its space ("BR31QZ").
+  conditions.push(like(sql`replace(${orders.postcode}, ' ', '')`, likeContains(query.replace(/\s+/g, ""))));
+  return or(...conditions)!;
+}
+
+/**
+ * Placed orders, newest first. Drafts (baskets) only when asked for by
+ * status. `query` searches across every status unless one is chosen.
+ */
+export async function adminListOrders(
+  filter: { status?: OrderStatus; query?: string | null } = {},
+): Promise<AdminOrderSummary[]> {
   const rows = await db
     .select({
       id: orders.id,
@@ -42,26 +81,43 @@ export async function adminListOrders(filter: { status?: OrderStatus } = {}): Pr
       contactName: orders.contactName,
       contactEmail: orders.contactEmail,
       totalPence: orders.totalPence,
+      accountEmail: users.email,
     })
     .from(orders)
-    .where(filter.status ? eq(orders.status, filter.status) : ne(orders.status, "draft"))
-    .orderBy(desc(orders.placedAt), desc(orders.createdAt));
+    .leftJoin(users, eq(orders.userId, users.id))
+    .where(
+      and(
+        filter.status ? eq(orders.status, filter.status) : ne(orders.status, "draft"),
+        filter.query ? orderSearch(filter.query) : undefined,
+      ),
+    )
+    .orderBy(desc(orders.placedAt), desc(orders.createdAt))
+    .limit(ORDER_LIST_LIMIT);
   if (rows.length === 0) return [];
 
-  const items = await db
-    .select({ orderId: orderItems.orderId })
-    .from(orderItems)
-    .where(inArray(orderItems.orderId, rows.map((row) => row.id)));
-  const countByOrder = new Map<string, number>();
+  const [items, labels] = await Promise.all([
+    db
+      .select({ orderId: orderItems.orderId, productId: orderItems.productId })
+      .from(orderItems)
+      .where(inArray(orderItems.orderId, rows.map((row) => row.id)))
+      .orderBy(orderItems.position, orderItems.createdAt),
+    getProductLabels(),
+  ]);
+  const itemsByOrder = new Map<string, string[]>();
   for (const item of items) {
-    countByOrder.set(item.orderId, (countByOrder.get(item.orderId) ?? 0) + 1);
+    const list = itemsByOrder.get(item.orderId) ?? [];
+    list.push(labels.get(item.productId) ?? item.productId);
+    itemsByOrder.set(item.orderId, list);
   }
-  return rows.map((row) => ({ ...row, itemCount: countByOrder.get(row.id) ?? 0 }));
-}
-
-export async function adminCountOrders(status: OrderStatus): Promise<number> {
-  const rows = await db.select({ id: orders.id }).from(orders).where(eq(orders.status, status));
-  return rows.length;
+  return rows.map(({ accountEmail, ...row }) => {
+    const products = itemsByOrder.get(row.id) ?? [];
+    return {
+      ...row,
+      itemCount: products.length,
+      products: [...new Set(products)],
+      customerEmail: accountEmail ?? row.contactEmail,
+    };
+  });
 }
 
 export async function adminGetOrder(id: string): Promise<OrderDetail | null> {

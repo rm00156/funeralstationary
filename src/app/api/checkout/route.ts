@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 
+import { parseServiceDate } from "@/lib/artwork";
 import { parseCheckoutDetails } from "@/lib/checkoutValidation";
 import {
   attachCheckoutSession,
@@ -36,10 +37,12 @@ export async function POST(request: NextRequest) {
   }
   const details = parseCheckoutDetails(body);
   if (!details.ok) return Response.json({ error: details.error }, { status: 400 });
+  const serviceDate = parseServiceDate((body as Record<string, unknown> | null)?.serviceDate);
+  if (!serviceDate.ok) return Response.json({ error: serviceDate.error }, { status: 400 });
 
   const owner = await getOrCreateOwner();
   try {
-    await setCheckoutDetails(owner, details.value);
+    await setCheckoutDetails(owner, details.value, serviceDate.date);
   } catch (error) {
     const response = cartErrorResponse(error);
     if (response) return response;

@@ -3,7 +3,10 @@
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 
-export default function AdminLogoutButton() {
+const DEFAULT_CLASS =
+  "flex items-center gap-2 rounded-lg px-3 py-2 font-body text-sm font-medium text-on-surface-variant transition-colors duration-300 hover:bg-surface-container hover:text-primary";
+
+export default function AdminLogoutButton({ className = DEFAULT_CLASS }: { className?: string }) {
   const router = useRouter();
 
   const logout = async () => {
@@ -16,7 +19,7 @@ export default function AdminLogoutButton() {
     <button
       type="button"
       onClick={logout}
-      className="flex items-center gap-2 rounded-lg px-3 py-2 font-body text-sm font-medium text-on-surface-variant transition-colors duration-300 hover:bg-surface-container hover:text-primary"
+      className={className}
     >
       <LogOut size={16} aria-hidden />
       Sign out

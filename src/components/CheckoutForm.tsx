@@ -35,7 +35,7 @@ function Field({
   );
 }
 
-type FormState = { [K in keyof CheckoutDetails]: string };
+type FormState = { [K in keyof CheckoutDetails | "serviceDate"]: string };
 
 export default function CheckoutForm({
   cart,
@@ -58,6 +58,7 @@ export default function CheckoutForm({
     addressLine2: cart.details?.addressLine2 ?? "",
     city: cart.details?.city ?? "",
     postcode: cart.details?.postcode ?? "",
+    serviceDate: cart.serviceDate ?? "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export default function CheckoutForm({
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, serviceDate: form.serviceDate || null }),
       });
       const payload = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!response.ok || !payload.url) {
@@ -118,6 +119,24 @@ export default function CheckoutForm({
           </div>
           <p className="mt-4 font-body text-sm text-on-surface-variant">
             We will send your order confirmation to this email address.
+          </p>
+        </section>
+
+        <section className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6 md:p-8">
+          <h2 className="mb-6 font-display text-2xl text-primary">The service</h2>
+          <Field id="serviceDate" label="Date of the funeral (optional)">
+            <input
+              id="serviceDate"
+              type="date"
+              min={new Date().toISOString().slice(0, 10)}
+              value={form.serviceDate}
+              onChange={set("serviceDate")}
+              aria-describedby="serviceDate-help"
+              className={`${fieldInput} sm:max-w-[320px]`}
+            />
+          </Field>
+          <p id="serviceDate-help" className="mt-4 font-body text-sm text-on-surface-variant">
+            Helps us make sure your order arrives in time.
           </p>
         </section>
 
