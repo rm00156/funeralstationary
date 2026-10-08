@@ -16,6 +16,7 @@ import {
   AlignLeft,
   AlignRight,
   ArrowDown,
+  ArrowLeft,
   ArrowRight,
   ArrowUp,
   Ban,
@@ -96,6 +97,7 @@ import {
   StaticPage,
   type CanvasGuides,
 } from "@/components/PageCanvas";
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import PreOrderCheckDialog, {
   parsePreOrderCheck,
   type PreOrderCheck,
@@ -285,6 +287,7 @@ export default function DesignEditor({
     return makeStarterDoc(template, initialPageOption?.pages ?? format.templatePages, format);
   });
   const [history, setHistory] = useState<DesignDoc[]>([]);
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [future, setFuture] = useState<DesignDoc[]>([]);
   const [pageIndex, setPageIndex] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -553,7 +556,7 @@ export default function DesignEditor({
   }, [doc, pagesOptionId, paperId]);
 
   // Flush a still-pending autosave when the editor unmounts — e.g. clicking
-  // "Templates" or navigating back right after an edit, before the 1.5s
+  // "Back" or navigating back right after an edit, before the 1.5s
   // debounce above has fired — so that edit isn't silently dropped.
   useEffect(() => {
     return () => {
@@ -674,6 +677,10 @@ export default function DesignEditor({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
+      // A modal question is open (apply template, pre-order check): its keys
+      // are its own, or Backspace on a focused button would delete the
+      // selected element behind it.
+      if (target.closest("dialog[open]")) return;
       const typing =
         target.tagName === "TEXTAREA" ||
         target.tagName === "INPUT" ||
@@ -971,9 +978,12 @@ export default function DesignEditor({
     }
 
     if (layout && layout.length > 0) {
-      const confirmed = window.confirm(
-        `Apply “${next.name}”? This replaces every page of your design with the template's layout.`,
-      );
+      const confirmed = await confirm({
+        title: `Apply “${next.name}”?`,
+        message: "This replaces every page of your design with the template's layout.",
+        confirmLabel: "Apply design",
+        cancelLabel: "Keep mine",
+      });
       if (!confirmed) return;
       // Keep the page-count invariant: adopt the layout's own length when a
       // page option matches it, otherwise fit the layout to the current one.
@@ -1107,11 +1117,11 @@ export default function DesignEditor({
       {/* ------------------------------ top bar ------------------------ */}
       <header className="flex items-center gap-1 border-b border-outline-variant/40 bg-surface-container-lowest px-3 py-2">
         <Link
-          href={authoring ? "/admin/templates" : "/templates"}
+          href={authoring ? `/admin/templates/${templateAuthoring.slug}` : "/templates"}
           className="flex items-center gap-2 rounded-lg border border-outline-variant/60 px-2.5 py-2 font-body text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary sm:px-3"
         >
-          <Home size={16} aria-hidden />
-          <span className="hidden sm:inline">{authoring ? "Templates" : "Home"}</span>
+          {authoring ? <ArrowLeft size={16} aria-hidden /> : <Home size={16} aria-hidden />}
+          <span className="hidden sm:inline">{authoring ? "Back" : "Home"}</span>
         </Link>
 
         <div className="mx-1 h-7 w-px bg-outline-variant/50 sm:mx-2" aria-hidden />
@@ -2409,6 +2419,8 @@ export default function DesignEditor({
           onClose={() => setPreOrderCheck(null)}
         />
       )}
+
+      {confirmDialog}
 
       {/* preview modal */}
       {preview && (

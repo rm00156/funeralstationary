@@ -7,6 +7,7 @@ import {
 } from "@/lib/designs.server";
 import { getPageCountOption } from "@/lib/pricing.server";
 import { getOrCreateOwner } from "@/lib/session";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,7 @@ export async function GET() {
 
 /** POST /api/designs — create a design from the editor's current state. */
 export async function POST(request: NextRequest) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   let body: unknown;
   try {
     body = await request.json();

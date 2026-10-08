@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { clientKey, createRateLimiter } from "@/lib/rateLimit";
 import { getOrCreateOwner } from "@/lib/session";
 import { checkUpload, uploadErrorResponse } from "@/lib/uploads.server";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 /** The first check downloads and parses a file of up to MAX_ARTWORK_BYTES. */
@@ -18,6 +19,7 @@ const checks = createRateLimiter({ limit: 60, windowMs: 10 * 60_000 });
  * analysis rather than reading the file again.
  */
 export async function POST(request: NextRequest, ctx: RouteContext<"/api/uploads/[id]/check">) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   if (!checks.hit(clientKey(request.headers))) {
     return Response.json({ error: "Too many checks — please wait a few minutes and try again." }, { status: 429 });
   }

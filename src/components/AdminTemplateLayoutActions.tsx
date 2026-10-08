@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Eraser, Undo2, UploadCloud } from "lucide-react";
 
+import { useConfirmDialog, type ConfirmOptions } from "@/components/ConfirmDialog";
 import { adminMutate } from "@/lib/adminClient";
 import type { LayoutAction } from "@/lib/adminValidation";
 
@@ -23,9 +24,10 @@ export default function AdminTemplateLayoutActions({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<LayoutAction | null>(null);
+  const { confirm, dialog } = useConfirmDialog();
 
-  const run = async (action: LayoutAction, confirmation?: string) => {
-    if (confirmation && !window.confirm(confirmation)) return;
+  const run = async (action: LayoutAction, confirmation?: ConfirmOptions) => {
+    if (confirmation && !(await confirm(confirmation))) return;
     setBusy(action);
     const message = await adminMutate(`/api/admin/templates/${slug}/layout`, "POST", {
       action,
@@ -54,10 +56,11 @@ export default function AdminTemplateLayoutActions({
           <button
             type="button"
             onClick={() =>
-              void run(
-                "discard",
-                "Discard the unpublished layout changes? The live layout stays as it is.",
-              )
+              void run("discard", {
+                title: "Discard the unpublished layout changes?",
+                message: "The live layout stays as it is.",
+                confirmLabel: "Discard draft",
+              })
             }
             disabled={busy !== null}
             className={secondary}
@@ -71,10 +74,11 @@ export default function AdminTemplateLayoutActions({
         <button
           type="button"
           onClick={() =>
-            void run(
-              "clear",
-              "Remove this template's authored layout? Customers will get the generic starter pages instead.",
-            )
+            void run("clear", {
+              title: "Remove this template's authored layout?",
+              message: "Customers will get the generic starter pages instead.",
+              confirmLabel: "Clear layout",
+            })
           }
           disabled={busy !== null}
           className={secondary}
@@ -83,6 +87,7 @@ export default function AdminTemplateLayoutActions({
           {busy === "clear" ? "Clearing…" : "Clear layout"}
         </button>
       )}
+      {dialog}
     </>
   );
 }

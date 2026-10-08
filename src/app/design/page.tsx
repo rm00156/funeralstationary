@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 
 import DesignEditor from "@/components/DesignEditor";
+import Footer from "@/components/Footer";
+import Header from "@/components/Header";
+import ShopClosedNotice from "@/components/ShopClosedNotice";
 import {
   getProducts,
   getTemplateBySlug,
@@ -11,6 +14,7 @@ import { getDesign } from "@/lib/designs.server";
 import { parseCarriedSelection, type Selection } from "@/lib/orderOfServicePricing";
 import { getPricingData } from "@/lib/pricing.server";
 import { readOwner } from "@/lib/session";
+import { isShopOpen } from "@/lib/siteBilling.server";
 import type { Product, Template } from "@/lib/templates";
 
 // The catalogue lives in MySQL and is editable from /admin, so this page
@@ -36,6 +40,22 @@ export default async function DesignPage({
     design: designParam,
     ...carriedParams
   } = await searchParams;
+
+  // The site's subscription is unpaid: no designing (the routes refuse a save anyway).
+  if (!(await isShopOpen())) {
+    return (
+      <>
+        <Header />
+        <main className="type-body flex-1">
+          <div className="site-container pb-24 pt-14">
+            <h1 className="type-page mb-8">Design your stationery</h1>
+            <ShopClosedNotice />
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   // ?design=<id> is the canonical address for an existing design and is
   // authoritative on its own: the row owns its template and product, and both

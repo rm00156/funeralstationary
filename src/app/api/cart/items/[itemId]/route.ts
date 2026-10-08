@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { cartErrorResponse, removeCartItem, updateCartItem } from "@/lib/orders.server";
 import { getOrCreateOwner } from "@/lib/session";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,7 @@ const optionalSlug = (value: unknown): string | undefined =>
 
 /** PATCH /api/cart/items/:itemId — change a line's quantity/delivery. */
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/cart/items/[itemId]">) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   const { itemId } = await ctx.params;
 
   let body: unknown;

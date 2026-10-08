@@ -9,6 +9,7 @@ import {
 } from "@/lib/designs.server";
 import { getPageCountOption } from "@/lib/pricing.server";
 import { getOrCreateOwner } from "@/lib/session";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/designs
 
 /** PATCH /api/designs/:id — autosave/manual save of doc, spec and name. */
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/designs/[id]">) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   const { id } = await ctx.params;
 
   let body: unknown;

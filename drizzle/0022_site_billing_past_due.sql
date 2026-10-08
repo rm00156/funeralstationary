@@ -1,0 +1,1 @@
+ALTER TABLE `site_billing` ADD `past_due_since` timestamp;

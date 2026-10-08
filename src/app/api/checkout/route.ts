@@ -13,6 +13,7 @@ import {
   isStripeConfigured,
   resolveRequestOrigin,
 } from "@/lib/stripe.server";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,7 @@ export const runtime = "nodejs";
  * Session and hands back its URL for the browser to navigate to.
  */
 export async function POST(request: NextRequest) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   if (!isStripeConfigured()) {
     return Response.json({ error: "Payments are not configured yet" }, { status: 503 });
   }

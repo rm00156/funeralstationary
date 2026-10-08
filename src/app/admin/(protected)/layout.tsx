@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import AdminLogoutButton from "@/components/AdminLogoutButton";
 import { requireAdmin } from "@/lib/adminSession";
+import { billingNotice } from "@/lib/siteAccess";
+import { getSiteAccess, subscriptionRequired } from "@/lib/siteBilling.server";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -22,6 +24,8 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   await requireAdmin();
+  // With the switch off nothing can close, so the billing table isn't read.
+  const notice = subscriptionRequired() ? billingNotice(await getSiteAccess()) : null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
@@ -36,6 +40,7 @@ export default async function AdminLayout({
               ["Products", "/admin/products"],
               ["Categories", "/admin/categories"],
               ["Templates", "/admin/templates"],
+              ["Billing", "/admin/billing"],
             ].map(([label, href]) => (
               <Link
                 key={href}
@@ -57,6 +62,16 @@ export default async function AdminLayout({
           </div>
         </div>
       </header>
+      {notice && (
+        <div role="status" className="bg-warn-bg text-warn-text">
+          <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-1 px-margin-mobile py-3 font-body text-sm md:px-gutter">
+            <span>{notice}</span>
+            <Link href="/admin/billing" className="font-medium underline">
+              Go to billing
+            </Link>
+          </div>
+        </div>
+      )}
       <main className="flex-1 px-margin-mobile py-8 md:px-gutter">
         <div className="mx-auto max-w-[1200px]">{children}</div>
       </main>

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { addUploadCartItem, cartErrorResponse } from "@/lib/orders.server";
 import { getOrCreateOwner } from "@/lib/session";
 import { uploadErrorResponse } from "@/lib/uploads.server";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 /** Usually instant, but reads the file if it has never been checked. */
@@ -22,6 +23,7 @@ const optionalSlug = (value: unknown): string | undefined =>
  * spelling" tick, which is required.
  */
 export async function POST(request: NextRequest) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   let body: unknown;
   try {
     body = await request.json();

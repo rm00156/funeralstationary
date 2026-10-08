@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
 import { db } from "@/db";
 import { designAssets } from "@/db/schema";
+import { isAdmin } from "@/lib/adminSession";
 import { getOrCreateOwner, ownerKey } from "@/lib/session";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 import {
   MAX_UPLOAD_BYTES,
   createUploadUrl,
@@ -21,6 +23,9 @@ export const runtime = "nodejs";
  * of Vercel's 4.5MB serverless request-body cap.
  */
 export async function POST(request: NextRequest) {
+  // Template preview uploads in /admin use this route too, and admin work
+  // carries on while the shop is closed.
+  if (!(await isShopOpen()) && !(await isAdmin())) return shopClosedResponse();
   if (!isStorageConfigured()) {
     return Response.json(
       { error: "Photo uploads are not configured on this environment." },

@@ -5,9 +5,11 @@ import { ChevronRight } from "lucide-react";
 import CartView from "@/components/CartView";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import ShopClosedNotice from "@/components/ShopClosedNotice";
 import { getCart } from "@/lib/orders.server";
 import { getPricingData } from "@/lib/pricing.server";
 import { readOwner } from "@/lib/session";
+import { isShopOpen } from "@/lib/siteBilling.server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CartPage() {
-  const owner = await readOwner();
+  const [owner, shopOpen] = await Promise.all([readOwner(), isShopOpen()]);
   const cart = owner ? await getCart(owner) : null;
   // Each line's option lists come from its own product — a basket can hold
   // several. getPricingData is request-cached, so repeats are free.
@@ -54,7 +56,13 @@ export default async function CartPage() {
               delivered. The price updates as you go.
             </p>
 
-            <CartView initialCart={cart} pricingByProduct={pricingByProduct} />
+            {!shopOpen && <ShopClosedNotice />}
+            {/* Closed, the basket stays readable and removable — only changing it and paying are refused. */}
+            {(shopOpen || (cart && cart.items.length > 0)) && (
+              <div className={shopOpen ? undefined : "mt-10"}>
+                <CartView initialCart={cart} pricingByProduct={pricingByProduct} closed={!shopOpen} />
+              </div>
+            )}
           </div>
         </section>
       </main>
