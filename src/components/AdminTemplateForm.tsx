@@ -41,9 +41,9 @@ export default function AdminTemplateForm({
   const [status, setStatus] = useState(template.status);
   const [sortOrder, setSortOrder] = useState(String(template.sortOrder));
   const [previewImageUrl, setPreviewImageUrl] = useState(template.previewImageUrl);
-  // Saving a new stand-in portrait redraws the thumbnail server-side, so the
-  // refreshed props carry a URL this form has never seen. Adopt it — otherwise
-  // the old preview stays on screen and the next save writes it back.
+  // Saving a new stand-in portrait (or publishing the layout) redraws the
+  // thumbnail server-side, so the refreshed props carry a URL this form has
+  // never seen. Adopt it, so the new preview is what's on screen.
   const [seenPreviewUrl, setSeenPreviewUrl] = useState(template.previewImageUrl);
   if (template.previewImageUrl !== seenPreviewUrl) {
     setSeenPreviewUrl(template.previewImageUrl);
@@ -118,7 +118,11 @@ export default function AdminTemplateForm({
       productId,
       status,
       sortOrder: Number(sortOrder),
-      previewImageUrl,
+      // Only when the admin changed it here. A redraw can land after this
+      // page loaded (a publish still rendering when they came back to it),
+      // and resending the URL the form loaded with would put the old
+      // thumbnail back.
+      ...(previewImageUrl !== seenPreviewUrl ? { previewImageUrl } : {}),
       placeholderPortrait: portrait,
       categories: selectedCategories,
     });
