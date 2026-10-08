@@ -1,23 +1,31 @@
 import type { NextRequest } from "next/server";
-import { redirect } from "next/navigation";
 
 import { consumeAdminLoginToken } from "@/lib/adminAuth.server";
-import { setAdminSessionCookie } from "@/lib/adminSession";
+import { adminConfigured, setAdminSessionCookie } from "@/lib/adminSession";
 import { safeNextPath } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
+/** 303, so the browser follows a form POST with a GET. */
+const seeOther = (location: string) => new Response(null, { status: 303, headers: { Location: location } });
+
 /**
- * GET /api/admin/verify?token=… — the link from an admin sign-in email.
+ * POST /api/admin/verify (form: token) — the "Sign in" button on the page an
+ * admin sign-in email links to (/admin/verify).
  *
- * A Route Handler, not a page: spending the token and setting the cookie are
- * side effects. Only admin tokens are accepted here (a customer's link reads
- * as invalid), and a failed link lands on the login page with the reason.
+ * A POST, not the link itself: a mail scanner fetching the link must not
+ * spend the single-use token. Only admin tokens are accepted here (a
+ * customer's link reads as invalid), and a failed link lands on the login
+ * page with the reason.
  */
-export async function GET(request: NextRequest) {
-  const secret = request.nextUrl.searchParams.get("token") ?? "";
-  const result = await consumeAdminLoginToken(secret);
-  if (!result.ok) redirect(`/admin/login?error=${result.reason}`);
-  if (!(await setAdminSessionCookie(result.adminId))) redirect("/admin/login?error=invalid");
-  redirect(safeNextPath(result.redirectTo, "/admin"));
+export async function POST(request: NextRequest) {
+  // Before the token is spent, so a link isn't burned on a server that can't
+  // sign anyone in. The login page says why.
+  if (!adminConfigured()) return seeOther("/admin/login");
+  const form = await request.formData().catch(() => null);
+  const token = form?.get("token");
+  const result = await consumeAdminLoginToken(typeof token === "string" ? token : "");
+  if (!result.ok) return seeOther(`/admin/login?error=${result.reason}`);
+  if (!(await setAdminSessionCookie(result.adminId))) return seeOther("/admin/login?error=invalid");
+  return seeOther(safeNextPath(result.redirectTo, "/admin"));
 }

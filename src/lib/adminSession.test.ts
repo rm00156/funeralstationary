@@ -1,3 +1,4 @@
+import { createHash, createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ADMIN_SESSION_SECONDS,
@@ -27,6 +28,18 @@ describe("adminConfigured", () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("AUTH_SECRET", "");
     expect(adminConfigured()).toBe(true);
+    const token = createAdminToken(ADMIN_ID, NOW)!;
+    expect(verifyAdminToken(token, NOW)).toBe(ADMIN_ID);
+  });
+
+  it("never signs with the public development secret, so an owner cookie can't be forged", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("AUTH_SECRET", "");
+    // What anyone reading userSession.ts could compute for the owner id in migration 0023.
+    const key = createHash("sha256").update("tfs-admin:tfs-local-development-only").digest();
+    const expires = Math.floor(NOW / 1000) + 3600;
+    const mac = createHmac("sha256", key).update(`admin:${ADMIN_ID}:${expires}`).digest("hex");
+    expect(verifyAdminToken(`${ADMIN_ID}.${expires}.${mac}`, NOW)).toBeNull();
   });
 
   it("no longer reads ADMIN_PASSWORD", () => {

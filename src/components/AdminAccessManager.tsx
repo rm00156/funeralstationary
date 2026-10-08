@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ShieldCheck, Trash2, UserPlus } from "lucide-react";
 
 import { useConfirmDialog } from "@/components/ConfirmDialog";
-import { adminMutate } from "@/lib/adminClient";
+import { adminMutate, adminRequest } from "@/lib/adminClient";
 
 export interface AdminAccessRow {
   id: string;
@@ -52,29 +52,15 @@ export default function AdminAccessManager({
     setAdding(true);
     setError(null);
     setNotice(null);
-    try {
-      const response = await fetch("/api/admin/access", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const body = (await response.json().catch(() => ({}))) as Partial<InviteResult> & { error?: string };
-      if (!response.ok) {
-        setError(
-          response.status === 401
-            ? "Your admin session has expired — sign in again"
-            : (body.error ?? "Something went wrong — please try again"),
-        );
-        return;
-      }
-      setNotice(inviteMessage(body as InviteResult));
-      setEmail("");
-      router.refresh();
-    } catch {
-      setError("Something went wrong — please try again");
-    } finally {
-      setAdding(false);
+    const result = await adminRequest<InviteResult>("/api/admin/access", "POST", { email });
+    setAdding(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+    setNotice(inviteMessage(result.body));
+    setEmail("");
+    router.refresh();
   };
 
   const remove = async (admin: AdminAccessRow) => {

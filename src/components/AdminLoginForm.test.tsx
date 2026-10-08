@@ -15,7 +15,7 @@ describe("AdminLoginForm", () => {
   });
 
   it("says the same thing whether or not a link was sent", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(Response.json({ ok: true, developmentLink: null }));
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ ok: true, linkInTerminal: false }));
     vi.stubGlobal("fetch", fetchMock);
     render(<AdminLoginForm />);
 
@@ -25,22 +25,15 @@ describe("AdminLoginForm", () => {
     expect(await screen.findByText("Check your email")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("If jo@example.com has admin access");
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ email: "jo@example.com" });
-    expect(screen.queryByRole("link", { name: "Open the sign-in link" })).toBeNull();
+    expect(screen.getByRole("status")).not.toHaveTextContent("terminal");
   });
 
-  it("shows the link on screen in development without email", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        Response.json({ ok: true, developmentLink: "http://localhost:3001/api/admin/verify?token=abc" }),
-      ),
-    );
+  it("points to the terminal, never puts a link on screen, in development without email", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ok: true, linkInTerminal: true })));
     render(<AdminLoginForm initialEmail="jo@example.com" />);
     fireEvent.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
-    expect(await screen.findByRole("link", { name: "Open the sign-in link" })).toHaveAttribute(
-      "href",
-      "http://localhost:3001/api/admin/verify?token=abc",
-    );
+    expect(await screen.findByRole("status")).toHaveTextContent("the sign-in link is in the terminal");
+    expect(screen.queryByRole("link")).toBeNull();
   });
 
   it("shows the server's error", async () => {

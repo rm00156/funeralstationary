@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { removeAdminRefusal, sortAdmins } from "@/lib/adminAccess";
+import { adminLinkError, removeAdminRefusal, sortAdmins } from "@/lib/adminAccess";
 
 describe("removeAdminRefusal", () => {
   it("never lets the owner be removed, even by themselves", () => {
@@ -29,5 +29,27 @@ describe("sortAdmins", () => {
     ];
     expect(sortAdmins(rows).map((row) => row.id)).toEqual(["owner", "a", "b"]);
     expect(rows[0].id).toBe("b");
+  });
+});
+
+describe("adminLinkError", () => {
+  it("explains each way a link can fail", () => {
+    expect(adminLinkError("expired")).toMatch(/expired/);
+    expect(adminLinkError("used")).toMatch(/already been used/);
+    expect(adminLinkError("revoked")).toMatch(/no longer has admin access/);
+  });
+
+  it("shows nothing without an error", () => {
+    expect(adminLinkError(undefined)).toBeNull();
+    expect(adminLinkError("")).toBeNull();
+    expect(adminLinkError(["used", "expired"])).toBeNull();
+  });
+
+  it("reads anything else, prototype keys included, as an invalid link", () => {
+    const invalid = adminLinkError("invalid");
+    expect(adminLinkError("nonsense")).toBe(invalid);
+    expect(adminLinkError("__proto__")).toBe(invalid);
+    expect(adminLinkError("constructor")).toBe(invalid);
+    expect(adminLinkError("toString")).toBe(invalid);
   });
 });

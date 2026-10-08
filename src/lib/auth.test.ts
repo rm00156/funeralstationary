@@ -61,9 +61,9 @@ describe("login secrets", () => {
 });
 
 describe("admin link URLs", () => {
-  it("sends an admin's link to the admin verify route, never the customer one", () => {
+  it("sends an admin's link to the admin confirm page, never a route that spends it on a GET", () => {
     expect(adminLoginLinkUrl("https://tfs.example", "a+b/c")).toBe(
-      "https://tfs.example/api/admin/verify?token=a%2Bb%2Fc",
+      "https://tfs.example/admin/verify?token=a%2Bb%2Fc",
     );
   });
 

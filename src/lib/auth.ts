@@ -45,9 +45,15 @@ export function loginLinkUrl(origin: string, secret: string): string {
   return `${origin}/api/auth/verify?token=${encodeURIComponent(secret)}`;
 }
 
-/** An admin's sign-in link — its own route, which spends only admin tokens. */
+/**
+ * An admin's sign-in link. It opens a page with a "Sign in" button rather
+ * than the route that spends the token: mail scanners (Outlook Safe Links,
+ * Mimecast) fetch every link in an email, and would spend a single-use token
+ * before the admin clicks — on the only way into /admin. A scanner fetches;
+ * it doesn't press the button, which POSTs to the admin-only verify route.
+ */
 export function adminLoginLinkUrl(origin: string, secret: string): string {
-  return `${origin}/api/admin/verify?token=${encodeURIComponent(secret)}`;
+  return `${origin}/admin/verify?token=${encodeURIComponent(secret)}`;
 }
 
 /** The admin sign-in page with the address filled in — what an invitation links to. */

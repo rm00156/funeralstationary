@@ -11,8 +11,8 @@ import { MailCheck, Send } from "lucide-react";
 export default function AdminLoginForm({ initialEmail = "" }: { initialEmail?: string }) {
   const [email, setEmail] = useState(initialEmail);
   const [sentTo, setSentTo] = useState<string | null>(null);
-  /** Development without email set up: the link we would have sent. */
-  const [developmentLink, setDevelopmentLink] = useState<string | null>(null);
+  /** Development without email set up: any link was printed in the server's terminal. */
+  const [linkInTerminal, setLinkInTerminal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -28,13 +28,13 @@ export default function AdminLoginForm({ initialEmail = "" }: { initialEmail?: s
       });
       const body = (await response.json().catch(() => ({}))) as {
         error?: string;
-        developmentLink?: string | null;
+        linkInTerminal?: boolean;
       };
       if (!response.ok) {
         setError(body.error ?? "We couldn't send your link just now — please try again.");
         return;
       }
-      setDevelopmentLink(body.developmentLink ?? null);
+      setLinkInTerminal(body.linkInTerminal === true);
       setSentTo(email.trim());
     } catch {
       setError("We couldn't send your link just now — please try again.");
@@ -56,12 +56,10 @@ export default function AdminLoginForm({ initialEmail = "" }: { initialEmail?: s
             If <strong className="text-on-surface">{sentTo}</strong> has admin access, we have sent it a
             sign-in link. It works once and expires in 15 minutes.
           </p>
-          {developmentLink && (
+          {linkInTerminal && (
             <p className="mt-3 rounded-lg bg-surface-container-low px-4 py-3 font-body text-sm text-on-surface-variant">
-              Email isn&apos;t set up on this computer, so nothing was sent.{" "}
-              <a href={developmentLink} className="link">
-                Open the sign-in link
-              </a>
+              Email isn&apos;t set up on this computer, so nothing was sent. If the address has access, the
+              sign-in link is in the terminal running the server.
             </p>
           )}
           <button

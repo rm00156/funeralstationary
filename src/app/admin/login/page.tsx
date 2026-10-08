@@ -2,20 +2,13 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import AdminLoginForm from "@/components/AdminLoginForm";
+import { adminLinkError } from "@/lib/adminAccess";
 import { isAdmin } from "@/lib/adminAuth.server";
 import { adminConfigured } from "@/lib/adminSession";
 
 export const metadata: Metadata = {
   title: "Admin Sign In | The Funeral Stationery",
   robots: { index: false, follow: false },
-};
-
-/** Why a sign-in link didn't work, from /api/admin/verify. */
-const LINK_ERRORS: Record<string, string> = {
-  expired: "That sign-in link has expired. Ask for a new one below.",
-  used: "That sign-in link has already been used. Ask for a new one below.",
-  invalid: "That sign-in link isn't valid. Ask for a new one below.",
-  revoked: "That email address no longer has admin access.",
 };
 
 export default async function AdminLoginPage({
@@ -25,7 +18,7 @@ export default async function AdminLoginPage({
 }) {
   if (await isAdmin()) redirect("/admin");
   const { email, error } = await searchParams;
-  const linkError = error ? (LINK_ERRORS[error] ?? LINK_ERRORS.invalid) : null;
+  const linkError = adminLinkError(error);
 
   return (
     <main className="flex min-h-dvh flex-1 items-center justify-center bg-paper px-margin-mobile md:px-gutter">

@@ -14,6 +14,7 @@
  */
 import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { cache } from "react";
 
 import { db } from "@/db";
@@ -66,12 +67,14 @@ export function unauthorised(): Response {
 
 /**
  * Email a sign-in link if the address is an admin; do nothing otherwise.
- * Either way the caller answers the same.
+ * Either way the caller answers the same — and as fast: the link is made and
+ * sent after the response, so neither the timing nor a failed send can tell
+ * an admin's address from a stranger's. Development without email prints
+ * the link in the server's terminal only, never on screen, so a dev server
+ * reachable from outside doesn't hand an admin link to whoever types an
+ * admin's address.
  */
-export async function requestAdminSignInLink(input: {
-  email: string;
-  origin: string;
-}): Promise<{ developmentLink: string | null }> {
+export async function requestAdminSignInLink(input: { email: string; origin: string }): Promise<void> {
   if (!adminConfigured()) {
     throw new AuthError("Admin sign-in is not configured — set AUTH_SECRET (see .env.example).", 503);
   }
@@ -84,15 +87,20 @@ export async function requestAdminSignInLink(input: {
   }
 
   const [admin] = await db.select({ id: admins.id }).from(admins).where(eq(admins.email, email)).limit(1);
-  if (!admin) return { developmentLink: null };
+  if (!admin) return;
 
-  const link = await createLoginLink({ email, origin: input.origin, next: "/admin", purpose: "admin" });
-  if (isEmailConfigured()) {
-    await sendEmail({ to: link.email, ...adminSignInEmail(link.url) });
-    return { developmentLink: null };
-  }
-  console.info(`[admin] Email is not configured. Admin sign-in link for ${link.email}:\n  ${link.url}`);
-  return { developmentLink: link.url };
+  after(async () => {
+    try {
+      const link = await createLoginLink({ email, origin: input.origin, next: "/admin", purpose: "admin" });
+      if (isEmailConfigured()) {
+        await sendEmail({ to: link.email, ...adminSignInEmail(link.url) });
+      } else {
+        console.info(`[admin] Email is not configured. Admin sign-in link for ${link.email}:\n  ${link.url}`);
+      }
+    } catch (error) {
+      console.error("Admin sign-in link failed", error);
+    }
+  });
 }
 
 export type AdminSignInResult =

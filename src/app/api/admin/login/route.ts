@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { requestAdminSignInLink } from "@/lib/adminAuth.server";
 import { AuthError } from "@/lib/auth.server";
+import { isEmailConfigured } from "@/lib/email.server";
 import { clientKey, createRateLimiter } from "@/lib/rateLimit";
 import { resolveRequestOrigin } from "@/lib/stripe.server";
 
@@ -30,9 +31,8 @@ export async function POST(request: NextRequest) {
   if (typeof email !== "string") {
     return Response.json({ error: "Please enter your email address." }, { status: 400 });
   }
-  let developmentLink: string | null;
   try {
-    ({ developmentLink } = await requestAdminSignInLink({ email, origin: resolveRequestOrigin(request) }));
+    await requestAdminSignInLink({ email, origin: resolveRequestOrigin(request) });
   } catch (error) {
     if (error instanceof AuthError) {
       return Response.json({ error: error.message }, { status: error.status });
@@ -40,6 +40,6 @@ export async function POST(request: NextRequest) {
     console.error("Admin sign-in link failed", error);
     return Response.json({ error: "We couldn't send your link just now — please try again." }, { status: 500 });
   }
-  // Only ever non-null in development without email set up — see requestAdminSignInLink.
-  return Response.json({ ok: true, developmentLink });
+  // The same for every address: in development without email, any link went to the terminal.
+  return Response.json({ ok: true, linkInTerminal: !isEmailConfigured() });
 }
