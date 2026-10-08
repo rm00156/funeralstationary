@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { addCartItem, cartErrorResponse } from "@/lib/orders.server";
 import { getOrCreateOwner } from "@/lib/session";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,7 @@ const optionalSlug = (value: unknown): string | undefined =>
  * renders — see src/lib/designReadiness.ts.
  */
 export async function POST(request: NextRequest) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   let body: unknown;
   try {
     body = await request.json();

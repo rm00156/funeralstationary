@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 
 import TaskFooter from "@/components/TaskFooter";
 import TaskHeader from "@/components/TaskHeader";
+import ShopClosedNotice from "@/components/ShopClosedNotice";
 import UploadFlow, { type UploadProduct } from "@/components/UploadFlow";
 import { getSellableProducts } from "@/lib/catalogue.server";
 import { PHONE_DISPLAY, PHONE_HREF } from "@/lib/site";
+import { isShopOpen } from "@/lib/siteBilling.server";
 import { isStorageConfigured } from "@/lib/storage";
 import { getPricingData } from "@/lib/pricing.server";
 
@@ -24,7 +26,7 @@ export const metadata: Metadata = {
  */
 export default async function UploadPage({ searchParams }: PageProps<"/upload">) {
   const { product: requested } = await searchParams;
-  const sellable = await getSellableProducts();
+  const [sellable, shopOpen] = await Promise.all([getSellableProducts(), isShopOpen()]);
   const products: UploadProduct[] = await Promise.all(
     sellable.map(async (product) => ({
       id: product.id,
@@ -46,7 +48,11 @@ export default async function UploadPage({ searchParams }: PageProps<"/upload">)
               Made it in Canva? Send us a PDF or your Canva link and we’ll print and deliver it. No account
               needed.
             </p>
-            {products.length > 0 ? (
+            {!shopOpen ? (
+              <div className="mt-10">
+                <ShopClosedNotice />
+              </div>
+            ) : products.length > 0 ? (
               <UploadFlow
                 products={products}
                 initialProductId={typeof requested === "string" ? requested : undefined}

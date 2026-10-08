@@ -27,6 +27,7 @@ import {
   PHONE_HREF,
   STANDARD_TURNAROUND,
 } from "@/lib/site";
+import { isShopOpen } from "@/lib/siteBilling.server";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "@/lib/storage";
 
 // Pricing and the catalogue live in MySQL and are editable from /admin, so
@@ -87,10 +88,11 @@ export default async function TemplatePage({
   if (!found) notFound();
   const { product, template } = found;
 
-  const [pricing, categories, products] = await Promise.all([
+  const [pricing, categories, products, shopOpen] = await Promise.all([
     getPricingData(product.id),
     getCategories(),
     getSellableProducts(),
+    isShopOpen(),
   ]);
   const styles = categories.filter((category) => template.categories.includes(category.id));
   const otherProducts = products.filter((other) => other.id !== product.id).slice(0, 3);
@@ -231,6 +233,7 @@ export default async function TemplatePage({
                   pricing={pricing}
                   format={format}
                   vatTreatment={product.vatTreatment}
+                  shopOpen={shopOpen}
                 />
 
                 <p className="text-base text-ink-2">

@@ -74,9 +74,12 @@ const MENU_ITEM =
 export default function HeaderNav({
   products,
   user,
+  shopClosed,
 }: {
   products: NavProduct[];
   user: { email: string } | null;
+  /** The site's subscription has lapsed: no designing, uploading or buying online. */
+  shopClosed: boolean;
 }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -103,11 +106,18 @@ export default function HeaderNav({
     <div className="site-chrome font-body">
       <div className="bg-plum-deep text-[15px] text-on-plum">
         <div className="site-container flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-2.5">
-          <span>
-            <strong className="font-semibold text-white">{STANDARD_TURNAROUND}</strong> delivery
-            if ordered before <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong>{" "}
-            on a working day
-          </span>
+          {shopClosed ? (
+            <span>
+              <strong className="font-semibold text-white">We’re not taking orders online just now.</strong>{" "}
+              Please call us and we’ll help.
+            </span>
+          ) : (
+            <span>
+              <strong className="font-semibold text-white">{STANDARD_TURNAROUND}</strong> delivery
+              if ordered before <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong>{" "}
+              on a working day
+            </span>
+          )}
           <a
             href={PHONE_HREF}
             className="flex min-h-6 items-center gap-2 text-white no-underline hover:underline"

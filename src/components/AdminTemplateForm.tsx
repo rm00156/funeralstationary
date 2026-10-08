@@ -41,6 +41,14 @@ export default function AdminTemplateForm({
   const [status, setStatus] = useState(template.status);
   const [sortOrder, setSortOrder] = useState(String(template.sortOrder));
   const [previewImageUrl, setPreviewImageUrl] = useState(template.previewImageUrl);
+  // Saving a new stand-in portrait redraws the thumbnail server-side, so the
+  // refreshed props carry a URL this form has never seen. Adopt it — otherwise
+  // the old preview stays on screen and the next save writes it back.
+  const [seenPreviewUrl, setSeenPreviewUrl] = useState(template.previewImageUrl);
+  if (template.previewImageUrl !== seenPreviewUrl) {
+    setSeenPreviewUrl(template.previewImageUrl);
+    setPreviewImageUrl(template.previewImageUrl);
+  }
   const [portrait, setPortrait] = useState<string | null>(template.placeholderPortrait);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     template.categories,

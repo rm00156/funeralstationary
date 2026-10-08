@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Pencil, ShoppingBag, Trash2 } from "lucide-react";
 
+import { useConfirmDialog } from "@/components/ConfirmDialog";
 import PreOrderCheckDialog, {
   parsePreOrderCheck,
   type PreOrderCheck,
@@ -36,6 +37,7 @@ export default function SavedDesignList({
   const [designs, setDesigns] = useState(initialDesigns);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, prompt, dialog } = useConfirmDialog();
   /**
    * The refused pre-order check, and the design it was refused for — the
    * confirmation has to re-send the add, so both are needed to retry.
@@ -86,7 +88,12 @@ export default function SavedDesignList({
   };
 
   const rename = async (design: SavedDesignSummary) => {
-    const next = window.prompt("Rename this design", design.name);
+    const next = await prompt({
+      title: "Rename this design",
+      label: "Design name",
+      defaultValue: design.name,
+      confirmLabel: "Rename",
+    });
     if (next === null) return;
     const name = next.trim();
     if (!name || name === design.name) return;
@@ -111,7 +118,13 @@ export default function SavedDesignList({
   };
 
   const remove = async (design: SavedDesignSummary) => {
-    if (!window.confirm(`Remove “${design.name}”? This cannot be undone.`)) return;
+    const confirmed = await confirm({
+      title: `Remove “${design.name}”?`,
+      message: "This cannot be undone.",
+      confirmLabel: "Remove",
+      cancelLabel: "Keep it",
+    });
+    if (!confirmed) return;
 
     setBusyId(design.id);
     setError(null);
@@ -213,6 +226,7 @@ export default function SavedDesignList({
           onClose={() => setPreOrderCheck(null)}
         />
       )}
+      {dialog}
     </div>
   );
 }

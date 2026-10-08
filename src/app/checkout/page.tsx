@@ -9,6 +9,7 @@ import Header from "@/components/Header";
 import { getCurrentUser } from "@/lib/auth.server";
 import { getCart } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
+import { isShopOpen } from "@/lib/siteBilling.server";
 import { isStripeConfigured } from "@/lib/stripe.server";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,8 @@ export default async function CheckoutPage({
 }) {
   const owner = await readOwner();
   const cart = owner ? await getCart(owner) : null;
-  if (!cart || cart.items.length === 0) redirect("/cart");
+  // Closed: the basket page explains why, and the Pay route refuses anyway.
+  if (!cart || cart.items.length === 0 || !(await isShopOpen())) redirect("/cart");
   const { cancelled } = await searchParams;
   const user = owner?.userId ? await getCurrentUser() : null;
 

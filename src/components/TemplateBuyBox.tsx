@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowRight, Truck } from "lucide-react";
+import { ArrowRight, Phone, Truck } from "lucide-react";
 
 import { pagesAxisLabel, type ProductFormat } from "@/lib/designEditor";
 import {
@@ -14,6 +14,7 @@ import {
   type PricingData,
   type Selection,
 } from "@/lib/orderOfServicePricing";
+import { PHONE_DISPLAY, PHONE_HREF } from "@/lib/site";
 import { priceVatNote, type VatTreatment } from "@/lib/vat";
 
 /** Each axis, with the narrowest its option buttons may get before wrapping. */
@@ -42,12 +43,15 @@ export default function TemplateBuyBox({
   pricing,
   format,
   vatTreatment,
+  shopOpen,
 }: {
   productId: string;
   templateId: string;
   pricing: PricingData;
   format: ProductFormat;
   vatTreatment: VatTreatment;
+  /** False while the site's subscription is unpaid: prices still show, ordering goes by phone. */
+  shopOpen: boolean;
 }) {
   const [selection, setSelection] = useState<Selection>(() => defaultSelection(pricing));
   const quote = useMemo(() => getQuote(pricing, selection), [pricing, selection]);
@@ -138,16 +142,30 @@ export default function TemplateBuyBox({
             {quote.delivery.note && ` — ${quote.delivery.note}`}
           </span>
         </div>
-        <Link
-          href={`/design?template=${templateId}&product=${productId}&${selectionSearchParams(selection)}`}
-          className="btn btn-primary min-h-[58px] text-lg"
-        >
-          Personalise this design
-          <ArrowRight size={18} aria-hidden />
-        </Link>
-        <p className="text-center text-[15px] text-ink-3">
-          You’ll see every page as you go. Nothing is printed until you order.
-        </p>
+        {shopOpen ? (
+          <>
+            <Link
+              href={`/design?template=${templateId}&product=${productId}&${selectionSearchParams(selection)}`}
+              className="btn btn-primary min-h-[58px] text-lg"
+            >
+              Personalise this design
+              <ArrowRight size={18} aria-hidden />
+            </Link>
+            <p className="text-center text-[15px] text-ink-3">
+              You’ll see every page as you go. Nothing is printed until you order.
+            </p>
+          </>
+        ) : (
+          <>
+            <a href={PHONE_HREF} className="btn btn-primary min-h-[58px] text-lg">
+              <Phone size={18} strokeWidth={1.8} aria-hidden />
+              Call {PHONE_DISPLAY} to order
+            </a>
+            <p className="text-center text-[15px] text-ink-3">
+              We’re not taking orders online just now — we’ll help you by phone.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

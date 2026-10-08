@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { clientKey, createRateLimiter } from "@/lib/rateLimit";
 import { getOrCreateOwner } from "@/lib/session";
 import { createCanvaUpload, createPdfUpload, uploadErrorResponse } from "@/lib/uploads.server";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,7 @@ const starts = createRateLimiter({ limit: 30, windowMs: 10 * 60_000 });
  * staff to download instead.
  */
 export async function POST(request: NextRequest) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   if (!starts.hit(clientKey(request.headers))) {
     return Response.json({ error: "Too many uploads — please wait a few minutes and try again." }, { status: 429 });
   }

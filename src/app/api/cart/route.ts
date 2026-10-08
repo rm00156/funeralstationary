@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { parseCheckoutDetails } from "@/lib/checkoutValidation";
 import { cartErrorResponse, getCart, setCheckoutDetails } from "@/lib/orders.server";
 import { getOrCreateOwner, readOwner } from "@/lib/session";
+import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,7 @@ export async function GET() {
  * per line and goes through PATCH /api/cart/items/:itemId.
  */
 export async function PATCH(request: NextRequest) {
+  if (!(await isShopOpen())) return shopClosedResponse();
   let body: unknown;
   try {
     body = await request.json();
