@@ -67,9 +67,29 @@ describe("orderConfirmationEmail", () => {
   it("leads the inbox preview with the order, not the logo's alt text", () => {
     expect(email.html).toMatch(/<div style="display:none[^"]*">We've received your order TFS-2026-004210/);
   });
+
+  it("sends a reply to the shop's inbox, since it invites one", () => {
+    expect(email.text).toContain("reply to this email");
+    expect(email.replyTo).toBe("info@thefuneralstationery.co.uk");
+  });
+
+  it("gives a plain-text reader the same next steps as the html", () => {
+    expect(email.html).toContain("What happens next");
+    expect(email.text).toContain("What happens next:");
+    expect(email.text).toMatch(/Call us on [^\n]+ as soon as you can/);
+  });
 });
 
 describe("orderNotificationEmail", () => {
+  it("names the funeral date in the plain text too, since it decides how urgent the order is", () => {
+    const dated = orderNotificationEmail({ ...summary, serviceDate: "2026-10-16" }, "https://example.com/admin/orders/abc");
+    expect(dated.text).toMatch(/Funeral: Friday,? 16 October 2026/);
+  });
+
+  it("sends a reply to the customer", () => {
+    expect(orderNotificationEmail(summary, "https://example.com/admin/orders/abc").replyTo).toBe("jane@example.com");
+  });
+
   it("leads with who ordered and how much", () => {
     const email = orderNotificationEmail(summary, "https://example.com/admin/orders/abc");
     expect(email.subject).toBe("New order TFS-2026-004210 — £99.99");

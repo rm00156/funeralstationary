@@ -53,6 +53,8 @@ export interface EmailContent {
   subject: string;
   text: string;
   html: string;
+  /** Where a reply goes: the shop's inbox for a customer, the customer for staff. */
+  replyTo?: string;
   attachments?: EmailAttachment[];
 }
 
@@ -107,15 +109,19 @@ const fallbackLink = (url: string) =>
 const finePrint = (html: string) =>
   `<p style="margin:28px 0 0;padding-top:20px;border-top:1px solid ${LINE};font-family:${SANS};font-size:14px;line-height:1.6;color:${LABEL}">${html}</p>`;
 
-/** Label/value pairs in a tinted box: the order number, the funeral date. */
+/**
+ * Label/value pairs in a tinted box: the order number, the funeral date.
+ * Inline blocks rather than table cells, so on a phone they wrap onto their
+ * own lines instead of squeezing side by side.
+ */
 function factsBox(facts: Array<[label: string, value: string]>): string {
   const cells = facts
     .map(
       ([label, value]) =>
-        `<td valign="top" style="padding:16px 20px"><span style="font-family:${SANS};font-size:13px;color:${LABEL}">${escapeHtml(label)}</span><br><span style="font-family:${SERIF};font-size:19px;color:${INK}">${escapeHtml(value)}</span></td>`,
+        `<div style="display:inline-block;vertical-align:top;padding:16px 20px"><span style="font-family:${SANS};font-size:13px;color:${LABEL}">${escapeHtml(label)}</span><br><span style="font-family:${SERIF};font-size:19px;color:${INK}">${escapeHtml(value)}</span></div>`,
     )
     .join("");
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 0;background:${MIST};border-radius:8px"><tr>${cells}</tr></table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 0;background:${MIST};border-radius:8px"><tr><td style="padding:0">${cells}</td></tr></table>`;
 }
 
 function itemsHtml(summary: OrderEmailSummary): string {
@@ -182,6 +188,7 @@ function brandedEmailHtml({
 }): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light only">
 <style>.addr a,a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}</style>
 </head><body style="margin:0;padding:0;background:${PAPER}">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(preheader)}</div>
@@ -267,6 +274,11 @@ export function orderConfirmationEmail(
     "",
     `You can view your order at ${orderUrl}`,
     "",
+    "What happens next:",
+    `1. We print it. Our standard turnaround is ${STANDARD_TURNAROUND}.`,
+    "2. We post it to you, to the address above, by the delivery you chose.",
+    `3. Need to change something? Call us on ${PHONE_DISPLAY} (${OPENING_HOURS}) as soon as you can, or reply to this email.`,
+    "",
     "With our sincere condolences,",
     "The Funeral Stationery",
   ].join("\n");
@@ -294,7 +306,7 @@ ${stepsHtml([
 ])}
 ${signOff("With our sincere condolences,")}`,
   });
-  return { subject, text, html, attachments: brandedAttachments() };
+  return { subject, text, html, replyTo: EMAIL, attachments: brandedAttachments() };
 }
 
 /** Sent to the business inbox so a new order isn't missed. */
@@ -305,6 +317,7 @@ export function orderNotificationEmail(
   const subject = `New order ${summary.orderNumber} — ${formatPence(summary.totalPence)}`;
   const text = [
     `New paid order ${summary.orderNumber} from ${summary.contactName} <${summary.contactEmail}>.`,
+    ...(summary.serviceDate ? ["", `Funeral: ${formatServiceDate(summary.serviceDate)}`] : []),
     "",
     itemsText(summary),
     "",
@@ -331,7 +344,7 @@ ${eyebrow("Deliver to")}
 ${addressHtml(summary.addressLines)}
 ${button("Open in admin", adminUrl)}`,
   });
-  return { subject, text, html, attachments: brandedAttachments() };
+  return { subject, text, html, replyTo: summary.contactEmail, attachments: brandedAttachments() };
 }
 
 /**
@@ -366,7 +379,7 @@ ${orderTableHtml(summary)}
 ${button("View your order", orderUrl)}
 ${signOff("With our sincere condolences,")}`,
   });
-  return { subject, text, html, attachments: brandedAttachments() };
+  return { subject, text, html, replyTo: EMAIL, attachments: brandedAttachments() };
 }
 
 /**
@@ -407,7 +420,7 @@ ${factsBox([
 ])}
 ${button("Open in admin", adminUrl)}`,
   });
-  return { subject, text, html, attachments: brandedAttachments() };
+  return { subject, text, html, replyTo: summary.contactEmail, attachments: brandedAttachments() };
 }
 
 /**

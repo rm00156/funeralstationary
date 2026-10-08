@@ -18,7 +18,9 @@ export default function AdminVerifyForm({ token }: { token: string }) {
     // Strict mode runs effects twice in development; one POST spends the token.
     if (submitted.current) return;
     submitted.current = true;
-    formRef.current?.requestSubmit();
+    // submit(), not requestSubmit(): it works in every browser (Safari < 16
+    // lacks requestSubmit) and fires no submit event for the guard below.
+    formRef.current?.submit();
   }, []);
 
   return (
@@ -26,6 +28,11 @@ export default function AdminVerifyForm({ token }: { token: string }) {
       ref={formRef}
       method="post"
       action="/api/admin/verify"
+      // Once the automatic POST is on its way, a click would send the token a
+      // second time and abandon the response carrying the sign-in cookie.
+      onSubmit={(event) => {
+        if (submitted.current) event.preventDefault();
+      }}
       className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-8 ambient-shadow"
     >
       <input type="hidden" name="token" value={token} />
@@ -34,7 +41,7 @@ export default function AdminVerifyForm({ token }: { token: string }) {
       </p>
       <button type="submit" className="btn btn-outline mt-6 min-h-11 w-full">
         <LogIn size={16} aria-hidden />
-        Not moving? Sign in
+        Sign in
       </button>
     </form>
   );
