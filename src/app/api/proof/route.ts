@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import type { ProofRequest } from "@/lib/designEditor";
 import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { renderProofPdf } from "@/lib/proofPdf.server";

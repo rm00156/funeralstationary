@@ -3,91 +3,91 @@ import {
   ADMIN_SESSION_SECONDS,
   adminConfigured,
   createAdminToken,
-  passwordMatches,
   verifyAdminToken,
 } from "@/lib/adminSession";
+import { createUserToken } from "@/lib/userSession";
 
 const NOW = 1_750_000_000_000;
+const ADMIN_ID = "5f0c2a3e-6b1d-4c8e-9a47-0d3e8b2f71c4";
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
 describe("adminConfigured", () => {
-  it("is false until ADMIN_PASSWORD is set", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "");
+  it("needs AUTH_SECRET in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_SECRET", "");
     expect(adminConfigured()).toBe(false);
-    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
+    vi.stubEnv("AUTH_SECRET", "a-long-random-secret");
     expect(adminConfigured()).toBe(true);
+  });
+
+  it("works without setup in development", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("AUTH_SECRET", "");
+    expect(adminConfigured()).toBe(true);
+  });
+
+  it("no longer reads ADMIN_PASSWORD", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_SECRET", "");
+    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
+    expect(adminConfigured()).toBe(false);
   });
 });
 
 describe("createAdminToken / verifyAdminToken", () => {
-  it("round-trips a freshly minted token", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
-    const token = createAdminToken(NOW);
+  it("round-trips the admin id", () => {
+    vi.stubEnv("AUTH_SECRET", "secret");
+    const token = createAdminToken(ADMIN_ID, NOW);
     expect(token).toBeTruthy();
-    expect(verifyAdminToken(token!, NOW)).toBe(true);
+    expect(verifyAdminToken(token!, NOW)).toBe(ADMIN_ID);
   });
 
-  it("returns null when admin is not configured", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "");
-    expect(createAdminToken(NOW)).toBeNull();
+  it("returns null when sign-in is not configured", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_SECRET", "");
+    expect(createAdminToken(ADMIN_ID, NOW)).toBeNull();
+  });
+
+  it("refuses to mint for something that isn't an id", () => {
+    vi.stubEnv("AUTH_SECRET", "secret");
+    expect(createAdminToken("admin", NOW)).toBeNull();
   });
 
   it("rejects an expired token", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
-    const token = createAdminToken(NOW)!;
-    const afterExpiry = NOW + (ADMIN_SESSION_SECONDS + 1) * 1000;
-    expect(verifyAdminToken(token, afterExpiry)).toBe(false);
+    vi.stubEnv("AUTH_SECRET", "secret");
+    const token = createAdminToken(ADMIN_ID, NOW)!;
+    expect(verifyAdminToken(token, NOW + (ADMIN_SESSION_SECONDS + 1) * 1000)).toBeNull();
   });
 
-  it("rejects a token whose expiry was tampered with", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
-    const token = createAdminToken(NOW)!;
-    const [expires, mac] = token.split(".");
-    const tampered = `${Number(expires) + 3600}.${mac}`;
-    expect(verifyAdminToken(tampered, NOW)).toBe(false);
+  it("rejects a token whose id or expiry was swapped", () => {
+    vi.stubEnv("AUTH_SECRET", "secret");
+    const [, expires, mac] = createAdminToken(ADMIN_ID, NOW)!.split(".");
+    const otherId = "11111111-2222-4333-8444-555555555555";
+    expect(verifyAdminToken(`${otherId}.${expires}.${mac}`, NOW)).toBeNull();
+    expect(verifyAdminToken(`${ADMIN_ID}.${Number(expires) + 3600}.${mac}`, NOW)).toBeNull();
   });
 
-  it("rejects a token signed with a different secret", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
-    const token = createAdminToken(NOW)!;
-    vi.stubEnv("ADMIN_PASSWORD", "different-password");
-    expect(verifyAdminToken(token, NOW)).toBe(false);
+  it("is signed out by rotating AUTH_SECRET", () => {
+    vi.stubEnv("AUTH_SECRET", "secret");
+    const token = createAdminToken(ADMIN_ID, NOW)!;
+    vi.stubEnv("AUTH_SECRET", "rotated");
+    expect(verifyAdminToken(token, NOW)).toBeNull();
+  });
+
+  it("never accepts a customer session token", () => {
+    vi.stubEnv("AUTH_SECRET", "secret");
+    const customer = createUserToken(ADMIN_ID, NOW)!;
+    expect(verifyAdminToken(customer, NOW)).toBeNull();
   });
 
   it("rejects garbage tokens", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
-    expect(verifyAdminToken("", NOW)).toBe(false);
-    expect(verifyAdminToken("not-a-token", NOW)).toBe(false);
-    expect(verifyAdminToken("123.zzzz", NOW)).toBe(false);
-  });
-
-  it("prefers ADMIN_SESSION_SECRET as the signing key when set", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
-    vi.stubEnv("ADMIN_SESSION_SECRET", "separate-secret");
-    const token = createAdminToken(NOW)!;
-    // Changing the password no longer invalidates sessions…
-    vi.stubEnv("ADMIN_PASSWORD", "rotated");
-    expect(verifyAdminToken(token, NOW)).toBe(true);
-    // …but changing the session secret does.
-    vi.stubEnv("ADMIN_SESSION_SECRET", "rotated-secret");
-    expect(verifyAdminToken(token, NOW)).toBe(false);
-  });
-});
-
-describe("passwordMatches", () => {
-  it("accepts only the configured password", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "hunter2");
-    expect(passwordMatches("hunter2")).toBe(true);
-    expect(passwordMatches("hunter3")).toBe(false);
-    expect(passwordMatches("")).toBe(false);
-  });
-
-  it("rejects everything when admin is not configured", () => {
-    vi.stubEnv("ADMIN_PASSWORD", "");
-    expect(passwordMatches("hunter2")).toBe(false);
-    expect(passwordMatches("")).toBe(false);
+    vi.stubEnv("AUTH_SECRET", "secret");
+    expect(verifyAdminToken("", NOW)).toBeNull();
+    expect(verifyAdminToken("not-a-token", NOW)).toBeNull();
+    expect(verifyAdminToken(`${ADMIN_ID}.123.zzzz`, NOW)).toBeNull();
+    expect(verifyAdminToken(`${createAdminToken(ADMIN_ID, NOW)}.extra`, NOW)).toBeNull();
   });
 });

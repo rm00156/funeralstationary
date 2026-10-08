@@ -5,6 +5,8 @@ import {
   orderCancelledNotificationEmail,
   orderConfirmationEmail,
   orderNotificationEmail,
+  adminInviteEmail,
+  adminSignInEmail,
   signInEmail,
   type OrderEmailSummary,
 } from "@/lib/orderEmails";
@@ -109,5 +111,28 @@ describe("signInEmail", () => {
     expect(text).toContain(url);
     expect(html).toContain('href="https://tfs.example/api/auth/verify?token=a%2Bb&amp;x=1"');
     expect(text).not.toMatch(/no account|not found|unknown/i);
+  });
+});
+
+describe("adminSignInEmail", () => {
+  it("carries the link, escaped in the html", () => {
+    const url = "https://tfs.example/api/admin/verify?token=a%2Bb&x=1";
+    const { subject, text, html } = adminSignInEmail(url);
+    expect(subject).toMatch(/admin sign-in link/i);
+    expect(text).toContain(url);
+    expect(html).toContain('href="https://tfs.example/api/admin/verify?token=a%2Bb&amp;x=1"');
+  });
+});
+
+describe("adminInviteEmail", () => {
+  it("names who granted access and links to the sign-in page, not a sign-in link", () => {
+    const { text, html } = adminInviteEmail({
+      signInPageUrl: "https://tfs.example/admin/login?email=jo%40example.com",
+      invitedBy: "<owner>@example.com",
+    });
+    expect(text).toContain("<owner>@example.com has given this email address access");
+    expect(html).toContain("&lt;owner&gt;@example.com");
+    expect(html).toContain('href="https://tfs.example/admin/login?email=jo%40example.com"');
+    expect(text).not.toContain("/api/admin/verify");
   });
 });

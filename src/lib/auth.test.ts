@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adminLoginLinkUrl,
+  adminSignInPageUrl,
   generateLoginSecret,
   hashLoginSecret,
   isValidEmail,
@@ -54,6 +56,20 @@ describe("login secrets", () => {
   it("builds the verify URL with the secret encoded", () => {
     expect(loginLinkUrl("https://tfs.example", "ab+c")).toBe(
       "https://tfs.example/api/auth/verify?token=ab%2Bc",
+    );
+  });
+});
+
+describe("admin link URLs", () => {
+  it("sends an admin's link to the admin verify route, never the customer one", () => {
+    expect(adminLoginLinkUrl("https://tfs.example", "a+b/c")).toBe(
+      "https://tfs.example/api/admin/verify?token=a%2Bb%2Fc",
+    );
+  });
+
+  it("links an invitation to the sign-in page with the address filled in", () => {
+    expect(adminSignInPageUrl("https://tfs.example", "jo+shop@example.com")).toBe(
+      "https://tfs.example/admin/login?email=jo%2Bshop%40example.com",
     );
   });
 });

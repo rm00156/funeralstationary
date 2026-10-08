@@ -44,3 +44,13 @@ export function hashLoginSecret(secret: string): string {
 export function loginLinkUrl(origin: string, secret: string): string {
   return `${origin}/api/auth/verify?token=${encodeURIComponent(secret)}`;
 }
+
+/** An admin's sign-in link — its own route, which spends only admin tokens. */
+export function adminLoginLinkUrl(origin: string, secret: string): string {
+  return `${origin}/api/admin/verify?token=${encodeURIComponent(secret)}`;
+}
+
+/** The admin sign-in page with the address filled in — what an invitation links to. */
+export function adminSignInPageUrl(origin: string, email: string): string {
+  return `${origin}/admin/login?email=${encodeURIComponent(email)}`;
+}

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { adminGetOrder, adminUpdateOrderStatus, OrderTransitionError } from "@/lib/adminOrders.server";
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import { parseNote } from "@/lib/adminValidation";
 import { parseOrderStatus } from "@/lib/orders";
 import { settleRefundedStatus } from "@/lib/refunds.server";

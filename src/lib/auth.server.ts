@@ -32,9 +32,11 @@ import {
   orderItems,
   orders,
   users,
+  type LoginTokenPurpose,
 } from "@/db/schema";
 import {
   LOGIN_LINK_TTL_SECONDS,
+  adminLoginLinkUrl,
   generateLoginSecret,
   hashLoginSecret,
   isValidEmail,
@@ -81,18 +83,21 @@ export class AuthError extends Error {
 
 /**
  * Create a one-time link for an address and return its URL. The secret is
- * returned to the caller only — the database keeps its hash.
+ * returned to the caller only — the database keeps its hash. Shared with the
+ * admin sign-in (adminAuth.server.ts), which passes its own purpose and URL.
  */
-async function createLoginLink(input: {
+export async function createLoginLink(input: {
   email: string;
   origin: string;
   next?: string;
+  purpose?: LoginTokenPurpose;
 }): Promise<{ email: string; url: string; expiresAt: Date }> {
   if (!authConfigured()) {
     throw new AuthError("Accounts are not configured — set AUTH_SECRET (see .env.example).", 503);
   }
   const email = normaliseEmail(input.email);
   if (!isValidEmail(email)) throw new AuthError("Please enter a valid email address.", 400);
+  const purpose = input.purpose ?? "customer";
 
   const secret = generateLoginSecret();
   const expiresAt = new Date(Date.now() + LOGIN_LINK_TTL_SECONDS * 1000);
@@ -100,10 +105,12 @@ async function createLoginLink(input: {
     id: crypto.randomUUID(),
     tokenHash: hashLoginSecret(secret),
     email,
-    redirectTo: safeNextPath(input.next),
+    redirectTo: safeNextPath(input.next, purpose === "admin" ? "/admin" : "/account"),
+    purpose,
     expiresAt,
   });
-  return { email, url: loginLinkUrl(input.origin, secret), expiresAt };
+  const url = purpose === "admin" ? adminLoginLinkUrl(input.origin, secret) : loginLinkUrl(input.origin, secret);
+  return { email, url, expiresAt };
 }
 
 /**
@@ -127,16 +134,16 @@ export async function requestSignInLink(input: {
   return { developmentLink: link.url };
 }
 
-export type ConsumeResult =
-  | { ok: true; userId: string; email: string; redirectTo: string }
+export type SpendResult =
+  | { ok: true; email: string; redirectTo: string }
   | { ok: false; reason: "invalid" | "expired" | "used" };
 
 /**
- * Spend a link. One atomic conditional UPDATE marks the row consumed — two
- * clicks on the same link race, and only one wins — then the users row is
- * found or created for its email.
+ * Spend a link of one purpose. One atomic conditional UPDATE marks the row
+ * consumed — two clicks on the same link race, and only one wins. A link of
+ * the other purpose reads as invalid.
  */
-export async function consumeLoginToken(secret: string): Promise<ConsumeResult> {
+export async function spendLoginToken(secret: string, purpose: LoginTokenPurpose): Promise<SpendResult> {
   if (!authConfigured() || !secret) return { ok: false, reason: "invalid" };
   const tokenHash = hashLoginSecret(secret);
   const [row] = await db
@@ -148,7 +155,7 @@ export async function consumeLoginToken(secret: string): Promise<ConsumeResult> 
       consumedAt: loginTokens.consumedAt,
     })
     .from(loginTokens)
-    .where(eq(loginTokens.tokenHash, tokenHash))
+    .where(and(eq(loginTokens.tokenHash, tokenHash), eq(loginTokens.purpose, purpose)))
     .limit(1);
   if (!row) return { ok: false, reason: "invalid" };
   if (row.consumedAt) return { ok: false, reason: "used" };
@@ -160,9 +167,19 @@ export async function consumeLoginToken(secret: string): Promise<ConsumeResult> 
     .set({ consumedAt: now })
     .where(and(eq(loginTokens.id, row.id), isNull(loginTokens.consumedAt)));
   if (result.affectedRows === 0) return { ok: false, reason: "used" };
+  return { ok: true, email: row.email, redirectTo: row.redirectTo };
+}
 
-  const userId = await findOrCreateUser(row.email, now);
-  return { ok: true, userId, email: row.email, redirectTo: safeNextPath(row.redirectTo) };
+export type ConsumeResult =
+  | { ok: true; userId: string; email: string; redirectTo: string }
+  | { ok: false; reason: "invalid" | "expired" | "used" };
+
+/** Spend a customer link, then find or create the users row for its email. */
+export async function consumeLoginToken(secret: string): Promise<ConsumeResult> {
+  const spent = await spendLoginToken(secret, "customer");
+  if (!spent.ok) return spent;
+  const userId = await findOrCreateUser(spent.email, new Date());
+  return { ok: true, userId, email: spent.email, redirectTo: safeNextPath(spent.redirectTo) };
 }
 
 async function findOrCreateUser(email: string, verifiedAt: Date): Promise<string> {

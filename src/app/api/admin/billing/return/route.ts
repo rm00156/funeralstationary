@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { isAdmin } from "@/lib/adminSession";
+import { isAdmin } from "@/lib/adminAuth.server";
 import { syncSiteSubscription } from "@/lib/siteBilling.server";
 import { resolveRequestOrigin } from "@/lib/stripe.server";
 

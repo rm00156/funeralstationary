@@ -4,7 +4,7 @@ import {
   adminListCategories,
   isDuplicateKeyError,
 } from "@/lib/adminCatalogue.server";
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import {
   parseHexColour,
   parseLabel,

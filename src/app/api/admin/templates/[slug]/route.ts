@@ -5,7 +5,7 @@ import {
   adminUpdateTemplate,
   TemplateMoveError,
 } from "@/lib/adminCatalogue.server";
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { isPlaceholderPortraitId } from "@/lib/placeholderPortraits";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";

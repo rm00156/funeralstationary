@@ -22,8 +22,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const DEVELOPMENT_AUTH_SECRET = "tfs-local-development-only";
 
-/** Env is read lazily (never at module scope) so tests can stub it per case. */
-function authSecret(): string | null {
+/**
+ * The secret both session cookies are signed with (each derives its own key
+ * from it). Env is read lazily (never at module scope) so tests can stub it
+ * per case.
+ */
+export function authSecret(): string | null {
   if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
   return process.env.NODE_ENV === "production" ? null : DEVELOPMENT_AUTH_SECRET;
 }

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { adminUpdateProduct } from "@/lib/adminCatalogue.server";
-import { isAdmin, unauthorised } from "@/lib/adminSession";
+import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
 import {
   parseBoolean,
   parseLabel,
