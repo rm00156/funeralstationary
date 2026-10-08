@@ -34,6 +34,10 @@ export async function PATCH(request: NextRequest) {
   }
   const { details, serviceDate: rawServiceDate } = (body ?? {}) as Record<string, unknown>;
 
+  if (rawServiceDate !== undefined && details === undefined) {
+    return Response.json({ error: "Send the funeral date with the checkout details" }, { status: 400 });
+  }
+
   const owner = await getOrCreateOwner();
   try {
     let cart = null;

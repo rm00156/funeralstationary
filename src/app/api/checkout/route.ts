@@ -37,12 +37,15 @@ export async function POST(request: NextRequest) {
   }
   const details = parseCheckoutDetails(body);
   if (!details.ok) return Response.json({ error: details.error }, { status: 400 });
-  const serviceDate = parseServiceDate((body as Record<string, unknown> | null)?.serviceDate);
-  if (!serviceDate.ok) return Response.json({ error: serviceDate.error }, { status: 400 });
+  // The funeral date is optional; a body without the field (an older form
+  // still open in a tab) leaves the dates the lines already carry.
+  const rawServiceDate = (body as Record<string, unknown> | null)?.serviceDate;
+  const serviceDate = rawServiceDate === undefined ? undefined : parseServiceDate(rawServiceDate);
+  if (serviceDate && !serviceDate.ok) return Response.json({ error: serviceDate.error }, { status: 400 });
 
   const owner = await getOrCreateOwner();
   try {
-    await setCheckoutDetails(owner, details.value, serviceDate.date);
+    await setCheckoutDetails(owner, details.value, serviceDate?.date);
   } catch (error) {
     const response = cartErrorResponse(error);
     if (response) return response;

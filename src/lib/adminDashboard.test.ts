@@ -108,7 +108,7 @@ describe("serviceUrgency", () => {
 });
 
 describe("actionItems", () => {
-  const ctx = { now: THURSDAY, thintentConfigured: true };
+  const ctx = { now: THURSDAY, thintentConfigured: true, storageConfigured: true };
 
   it("leaves a healthy order with a distant service alone", () => {
     expect(actionItems([order({ serviceDate: "2026-10-20" })], ctx)).toEqual([]);
@@ -127,6 +127,29 @@ describe("actionItems", () => {
       ctx,
     );
     expect(item).toMatchObject({ action: "Open Canva link", href: "https://www.canva.com/design/x", external: true });
+  });
+
+  it("doesn't let a Canva link hide a missing Thintent job", () => {
+    const [item] = actionItems(
+      [order({ thintentJobRef: null, lines: [line({ source: "canva", canvaUrl: "https://canva.link/x" })] })],
+      ctx,
+    );
+    expect(item.action).toBe("Send to Thintent");
+  });
+
+  it("stops asking about the file once the order is printing", () => {
+    expect(
+      actionItems(
+        [order({ status: "in_production", lines: [line({ source: "canva", canvaUrl: "https://canva.link/x" })] })],
+        ctx,
+      ),
+    ).toEqual([]);
+  });
+
+  it("only asks for a proof when storage could have made one", () => {
+    const unproofed = order({ lines: [line({ missingProof: true })] });
+    expect(actionItems([unproofed], ctx)[0].action).toBe("Regenerate proof");
+    expect(actionItems([unproofed], { ...ctx, storageConfigured: false })).toEqual([]);
   });
 
   it("flags an order missing from Thintent only once fulfilment has had its chance", () => {

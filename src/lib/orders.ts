@@ -49,6 +49,11 @@ export function parseOrderStatus(value: unknown): OrderStatus | null {
   return ORDER_STATUSES.includes(value as OrderStatus) ? (value as OrderStatus) : null;
 }
 
+/** The earliest funeral date among an order's lines — what its print run is planned by. */
+export function earliestServiceDate(dates: readonly (string | null)[]): string | null {
+  return dates.filter((date): date is string => !!date).sort()[0] ?? null;
+}
+
 /** Customer-facing wording. */
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   draft: "Draft",

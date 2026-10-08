@@ -70,7 +70,7 @@ export default async function AdminCustomersPage({
               <th className="px-5 py-3">Orders</th>
               <th className="px-5 py-3">Last order</th>
               <th className="px-5 py-3">Account</th>
-              <th className="px-5 py-3 text-right">Spent</th>
+              <th className="px-5 py-3 text-right">Spent, less refunds</th>
             </tr>
           </thead>
           <tbody>

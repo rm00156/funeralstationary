@@ -2,6 +2,7 @@
  * Gathers the facts behind the admin "Today" page; the rules that turn them
  * into rows and figures are in adminDashboard.ts. Read-only.
  */
+import { cache } from "react";
 import { and, desc, eq, gte, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -27,7 +28,7 @@ import {
   type TakingsSummary,
 } from "@/lib/adminDashboard";
 import { getProductLabels } from "@/lib/catalogue.server";
-import { ORDER_STATUSES, type OrderStatus } from "@/lib/orders";
+import { ORDER_STATUSES, earliestServiceDate, type OrderStatus } from "@/lib/orders";
 
 /** Weeks of takings in the chart. */
 export const TAKINGS_WEEKS = 12;
@@ -36,8 +37,11 @@ const REFUND_NAG_DAYS = 30;
 
 export type StatusCounts = Record<OrderStatus, number>;
 
-/** Paid orders per status (drafts — baskets — included for completeness). */
-export async function adminOrderCounts(): Promise<StatusCounts> {
+/**
+ * Paid orders per status (drafts — baskets — included for completeness).
+ * Cached per request: the layout's badge and the Today page both ask.
+ */
+export const adminOrderCounts = cache(async (): Promise<StatusCounts> => {
   const rows = await db
     .select({ status: orders.status, count: sql<number>`count(*)` })
     .from(orders)
@@ -45,7 +49,7 @@ export async function adminOrderCounts(): Promise<StatusCounts> {
   const counts = Object.fromEntries(ORDER_STATUSES.map((status) => [status, 0])) as StatusCounts;
   for (const row of rows) counts[row.status] = Number(row.count);
   return counts;
-}
+});
 
 /**
  * The orders the day's work is about: everything paid and not yet sent,
@@ -137,13 +141,12 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
 
   return rows.map(({ accountEmail, ...row }): DashboardOrder => {
     const items = itemRows.filter((item) => item.orderId === row.id);
-    const dates = items.map((item) => item.serviceDate).filter((date): date is string => !!date).sort();
     return {
       ...row,
       customerEmail: accountEmail ?? row.contactEmail,
       shippedAt: shippedAt.get(row.id) ?? null,
       refundedPence: refunded.get(row.id) ?? 0,
-      serviceDate: dates[0] ?? null,
+      serviceDate: earliestServiceDate(items.map((item) => item.serviceDate)),
       lines: items.map((item) => ({
         productLabel: labels.get(item.productId) ?? item.productId,
         copies: item.copies,

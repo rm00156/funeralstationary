@@ -70,6 +70,7 @@ import { checkDocReadiness } from "@/lib/designReadiness.server";
 import type { OrderEmailSummary } from "@/lib/orderEmails";
 import {
   computeOrderTotals,
+  earliestServiceDate,
   lineSpec,
   makeOrderNumber,
   resolveSelectionStrict,
@@ -561,7 +562,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     orderNumber: order.orderNumber,
     items,
     details: detailsFrom(order),
-    serviceDate: items.map((item) => item.serviceDate).filter((date): date is string => !!date).sort()[0] ?? null,
+    serviceDate: earliestServiceDate(items.map((item) => item.serviceDate)),
     totals,
     ready,
   };
@@ -896,23 +897,25 @@ export async function setCheckoutDetails(
 ): Promise<Cart> {
   const order = await findDraftOrder(owner);
   if (!order) throw new CartError(404, "Your basket is empty");
-  if (serviceDate !== undefined) {
-    await db.update(orderItems).set({ serviceDate }).where(eq(orderItems.orderId, order.id));
-  }
-  await db
-    .update(orders)
-    .set({
-      contactName: details.contactName,
-      contactEmail: details.contactEmail,
-      contactPhone: details.contactPhone,
-      guestEmail: owner.userId ? null : details.contactEmail,
-      addressLine1: details.addressLine1,
-      addressLine2: details.addressLine2,
-      city: details.city,
-      postcode: details.postcode,
-      country: "GB",
-    })
-    .where(eq(orders.id, order.id));
+  await db.transaction(async (tx) => {
+    if (serviceDate !== undefined) {
+      await tx.update(orderItems).set({ serviceDate }).where(eq(orderItems.orderId, order.id));
+    }
+    await tx
+      .update(orders)
+      .set({
+        contactName: details.contactName,
+        contactEmail: details.contactEmail,
+        contactPhone: details.contactPhone,
+        guestEmail: owner.userId ? null : details.contactEmail,
+        addressLine1: details.addressLine1,
+        addressLine2: details.addressLine2,
+        city: details.city,
+        postcode: details.postcode,
+        country: "GB",
+      })
+      .where(eq(orders.id, order.id));
+  });
   const cart = await getCart(owner);
   if (!cart) throw new Error("Basket vanished");
   return cart;

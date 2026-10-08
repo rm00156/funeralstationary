@@ -74,7 +74,7 @@ export default async function AdminCustomerPage({ params }: PageProps<"/admin/cu
 
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Fact label="Orders">{summary.orderCount}</Fact>
-        <Fact label="Spent">{formatPence(summary.spentPence)}</Fact>
+        <Fact label="Spent, after refunds">{formatPence(summary.spentPence)}</Fact>
         <Fact label="Refunded">{formatPence(customer.refundedPence)}</Fact>
         <Fact label="Last order">
           <span className="text-2xl">{formatDate(summary.lastOrderAt)}</span>

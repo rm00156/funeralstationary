@@ -27,6 +27,7 @@ import {
 } from "@/lib/adminDashboard.server";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { ORDER_CUTOFF } from "@/lib/site";
+import { isStorageConfigured } from "@/lib/storage";
 import { isThintentConfigured } from "@/lib/thintent.server";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +87,11 @@ export default async function AdminTodayPage() {
   ]);
 
   const today = shopDate(now);
-  const actions = actionItems(working, { now, thintentConfigured: isThintentConfigured() });
+  const actions = actionItems(working, {
+    now,
+    thintentConfigured: isThintentConfigured(),
+    storageConfigured: isStorageConfigured(),
+  });
   const dispatch = mustGoOutToday(working, now);
   const dispatched = dispatch.filter((row) => row.sent).length;
   const sentToday = working.filter(
@@ -364,7 +369,7 @@ export default async function AdminTodayPage() {
                 [
                   "Avg order",
                   takings.averageOrderPence === null ? "—" : formatPence(takings.averageOrderPence),
-                  `${takings.month.orders} this month`,
+                  `${takings.month.orders} this month, before refunds`,
                 ],
               ].map(([label, value, note]) => (
                 <div key={label}>

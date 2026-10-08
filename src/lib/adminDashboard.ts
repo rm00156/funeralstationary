@@ -226,7 +226,7 @@ export const customerName = (order: Pick<DashboardOrder, "contactName" | "contac
  */
 export function actionItems(
   orders: readonly DashboardOrder[],
-  ctx: { now: Date; thintentConfigured: boolean },
+  ctx: { now: Date; thintentConfigured: boolean; storageConfigured: boolean },
 ): ActionItem[] {
   const today = shopDate(ctx.now);
   const settled = (order: DashboardOrder) =>
@@ -263,21 +263,16 @@ export function actionItems(
     }
     if (!open) continue;
 
-    const canva = order.lines.find((line) => line.source === "canva");
-    const warned = order.lines.find((line) => line.acceptedWarnings.length > 0);
+    // The file checks matter until it goes to press; once it is printing,
+    // someone has already looked.
+    const waiting = order.status === "awaiting_print";
+    const canva = waiting ? order.lines.find((line) => line.source === "canva" && line.canvaUrl) : undefined;
+    const warned = waiting ? order.lines.find((line) => line.acceptedWarnings.length > 0) : undefined;
     const urgent = base.chip.urgency === "now";
 
-    if (canva?.canvaUrl) {
-      items.push({
-        ...base,
-        rank: urgent ? 0 : 2,
-        message: "Sent a Canva link. Export it for print and check it — nothing has checked it yet.",
-        action: "Open Canva link",
-        href: canva.canvaUrl,
-        external: true,
-        emphasis: urgent ? "primary" : "outline",
-      });
-    } else if (order.lines.some((line) => line.missingProof) && settled(order)) {
+    // Fulfilment can only render proofs with storage configured; without it
+    // every design line has none, and "regenerate" can't fix that.
+    if (ctx.storageConfigured && order.lines.some((line) => line.missingProof) && settled(order)) {
       items.push({
         ...base,
         rank: urgent ? 0 : 2,
@@ -295,6 +290,16 @@ export function actionItems(
         action: "Send to Thintent",
         href: orderHref,
         external: false,
+        emphasis: urgent ? "primary" : "outline",
+      });
+    } else if (canva?.canvaUrl) {
+      items.push({
+        ...base,
+        rank: urgent ? 0 : 2,
+        message: "Sent a Canva link. Export it for print and check it — nothing has checked it yet.",
+        action: "Open Canva link",
+        href: canva.canvaUrl,
+        external: true,
         emphasis: urgent ? "primary" : "outline",
       });
     } else if (warned) {
@@ -400,7 +405,7 @@ export interface TakingsSummary {
   month: Takings;
   /** The same stretch of last month (1st to today's date), for a fair comparison. */
   lastMonthToDate: Takings;
-  /** Net takings this month per order, or null with no orders. */
+  /** What customers paid per order this month, before refunds; null with no orders. */
   averageOrderPence: number | null;
   /** The last `weeks` shop weeks, oldest first; the last is this week so far. */
   weekly: { weekStart: string; netPence: number; orders: number }[];

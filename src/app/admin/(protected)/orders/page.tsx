@@ -95,6 +95,12 @@ export default async function AdminOrdersPage({
         </p>
       )}
 
+      {!query && orders.length === ORDER_LIST_LIMIT && (
+        <p className="mb-4 font-body text-sm text-on-surface-variant" role="status">
+          Showing the {ORDER_LIST_LIMIT} most recent — search to find an older order.
+        </p>
+      )}
+
       <div className="overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
         <table className="w-full min-w-[720px] text-left">
           <thead>

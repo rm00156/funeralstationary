@@ -13,7 +13,7 @@ import {
   type CustomerSummary,
 } from "@/lib/adminCustomers";
 import { getProductLabels } from "@/lib/catalogue.server";
-import { refundedPence, type OrderStatus } from "@/lib/orders";
+import { earliestServiceDate, refundedPence, type OrderStatus } from "@/lib/orders";
 
 const orderColumns = {
   id: orders.id,
@@ -39,11 +39,20 @@ export const CUSTOMER_LIST_LIMIT = 200;
 export async function adminListCustomers(
   query: string | null,
 ): Promise<{ customers: CustomerSummary[]; total: number }> {
-  const [orderRows, accounts] = await Promise.all([
+  const [orderRows, accounts, refunds] = await Promise.all([
     db.select(orderColumns).from(orders).where(ne(orders.status, "draft")),
     db.select({ id: users.id, email: users.email, name: users.name, createdAt: users.createdAt }).from(users),
+    db
+      .select({ orderId: orderRefunds.orderId, total: sql<number>`sum(${orderRefunds.amountPence})` })
+      .from(orderRefunds)
+      .where(eq(orderRefunds.status, "succeeded"))
+      .groupBy(orderRefunds.orderId),
   ]);
-  const all = groupCustomers(orderRows, accounts);
+  const refunded = new Map(refunds.map((row) => [row.orderId, Number(row.total)]));
+  const all = groupCustomers(
+    orderRows.map((row) => ({ ...row, refundedPence: refunded.get(row.id) ?? 0 })),
+    accounts,
+  );
   const matched = query ? all.filter((customer) => matchesCustomer(customer, query)) : all;
   return { customers: matched.slice(0, CUSTOMER_LIST_LIMIT), total: matched.length };
 }
@@ -97,9 +106,6 @@ export async function adminGetCustomer(rawEmail: string): Promise<CustomerDetail
   // belongs to that account's customer, as on the list.
   const mine = orderRows.filter((row) => !row.userId || row.userId === account?.id);
 
-  const [summary] = groupCustomers(mine, account ? [account] : []).filter((row) => row.email === email);
-  if (!summary) return null;
-
   const ids = mine.map((row) => row.id);
   const [itemRows, refundRows, labels, designCount, uploadCount] = await Promise.all([
     ids.length
@@ -128,7 +134,6 @@ export async function adminGetCustomer(rawEmail: string): Promise<CustomerDetail
 
   const customerOrders = mine.map((row): CustomerOrder => {
     const items = itemRows.filter((item) => item.orderId === row.id);
-    const dates = items.map((item) => item.serviceDate).filter((date): date is string => !!date).sort();
     return {
       id: row.id,
       orderNumber: row.orderNumber,
@@ -138,9 +143,16 @@ export async function adminGetCustomer(rawEmail: string): Promise<CustomerDetail
       refundedPence: refundedPence(refundRows.filter((refund) => refund.orderId === row.id)),
       products: [...new Set(items.map((item) => labels.get(item.productId) ?? item.productId))],
       itemCount: items.length,
-      serviceDate: dates[0] ?? null,
+      serviceDate: earliestServiceDate(items.map((item) => item.serviceDate)),
     };
   });
+
+  const refunded = new Map(customerOrders.map((order) => [order.id, order.refundedPence]));
+  const [summary] = groupCustomers(
+    mine.map((row) => ({ ...row, refundedPence: refunded.get(row.id) ?? 0 })),
+    account ? [account] : [],
+  ).filter((row) => row.email === email);
+  if (!summary) return null;
 
   const latest = mine[0];
   return {

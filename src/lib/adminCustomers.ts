@@ -16,6 +16,8 @@ export interface CustomerOrderRow {
   contactPhone: string | null;
   postcode: string | null;
   totalPence: number;
+  /** Succeeded refunds on the order. */
+  refundedPence: number;
   placedAt: Date | null;
   createdAt: Date;
 }
@@ -34,6 +36,7 @@ export interface CustomerSummary {
   phone: string | null;
   postcode: string | null;
   orderCount: number;
+  /** What they paid, less what was refunded. */
   spentPence: number;
   firstOrderAt: Date | null;
   lastOrderAt: Date | null;
@@ -92,7 +95,7 @@ export function groupCustomers(
     customer.phone = order.contactPhone?.trim() || customer.phone;
     customer.postcode = order.postcode?.trim() || customer.postcode;
     customer.orderCount += 1;
-    customer.spentPence += order.totalPence;
+    customer.spentPence += order.totalPence - order.refundedPence;
     customer.lastOrderAt = when(order);
     customer.orderNumbers.push(order.orderNumber);
     byEmail.set(email, customer);

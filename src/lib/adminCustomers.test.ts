@@ -10,6 +10,7 @@ const row = (overrides: Partial<CustomerOrderRow>): CustomerOrderRow => ({
   contactPhone: "07700 900123",
   postcode: "BR3 1QZ",
   totalPence: 1000,
+  refundedPence: 0,
   placedAt: new Date("2026-10-01T10:00:00Z"),
   createdAt: new Date("2026-10-01T09:00:00Z"),
   ...overrides,
@@ -19,7 +20,7 @@ describe("groupCustomers", () => {
   it("groups orders by email case-insensitively, latest details winning", () => {
     const [customer] = groupCustomers(
       [
-        row({ id: "1", orderNumber: "A", contactName: "J Okafor", totalPence: 1000 }),
+        row({ id: "1", orderNumber: "A", contactName: "J Okafor", totalPence: 1000, refundedPence: 400 }),
         row({
           id: "2",
           orderNumber: "B",
@@ -37,7 +38,7 @@ describe("groupCustomers", () => {
       name: "Jane Okafor",
       phone: "07700 900123",
       orderCount: 2,
-      spentPence: 3500,
+      spentPence: 3100,
       orderNumbers: ["A", "B"],
       account: null,
     });
