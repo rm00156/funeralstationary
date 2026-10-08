@@ -5,12 +5,16 @@ import { ChevronRight, ExternalLink, FileDown } from "lucide-react";
 import AdminOrderProofActions from "@/components/AdminOrderProofActions";
 import AdminPrintPdfButton from "@/components/AdminPrintPdfButton";
 import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
+import AdminThintentButton from "@/components/AdminThintentButton";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { adminGetOrder } from "@/lib/adminOrders.server";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { fileSizeText } from "@/lib/artwork";
 import { trimText } from "@/lib/designEditor";
-import { ORDER_STATUS_LABELS, lineSpec } from "@/lib/orders";
+import { ORDER_STATUS_LABELS, lineSpec, refundStatusEffect, refundedPence } from "@/lib/orders";
+import { canSendToThintent } from "@/lib/thintent";
+import { isThintentConfigured } from "@/lib/thintent.server";
+import { vatRateLabel } from "@/lib/vat";
 
 /** Stripe's dashboard page for a payment; test-mode payments live under /test. */
 function stripePaymentUrl(paymentIntentId: string): string {
@@ -56,6 +60,10 @@ export default async function AdminOrderPage({
   const { id } = await params;
   const order = await adminGetOrder(id);
   if (!order) notFound();
+  const refunded = refundedPence(order.refunds);
+  const refundsNotInThintent = order.thintent
+    ? order.refunds.filter((refund) => refund.status === "succeeded" && !refund.thintentCreditRef).length
+    : 0;
 
   return (
     <>
@@ -79,6 +87,27 @@ export default async function AdminOrderPage({
         </div>
         <OrderStatusBadge status={order.status} />
       </div>
+
+      {/* A cancel never moves money (it can come from a Thintent webhook):
+          the refund is made in Stripe, and the order settles to Refunded by itself. */}
+      {order.status === "cancelled" && order.paidAt && refunded < order.totals.totalPence && (
+        <div className="mb-8 rounded-xl bg-warn-bg px-6 py-4 font-body text-sm text-warn-text">
+          <p className="font-medium">Refund needed?</p>
+          <p className="mt-1">
+            This order was cancelled after the customer paid {formatPence(order.totals.totalPence)}.{" "}
+            {refunded > 0 ? `${formatPence(refunded)} has been refunded so far.` : "Nothing has been refunded yet."}{" "}
+            Refund it in Stripe if that’s due — the order moves to Refunded by itself once it’s refunded in full.
+          </p>
+        </div>
+      )}
+      {refundStatusEffect(order.status, refunded, order.totals.totalPence) === "still-printing" && (
+        <div className="mb-8 rounded-xl bg-warn-bg px-6 py-4 font-body text-sm text-warn-text">
+          <p className="font-medium">Refunded, but still going to print</p>
+          <p className="mt-1">
+            The customer has been refunded in full. If this order shouldn’t be printed, cancel the job in Thintent.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex flex-col gap-8">
@@ -253,8 +282,60 @@ export default async function AdminOrderPage({
 
         <div className="flex flex-col gap-8">
           <Section title="Status">
-            <AdminOrderStatusForm orderId={order.id} status={order.status} />
+            <AdminOrderStatusForm
+              orderId={order.id}
+              status={order.status}
+              thintentJobRef={order.thintent?.jobRef ?? null}
+            />
           </Section>
+
+          {(order.thintent || (isThintentConfigured() && order.paidAt)) && (
+            <Section title="Thintent">
+              {order.thintent ? (
+                <>
+                  <p className="font-body text-sm text-on-surface">
+                    Managed in Thintent as job #{order.thintent.jobRef}.
+                  </p>
+                  {order.thintent.jobUrl && (
+                    <a
+                      href={order.thintent.jobUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1.5 font-body text-sm font-medium text-primary hover:underline"
+                    >
+                      <ExternalLink size={14} aria-hidden />
+                      Open the job in Thintent
+                    </a>
+                  )}
+                  <p className="mt-2 font-body text-xs text-on-surface-variant">
+                    Moving the job there — dispatching, completing or cancelling it — moves this order too.
+                    Refunds made in Stripe are recorded there as credit notes.
+                  </p>
+                  {refundsNotInThintent > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-2 font-body text-sm text-on-surface-variant">
+                        {refundsNotInThintent === 1 ? "1 refund isn’t" : `${refundsNotInThintent} refunds aren’t`} in
+                        Thintent yet. It is retried every hour, or send it now.
+                      </p>
+                      <AdminThintentButton orderId={order.id} label="Send refunds to Thintent" />
+                    </div>
+                  )}
+                </>
+              ) : canSendToThintent(order.status) ? (
+                <>
+                  <p className="mb-3 font-body text-sm text-on-surface-variant">
+                    Not in Thintent yet. It is retried every hour, or send it now.
+                  </p>
+                  <AdminThintentButton orderId={order.id} />
+                </>
+              ) : (
+                <p className="font-body text-sm text-on-surface-variant">
+                  Not in Thintent. It has moved on from awaiting print here, so it isn’t sent — that would make a
+                  second job for work already under way.
+                </p>
+              )}
+            </Section>
+          )}
 
           <Section title="Customer">
             <p className="font-body text-sm text-on-surface">{order.contact.name ?? "—"}</p>
@@ -288,13 +369,31 @@ export default async function AdminOrderPage({
                 <dd className="text-on-surface">{formatPence(order.totals.deliveryPence)}</dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt>VAT ({Math.round(order.totals.vatRate * 100)}%, included)</dt>
+                <dt>VAT ({vatRateLabel(order.items.map((item) => item.vatTreatment))}, included)</dt>
                 <dd className="text-on-surface">{formatPence(order.totals.vatPence)}</dd>
               </div>
               <div className="flex justify-between gap-4 border-t border-outline-variant/40 pt-2 font-medium">
                 <dt className="text-on-surface">Total</dt>
                 <dd className="text-primary">{formatPence(order.totals.totalPence)}</dd>
               </div>
+              {order.refunds.map((refund) => (
+                <div key={refund.stripeRefundId} className="flex justify-between gap-4">
+                  <dt>
+                    Refund, {formatDateTime(refund.refundedAt)}
+                    {refund.status !== "succeeded" && ` (${refund.status.replace(/_/g, " ")})`}
+                    {refund.thintentCreditRef && ` · Thintent ${refund.thintentCreditRef}`}
+                  </dt>
+                  <dd className={refund.status === "succeeded" ? "text-on-surface" : "line-through"}>
+                    −{formatPence(refund.amountPence)}
+                  </dd>
+                </div>
+              ))}
+              {refunded > 0 && (
+                <div className="flex justify-between gap-4 border-t border-outline-variant/40 pt-2 font-medium">
+                  <dt className="text-on-surface">Kept</dt>
+                  <dd className="text-primary">{formatPence(order.totals.totalPence - refunded)}</dd>
+                </div>
+              )}
             </dl>
             {order.stripe.paymentIntentId && (
               <a

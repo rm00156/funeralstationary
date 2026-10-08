@@ -8,17 +8,19 @@ import { Plus } from "lucide-react";
 import type { AdminProduct } from "@/lib/adminCatalogue.server";
 import { adminMutate } from "@/lib/adminClient";
 import { OCCASION_LABELS, PRODUCT_OCCASIONS, type ProductOccasion } from "@/lib/templates";
+import { VAT_TREATMENT_LABELS, VAT_TREATMENTS, type VatTreatment } from "@/lib/vat";
 
 export default function AdminProductsManager({ products }: { products: AdminProduct[] }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
-        <table className="w-full min-w-[820px] text-left">
+        <table className="w-full min-w-[960px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
               <th className="px-5 py-3">Product</th>
               <th className="px-5 py-3">Slug</th>
               <th className="px-5 py-3">Shop group</th>
+              <th className="px-5 py-3">VAT</th>
               <th className="px-5 py-3">Sort</th>
               <th className="px-5 py-3">Active</th>
               <th className="px-5 py-3" />
@@ -41,6 +43,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
   const [label, setLabel] = useState(product.label);
   const [description, setDescription] = useState(product.description ?? "");
   const [occasion, setOccasion] = useState<ProductOccasion>(product.occasion);
+  const [vatTreatment, setVatTreatment] = useState<VatTreatment>(product.vatTreatment);
   const [sortOrder, setSortOrder] = useState(String(product.sortOrder));
   const [isActive, setIsActive] = useState(product.isActive);
   const [saving, setSaving] = useState(false);
@@ -50,6 +53,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
     label !== product.label ||
     description.trim() !== (product.description ?? "") ||
     occasion !== product.occasion ||
+    vatTreatment !== product.vatTreatment ||
     Number(sortOrder) !== product.sortOrder ||
     isActive !== product.isActive;
 
@@ -60,6 +64,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
       label,
       description,
       occasion,
+      vatTreatment,
       sortOrder: Number(sortOrder),
       isActive,
     });
@@ -103,6 +108,20 @@ function ProductRow({ product }: { product: AdminProduct }) {
           {PRODUCT_OCCASIONS.map((value) => (
             <option key={value} value={value}>
               {OCCASION_LABELS[value]}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-5 py-3">
+        <select
+          aria-label={`VAT for ${product.slug}`}
+          value={vatTreatment}
+          onChange={(event) => setVatTreatment(event.target.value as VatTreatment)}
+          className="rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15"
+        >
+          {VAT_TREATMENTS.map((value) => (
+            <option key={value} value={value}>
+              {VAT_TREATMENT_LABELS[value]}
             </option>
           ))}
         </select>

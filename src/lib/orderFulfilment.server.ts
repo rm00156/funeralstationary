@@ -10,16 +10,21 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import type { DesignDoc } from "@/lib/designEditor";
-import { designs, orderItems, orderProofPages, orderProofs } from "@/db/schema";
+import { designs, orderItems, orderProofPages, orderProofs, orderRefunds } from "@/db/schema";
 import { isEmailConfigured, sendEmail } from "@/lib/email.server";
 import {
+  orderCancelledEmail,
+  orderCancelledNotificationEmail,
   orderConfirmationEmail,
   orderNotificationEmail,
+  type EmailContent,
 } from "@/lib/orderEmails";
+import { refundedPence } from "@/lib/orders";
 import { addOrderEvent, getOrderEmailSummary, loadOrderDetail } from "@/lib/orders.server";
 import { renderProofPdf } from "@/lib/proofPdf.server";
 import { renderProofPageImages } from "@/lib/proofRender.server";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";
+import { isThintentConfigured, pushOrderToThintent } from "@/lib/thintent.server";
 
 /**
  * The artwork to proof for one line: the live design when it still exists,
@@ -171,9 +176,35 @@ export async function generateOrderItemPrintPdf(
 }
 
 /**
+ * The print PDF of a line's newest proof, rendering it first when nobody has
+ * yet — what a press link from Thintent opens (/api/thintent/press). Newest
+ * rather than the version the job was sent with, so a corrected proof made
+ * after the job reached Thintent is what the press gets. Null when the line
+ * has no proof at all.
+ */
+export async function newestPrintPdfUrl(
+  orderId: string,
+  itemId: string,
+  origin: string,
+): Promise<string | null> {
+  const [proof] = await db
+    .select({ id: orderProofs.id, pdfUrl: orderProofs.pdfUrl })
+    .from(orderProofs)
+    .innerJoin(orderItems, eq(orderProofs.orderItemId, orderItems.id))
+    .where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId)))
+    .orderBy(desc(orderProofs.version))
+    .limit(1);
+  if (!proof) return null;
+  if (proof.pdfUrl) return proof.pdfUrl;
+  const { pdfUrl } = await generateOrderItemPrintPdf(orderId, proof.id, origin, "thintent");
+  return pdfUrl;
+}
+
+/**
  * Post-payment side effects, run from after() in the webhook / return
  * routes. Proofs first (skipped entirely without S3), then the customer
- * confirmation and the business notification. Never throws.
+ * confirmation and the business notification, then the job in Thintent
+ * (skipped without THINTENT_*). Never throws.
  *
  * Two origins because they answer different questions: `site` is the public
  * origin the emailed links must carry; `render` is where this server's own
@@ -201,15 +232,25 @@ export async function runPostPaymentSideEffects(
     }
   }
 
+  await sendOrderConfirmationEmails(orderId, origins.site);
+
+  // After the proofs, so the job in Thintent gets a print-PDF link rather
+  // than "no proof yet" (see lineFiles in thintent.ts); after the emails,
+  // because a send that runs out of time is retried by the hourly sweep and
+  // an email is never retried.
+  if (isThintentConfigured()) await pushOrderToThintent(orderId, origins.site);
+}
+
+async function sendOrderConfirmationEmails(orderId: string, siteOrigin: string): Promise<void> {
   if (!isEmailConfigured()) return;
   const summary = await getOrderEmailSummary(orderId);
   if (!summary) return;
 
-  const sends: { label: string; to: string; content: ReturnType<typeof orderConfirmationEmail> }[] = [
+  const sends: OrderEmailSend[] = [
     {
       label: "customer confirmation",
       to: summary.contactEmail,
-      content: orderConfirmationEmail(summary, `${origins.site}/orders/${orderId}`),
+      content: orderConfirmationEmail(summary, `${siteOrigin}/orders/${orderId}`),
     },
   ];
   const notify = process.env.ORDER_NOTIFY_EMAIL;
@@ -217,16 +258,68 @@ export async function runPostPaymentSideEffects(
     sends.push({
       label: "business notification",
       to: notify,
-      content: orderNotificationEmail(summary, `${origins.site}/admin/orders/${orderId}`),
+      content: orderNotificationEmail(summary, `${siteOrigin}/admin/orders/${orderId}`),
     });
   }
+  await sendOrderEmails(orderId, summary.orderNumber, sends);
+}
 
+/**
+ * After Thintent cancels a paid order: tell the customer it won't be
+ * printed, and the shop that the refund is still theirs to make. Called
+ * only by the delivery that actually cancelled it (applyThintentJobEvent),
+ * so a redelivered webhook doesn't email twice. Best-effort, like the rest.
+ */
+export async function sendOrderCancelledEmails(orderId: string, siteOrigin: string): Promise<void> {
+  if (!isEmailConfigured()) return;
+  const summary = await getOrderEmailSummary(orderId);
+  if (!summary) return;
+
+  const sends: OrderEmailSend[] = [
+    {
+      label: "customer cancellation",
+      to: summary.contactEmail,
+      content: orderCancelledEmail(summary, `${siteOrigin}/orders/${orderId}`),
+    },
+  ];
+  const notify = process.env.ORDER_NOTIFY_EMAIL;
+  if (notify) {
+    sends.push({
+      label: "business cancellation notice",
+      to: notify,
+      content: orderCancelledNotificationEmail(
+        summary,
+        `${siteOrigin}/admin/orders/${orderId}`,
+        await orderRefundedPence(orderId),
+      ),
+    });
+  }
+  await sendOrderEmails(orderId, summary.orderNumber, sends);
+}
+
+/** What has gone back to the customer so far — a refund can come before the cancel. */
+async function orderRefundedPence(orderId: string): Promise<number> {
+  const refunds = await db
+    .select({ amountPence: orderRefunds.amountPence, status: orderRefunds.status })
+    .from(orderRefunds)
+    .where(eq(orderRefunds.orderId, orderId));
+  return refundedPence(refunds);
+}
+
+interface OrderEmailSend {
+  label: string;
+  to: string;
+  content: EmailContent;
+}
+
+/** Each send recorded on the order as email_sent / email_failed; none throws. */
+async function sendOrderEmails(orderId: string, orderNumber: string, sends: OrderEmailSend[]): Promise<void> {
   for (const send of sends) {
     try {
       await sendEmail({ to: send.to, ...send.content });
       await addOrderEvent(orderId, { type: "email_sent", note: `${send.label} sent to ${send.to}` });
     } catch (error) {
-      console.error(`Email (${send.label}) failed for order ${order.orderNumber}`, error);
+      console.error(`Email (${send.label}) failed for order ${orderNumber}`, error);
       await addOrderEvent(orderId, {
         type: "email_failed",
         note: `${send.label}: ${error instanceof Error ? error.message : String(error)}`,

@@ -9,6 +9,7 @@ import ConfigField from "@/components/ConfigField";
 import { copiesText, formatPence, type PricingData } from "@/lib/orderOfServicePricing";
 import type { Cart, CartItem } from "@/lib/orders.server";
 import { lineSpec, staleLineSpec, type SelectionAxis } from "@/lib/orders";
+import { vatIncludedText } from "@/lib/vat";
 
 /** Tell the header badge (and anything else listening) the basket changed. */
 export const notifyCartChanged = () => window.dispatchEvent(new Event("tfs:cart-changed"));
@@ -115,7 +116,7 @@ export default function CartView({
           </span>
         </div>
         <p className="mt-1 text-right font-body text-sm text-on-surface-variant">
-          Includes VAT of {formatPence(totals.vatPence)}
+          {vatIncludedText(totals.vatPence)}
         </p>
 
         {cart.ready ? (

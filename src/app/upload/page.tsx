@@ -30,6 +30,7 @@ export default async function UploadPage({ searchParams }: PageProps<"/upload">)
       id: product.id,
       label: product.label,
       format: product.format,
+      vatTreatment: product.vatTreatment,
       pricing: await getPricingData(product.id),
     })),
   );

@@ -26,12 +26,14 @@ import {
   type Selection,
 } from "@/lib/orderOfServicePricing";
 import { closePdf, openPdf, type PDFDocumentProxy } from "@/lib/pdfPreview";
+import { chargesVat, priceVatNote, type VatTreatment } from "@/lib/vat";
 
 export interface UploadProduct {
   id: string;
   label: string;
   format: ProductFormat;
   pricing: PricingData;
+  vatTreatment: VatTreatment;
 }
 
 /** The step-1 choice. Delivery isn't asked here — it's chosen in the basket. */
@@ -523,10 +525,10 @@ export default function UploadFlow({
                   {formatPence(quote.totalPence)}
                 </strong>
                 <span className="block text-[15px] text-ink-3">
-                  Includes VAT
+                  {chargesVat(product.vatTreatment) ? "Includes VAT and " : "No VAT. Includes "}
                   {quote.delivery.pricePence > 0
-                    ? ` and ${formatPence(quote.delivery.pricePence)} delivery`
-                    : ` and ${quote.delivery.label.toLowerCase()}`}
+                    ? `${formatPence(quote.delivery.pricePence)} delivery`
+                    : quote.delivery.label.toLowerCase()}
                 </span>
               </p>
               <button type="button" className="btn btn-primary min-h-[56px] text-lg" onClick={() => goTo(1)}>
@@ -858,7 +860,7 @@ export default function UploadFlow({
                     <span className="block font-display text-[32px] leading-none text-ink">
                       {formatPence(quote.totalPence)}
                     </span>
-                    <span className="text-sm text-ink-3">Includes VAT</span>
+                    <span className="text-sm text-ink-3">{priceVatNote(product.vatTreatment)}</span>
                   </dd>
                 </div>
               </dl>

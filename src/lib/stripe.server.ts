@@ -10,7 +10,7 @@
  */
 import Stripe from "stripe";
 
-import { buildStripeLineItems, sumLineItems } from "@/lib/orders";
+import { buildStripeLineItems, sumLineItems, type OrderRefund } from "@/lib/orders";
 import type { FrozenOrder } from "@/lib/orders.server";
 
 export function isStripeConfigured(): boolean {
@@ -109,6 +109,66 @@ export function summariseSession(session: Stripe.Checkout.Session): PaidSession 
 
 export async function retrieveCheckoutSession(sessionId: string): Promise<PaidSession> {
   return summariseSession(await getStripe().checkout.sessions.retrieve(sessionId));
+}
+
+/**
+ * The payment a refund/charge event is about. Refund events carry it
+ * directly; charge.refunded carries it on the charge.
+ */
+export function eventPaymentIntentId(event: Stripe.Event): string | null {
+  switch (event.type) {
+    case "refund.created":
+    case "refund.updated":
+    case "refund.failed":
+    case "charge.refund.updated":
+    case "charge.refunded": {
+      const pi = event.data.object.payment_intent;
+      return typeof pi === "string" ? pi : (pi?.id ?? null);
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Every refund on a payment, as it stands now — read whole rather than taken
+ * from the event, so a late or re-ordered delivery can't leave a stale state.
+ */
+export async function listPaymentRefunds(
+  paymentIntentId: string,
+): Promise<(OrderRefund & { reason: string | null })[]> {
+  const refunds: (OrderRefund & { reason: string | null })[] = [];
+  for await (const refund of getStripe().refunds.list({ payment_intent: paymentIntentId, limit: 100 })) {
+    refunds.push({
+      stripeRefundId: refund.id,
+      amountPence: refund.amount,
+      status: refund.status ?? "pending",
+      reason: refund.reason ?? null,
+      refundedAt: new Date(refund.created * 1000),
+    });
+  }
+  return refunds;
+}
+
+/**
+ * Stripe's fee on a payment, in pence, off its charge's balance transaction
+ * (expanded). Null while the charge has none yet — a payment still settling —
+ * or when it settled in a currency other than pounds, which a fee in pence
+ * can't describe.
+ */
+export function paymentFeePence(intent: Stripe.PaymentIntent): number | null {
+  const charge = intent.latest_charge;
+  if (!charge || typeof charge === "string") return null;
+  const txn = charge.balance_transaction;
+  if (!txn || typeof txn === "string") return null;
+  return txn.currency === "gbp" ? txn.fee : null;
+}
+
+export async function retrievePaymentFeePence(paymentIntentId: string): Promise<number | null> {
+  const intent = await getStripe().paymentIntents.retrieve(paymentIntentId, {
+    expand: ["latest_charge.balance_transaction"],
+  });
+  return paymentFeePence(intent);
 }
 
 /** Verify a webhook delivery's signature; throws on a bad or missing one. */

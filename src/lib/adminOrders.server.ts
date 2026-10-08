@@ -81,27 +81,46 @@ export async function adminUpdateOrderStatus(
 ): Promise<OrderDetail | null> {
   const current = await loadOrderDetail(id);
   if (!current) return null;
+  // Once it has a job, Thintent is where status changes — a move here would
+  // never reach it, and the two would disagree from then on. The override
+  // stays for an order that never got there.
+  if (current.thintent) {
+    throw new OrderTransitionError(
+      `This order is managed in Thintent as job #${current.thintent.jobRef} — move the job there and this order follows`,
+    );
+  }
   if (!canTransition(current.status, to)) {
     throw new OrderTransitionError(
       `An order that is "${current.status}" cannot be moved to "${to}"`,
     );
   }
 
-  const [result] = await db
-    .update(orders)
-    .set({ status: to })
-    .where(and(eq(orders.id, id), eq(orders.status, current.status)));
-  if (result.affectedRows === 0) {
+  if (!(await moveOrderStatus(id, current.status, to, note, actor))) {
     throw new OrderTransitionError("This order was changed by someone else — reload and try again");
   }
 
-  await addOrderEvent(id, {
-    type: "status_changed",
-    fromStatus: current.status,
-    toStatus: to,
-    note,
-    actor,
-  });
-
   return loadOrderDetail(id);
+}
+
+/**
+ * One status move, conditional on the order still being `from`, with its
+ * `status_changed` event. False when the order had already moved on — the
+ * caller decides whether that is a conflict (an admin on a stale screen) or
+ * harmless (a redelivered Thintent webhook). Callers check canTransition.
+ */
+export async function moveOrderStatus(
+  id: string,
+  from: OrderStatus,
+  to: OrderStatus,
+  note: string | null,
+  actor: string,
+): Promise<boolean> {
+  const [result] = await db
+    .update(orders)
+    .set({ status: to })
+    .where(and(eq(orders.id, id), eq(orders.status, from)));
+  if (result.affectedRows === 0) return false;
+
+  await addOrderEvent(id, { type: "status_changed", fromStatus: from, toStatus: to, note, actor });
+  return true;
 }

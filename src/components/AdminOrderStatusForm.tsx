@@ -9,12 +9,19 @@ import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS, type OrderStatus } from 
 const fieldInput =
   "rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 font-body text-sm focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15";
 
+/**
+ * The manual status override — for an order that never reached Thintent.
+ * Once it has a job, status is changed there (adminUpdateOrderStatus refuses
+ * a move here too), so this just says so.
+ */
 export default function AdminOrderStatusForm({
   orderId,
   status,
+  thintentJobRef = null,
 }: {
   orderId: string;
   status: OrderStatus;
+  thintentJobRef?: string | null;
 }) {
   const router = useRouter();
   const targets = ORDER_STATUS_TRANSITIONS[status];
@@ -22,6 +29,15 @@ export default function AdminOrderStatusForm({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (thintentJobRef) {
+    return (
+      <p className="font-body text-sm text-on-surface-variant">
+        {ORDER_STATUS_LABELS[status]}. Status is managed in Thintent (job #{thintentJobRef}) — move the job there and
+        this order follows. A refund made in Stripe moves it to Refunded by itself.
+      </p>
+    );
+  }
 
   if (targets.length === 0) {
     return (

@@ -7,10 +7,11 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
-import { lineSpec } from "@/lib/orders";
+import { lineSpec, refundedPence } from "@/lib/orders";
 import { getOrder } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
 import { authConfigured } from "@/lib/userSession";
+import { vatIncludedText } from "@/lib/vat";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,8 @@ const STATUS_NOTES: Partial<Record<string, string>> = {
   in_production: "Your stationery is being printed.",
   shipped: "Your order is on its way.",
   delivered: "Your order has been delivered.",
-  cancelled: "This order was cancelled.",
+  cancelled:
+    "This order was cancelled and will not be printed. If a refund is due, it will go back to the card you paid with.",
   refunded: "This order was refunded.",
 };
 
@@ -57,6 +59,8 @@ export default async function OrderPage({
     if (!owner?.userId && authConfigured()) redirect(`/account?next=/orders/${encodeURIComponent(id)}`);
     notFound();
   }
+  // Succeeded refunds only: a pending one hasn't reached their card yet.
+  const refunded = refundedPence(order.refunds);
 
   return (
     <>
@@ -113,6 +117,12 @@ export default async function OrderPage({
             {STATUS_NOTES[order.status] && (
               <p className="mb-10 max-w-3xl font-body text-lg text-on-surface-variant">
                 {STATUS_NOTES[order.status]}
+                {(order.status === "shipped" || order.status === "delivered") && order.tracking.ref && (
+                  <span className="mt-2 block text-on-surface">
+                    {order.tracking.courier ? `${order.tracking.courier} tracking` : "Tracking"} number:{" "}
+                    <span className="font-medium">{order.tracking.ref}</span>
+                  </span>
+                )}
               </p>
             )}
 
@@ -173,8 +183,14 @@ export default async function OrderPage({
                     </span>
                   </div>
                   <p className="mt-1 text-right font-body text-sm text-on-surface-variant">
-                    Includes VAT of {formatPence(order.totals.vatPence)}
+                    {vatIncludedText(order.totals.vatPence)}
                   </p>
+                  {refunded > 0 && (
+                    <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-4">
+                      <span className="font-body text-on-surface">Refunded to your card</span>
+                      <span className="font-display text-xl text-primary">{formatPence(refunded)}</span>
+                    </div>
+                  )}
                 </section>
 
                 <section className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6">

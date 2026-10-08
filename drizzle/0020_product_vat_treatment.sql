@@ -1,0 +1,2 @@
+ALTER TABLE `products` ADD `vat_treatment` enum('standard','reduced','zero','exempt') DEFAULT 'standard' NOT NULL;--> statement-breakpoint
+ALTER TABLE `order_items` ADD `vat_treatment` enum('standard','reduced','zero','exempt');

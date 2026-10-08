@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  orderCancelledEmail,
+  orderCancelledNotificationEmail,
   orderConfirmationEmail,
   orderNotificationEmail,
   signInEmail,
@@ -39,6 +41,13 @@ describe("orderConfirmationEmail", () => {
     expect(email.html).toContain("£99.99");
   });
 
+  it("says no VAT, rather than VAT of £0.00, for a zero-rated order", () => {
+    const zero = orderConfirmationEmail({ ...summary, vatPence: 0 }, "https://example.com/orders/abc");
+    expect(zero.text).toContain("Total: £99.99 (no VAT)");
+    expect(zero.html).toContain("no VAT");
+    expect(zero.html).not.toContain("£0.00");
+  });
+
   it("escapes HTML in customer-supplied text", () => {
     expect(email.html).toContain("Jane &lt;Doe&gt;");
     expect(email.html).not.toContain("<Doe>");
@@ -51,6 +60,44 @@ describe("orderNotificationEmail", () => {
     expect(email.subject).toBe("New order TFS-2026-004210 — £99.99");
     expect(email.text).toContain("jane@example.com");
     expect(email.text).toContain("Delivery: Next day (£9.99)");
+  });
+});
+
+describe("orderCancelledEmail", () => {
+  const email = orderCancelledEmail(summary, "https://example.com/orders/abc");
+
+  it("says it won't be printed, links the order, and doesn't claim a refund was made", () => {
+    expect(email.subject).toContain("TFS-2026-004210");
+    expect(email.subject).toContain("cancelled");
+    expect(email.text).toContain("will not be printed");
+    expect(email.text).toContain("https://example.com/orders/abc");
+    expect(email.text).not.toMatch(/has been refunded|we have refunded/i);
+  });
+
+  it("escapes HTML in customer-supplied text", () => {
+    expect(email.html).toContain("Jane &lt;Doe&gt;");
+    expect(email.html).not.toContain("<Doe>");
+  });
+});
+
+describe("orderCancelledNotificationEmail", () => {
+  it("tells the shop what was paid and that the refund is still to do", () => {
+    const email = orderCancelledNotificationEmail(summary, "https://example.com/admin/orders/abc");
+    expect(email.subject).toContain("TFS-2026-004210");
+    expect(email.text).toContain("£99.99");
+    expect(email.text).toContain("Nothing has been refunded");
+    expect(email.text).toContain("https://example.com/admin/orders/abc");
+  });
+
+  it("says what has been refunded already", () => {
+    const part = orderCancelledNotificationEmail(summary, "https://example.com/admin/orders/abc", 2000);
+    expect(part.subject).toContain("refund £79.99?");
+    expect(part.text).toContain("£20.00 of it has been refunded");
+    expect(part.text).not.toContain("Nothing has been refunded");
+
+    const full = orderCancelledNotificationEmail(summary, "https://example.com/admin/orders/abc", 9999);
+    expect(full.subject).toContain("already refunded");
+    expect(full.text).toContain("refunded in full (£99.99)");
   });
 });
 

@@ -11,6 +11,7 @@ import {
   parsePence,
   parseProductDescription,
   parseProductOccasion,
+  parseVatTreatment,
   parseSlug,
 } from "@/lib/adminValidation";
 
@@ -254,5 +255,14 @@ describe("parseProductOccasion", () => {
     expect(parseProductOccasion("after")).toBe("after");
     expect(parseProductOccasion("other")).toBeNull();
     expect(parseProductOccasion(undefined)).toBeNull();
+  });
+});
+
+describe("parseVatTreatment", () => {
+  it("accepts only the four VAT treatments", () => {
+    for (const value of ["standard", "reduced", "zero", "exempt"]) expect(parseVatTreatment(value)).toBe(value);
+    expect(parseVatTreatment("20%")).toBeNull();
+    expect(parseVatTreatment("none")).toBeNull();
+    expect(parseVatTreatment(undefined)).toBeNull();
   });
 });

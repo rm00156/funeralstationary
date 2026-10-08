@@ -8,6 +8,7 @@ import type { CheckoutDetails } from "@/lib/checkoutValidation";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import type { Cart } from "@/lib/orders.server";
 import { lineSpec } from "@/lib/orders";
+import { vatIncludedText } from "@/lib/vat";
 
 const fieldInput =
   "w-full rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-4 py-3 font-body text-base text-on-surface focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15";
@@ -205,7 +206,7 @@ export default function CheckoutForm({
           </span>
         </div>
         <p className="mt-1 text-right font-body text-sm text-on-surface-variant">
-          Includes VAT of {formatPence(cart.totals.vatPence)}
+          {vatIncludedText(cart.totals.vatPence)}
         </p>
         <Link href="/cart" className="mt-5 block text-center font-body text-sm text-on-surface-variant underline hover:text-primary">
           Change quantities or delivery

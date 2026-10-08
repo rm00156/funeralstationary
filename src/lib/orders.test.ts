@@ -11,12 +11,21 @@ import {
   staleLineSpec,
   makeOrderNumber,
   parseOrderStatus,
+  refundStatusEffect,
+  refundedPence,
   resolveSelectionStrict,
   sumLineItems,
   vatFromInclusive,
   vatRateToDecimalString,
 } from "@/lib/orders";
 import type { PricingData } from "@/lib/orderOfServicePricing";
+import type { VatTreatment } from "@/lib/vat";
+
+const line = (printPence: number, deliveryPence: number, vatTreatment: VatTreatment = "standard") => ({
+  printPence,
+  deliveryPence,
+  vatTreatment,
+});
 
 const pricing: PricingData = {
   quantity: [
@@ -78,14 +87,28 @@ describe("VAT and totals", () => {
   });
 
   it("sums lines, adds delivery and backs out VAT of the total", () => {
-    expect(computeOrderTotals([3000, 1500], 499)).toEqual({
+    expect(computeOrderTotals([line(3000, 499), line(1500, 0)])).toEqual({
       subtotalPence: 4500,
       deliveryPence: 499,
       totalPence: 4999,
       vatPence: vatFromInclusive(4999),
       vatRate: 0.2,
     });
-    expect(computeOrderTotals([], 0).totalPence).toBe(0);
+    expect(computeOrderTotals([]).totalPence).toBe(0);
+  });
+
+  it("backs VAT out at each product's treatment, its delivery with it", () => {
+    const totals = computeOrderTotals([line(6000, 499, "zero"), line(3000, 999, "standard"), line(2100, 0, "reduced")]);
+    expect(totals.totalPence).toBe(12_598);
+    expect(totals.vatPence).toBe(vatFromInclusive(3999) + vatFromInclusive(2100, 0.05));
+    expect(totals.vatRate).toBe(Number((totals.vatPence / (12_598 - totals.vatPence)).toFixed(4)));
+  });
+
+  it("charges no VAT on zero-rated and exempt products, and records their one rate", () => {
+    const totals = computeOrderTotals([line(6000, 499, "zero"), line(1000, 0, "exempt")]);
+    expect(totals.vatPence).toBe(0);
+    expect(computeOrderTotals([line(6000, 499, "reduced")]).vatRate).toBe(0.05);
+    expect(computeOrderTotals([line(6000, 499, "zero")]).vatRate).toBe(0);
   });
 });
 
@@ -140,7 +163,7 @@ describe("buildStripeLineItems", () => {
       unitAmountPence: 999,
       quantity: 1,
     });
-    expect(sumLineItems(lines)).toBe(computeOrderTotals([9000, 3750], 999 + 999).totalPence);
+    expect(sumLineItems(lines)).toBe(computeOrderTotals([line(9000, 999), line(3750, 999)]).totalPence);
   });
 
   it("omits a free delivery line but keeps a paid one on the same order", () => {
@@ -178,5 +201,37 @@ describe("staleLineSpec", () => {
 
   it("shows only the size range for a board, whose page option is a size", () => {
     expect(staleLineSpec({ sizeLabel: "A4 to A0", sizedByOption: true }, 1)).toBe("A4 to A0");
+  });
+});
+
+describe("refunds", () => {
+  it("counts only refunds that succeeded", () => {
+    expect(
+      refundedPence([
+        { amountPence: 1000, status: "succeeded" },
+        { amountPence: 500, status: "pending" },
+        { amountPence: 700, status: "failed" },
+        { amountPence: 300, status: "succeeded" },
+      ]),
+    ).toBe(1300);
+    expect(refundedPence([])).toBe(0);
+  });
+
+  it("settles a fully refunded cancelled or delivered order to refunded", () => {
+    expect(refundStatusEffect("cancelled", 5000, 5000)).toBe("refund");
+    expect(refundStatusEffect("delivered", 5000, 5000)).toBe("refund");
+    expect(canTransition("cancelled", "refunded")).toBe(true);
+  });
+
+  it("flags a fully refunded order that is still going to print, rather than stopping it", () => {
+    expect(refundStatusEffect("awaiting_print", 5000, 5000)).toBe("still-printing");
+    expect(refundStatusEffect("in_production", 5000, 5000)).toBe("still-printing");
+  });
+
+  it("leaves part refunds, shipped orders and settled ones alone", () => {
+    expect(refundStatusEffect("cancelled", 4999, 5000)).toBe("none");
+    expect(refundStatusEffect("shipped", 5000, 5000)).toBe("none");
+    expect(refundStatusEffect("refunded", 5000, 5000)).toBe("none");
+    expect(refundStatusEffect("draft", 0, 0)).toBe("none");
   });
 });

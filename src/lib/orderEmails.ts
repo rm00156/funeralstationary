@@ -4,6 +4,8 @@
  * happens in orderFulfilment.server.ts via email.server.ts.
  */
 import { formatPence } from "@/lib/orderOfServicePricing";
+import { EMAIL, PHONE_DISPLAY, SITE_NAME } from "@/lib/site";
+import { vatIncludedText } from "@/lib/vat";
 
 export interface OrderEmailItem {
   name: string;
@@ -53,11 +55,14 @@ function itemsText(summary: OrderEmailSummary): string {
     .join("\n");
 }
 
+/** "Includes VAT of £16.67" → "includes VAT of £16.67", for mid-sentence use. */
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
 function totalsText(summary: OrderEmailSummary): string {
   return [
     `Subtotal: ${formatPence(summary.subtotalPence)}`,
     `Delivery: ${freeOr(summary.deliveryPence)}`,
-    `Total: ${formatPence(summary.totalPence)} (includes VAT of ${formatPence(summary.vatPence)})`,
+    `Total: ${formatPence(summary.totalPence)} (${lowerFirst(vatIncludedText(summary.vatPence))})`,
   ].join("\n");
 }
 
@@ -71,7 +76,7 @@ function itemsHtml(summary: OrderEmailSummary): string {
   return `<table style="width:100%;border-collapse:collapse;font-family:Georgia,serif">${rows}
 <tr><td style="padding:8px 0">Subtotal</td><td style="text-align:right">${formatPence(summary.subtotalPence)}</td></tr>
 <tr><td style="padding:8px 0">Delivery</td><td style="text-align:right">${freeOr(summary.deliveryPence)}</td></tr>
-<tr><td style="padding:8px 0"><strong>Total</strong><br><span style="color:#6b6560">includes VAT of ${formatPence(summary.vatPence)}</span></td><td style="text-align:right"><strong>${formatPence(summary.totalPence)}</strong></td></tr>
+<tr><td style="padding:8px 0"><strong>Total</strong><br><span style="color:#6b6560">${lowerFirst(vatIncludedText(summary.vatPence))}</span></td><td style="text-align:right"><strong>${formatPence(summary.totalPence)}</strong></td></tr>
 </table>`;
 }
 
@@ -132,6 +137,73 @@ export function orderNotificationEmail(
 <p>New paid order <strong>${escapeHtml(summary.orderNumber)}</strong> from ${escapeHtml(summary.contactName)} &lt;${escapeHtml(summary.contactEmail)}&gt;.</p>
 ${itemsHtml(summary)}
 <p style="margin-top:24px"><strong>Deliver to</strong><br>${summary.addressLines.map(escapeHtml).join("<br>")}</p>
+<p><a href="${escapeHtml(adminUrl)}">Open in admin</a></p>
+</div>`;
+  return { subject, text, html };
+}
+
+/**
+ * Sent to the customer when the shop cancels a paid order (from Thintent).
+ * Says a refund *will* follow only as far as the shop has promised one: the
+ * refund is a separate step a person makes in Stripe, so this tells them
+ * where it goes and how to ask, not that it has happened.
+ */
+export function orderCancelledEmail(summary: OrderEmailSummary, orderUrl: string): EmailContent {
+  const subject = `Your order ${summary.orderNumber} has been cancelled — ${SITE_NAME}`;
+  const text = [
+    `Dear ${summary.contactName},`,
+    "",
+    `Your order ${summary.orderNumber} has been cancelled and will not be printed.`,
+    `If a refund is due, it will go back to the card you paid with. If you didn't expect this, or have any questions, please call us on ${PHONE_DISPLAY} or email ${EMAIL}.`,
+    "",
+    itemsText(summary),
+    "",
+    `You can view your order at ${orderUrl}`,
+    "",
+    "With our sincere condolences,",
+    SITE_NAME,
+  ].join("\n");
+  const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
+<p>Dear ${escapeHtml(summary.contactName)},</p>
+<p>Your order <strong>${escapeHtml(summary.orderNumber)}</strong> has been cancelled and will not be printed.</p>
+<p>If a refund is due, it will go back to the card you paid with. If you didn't expect this, or have any questions, please call us on ${escapeHtml(PHONE_DISPLAY)} or email <a href="mailto:${escapeHtml(EMAIL)}">${escapeHtml(EMAIL)}</a>.</p>
+${itemsHtml(summary)}
+<p style="margin-top:24px"><a href="${escapeHtml(orderUrl)}">View your order</a></p>
+<p>With our sincere condolences,<br>${SITE_NAME}</p>
+</div>`;
+  return { subject, text, html };
+}
+
+/**
+ * Sent to the business inbox when Thintent cancels a paid order. A cancel
+ * never moves money, so it says what has gone back so far (a refund can be
+ * made before the cancel) and what is left to decide.
+ */
+export function orderCancelledNotificationEmail(
+  summary: OrderEmailSummary,
+  adminUrl: string,
+  refundedPence = 0,
+): EmailContent {
+  const outstanding = summary.totalPence - refundedPence;
+  const subject =
+    outstanding <= 0
+      ? `Cancelled: order ${summary.orderNumber} — already refunded`
+      : `Cancelled: order ${summary.orderNumber} — refund ${formatPence(outstanding)}?`;
+  const refundText =
+    refundedPence <= 0
+      ? "Nothing has been refunded — if a refund is due, make it in Stripe."
+      : outstanding <= 0
+        ? `It has already been refunded in full (${formatPence(refundedPence)}) in Stripe — there is nothing more to refund.`
+        : `${formatPence(refundedPence)} of it has been refunded in Stripe so far — if more is due, make it there.`;
+  const text = [
+    `Order ${summary.orderNumber} from ${summary.contactName} <${summary.contactEmail}> was cancelled in Thintent.`,
+    `The customer paid ${formatPence(summary.totalPence)}. ${refundText}`,
+    "",
+    `Order: ${adminUrl}`,
+  ].join("\n");
+  const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
+<p>Order <strong>${escapeHtml(summary.orderNumber)}</strong> from ${escapeHtml(summary.contactName)} &lt;${escapeHtml(summary.contactEmail)}&gt; was cancelled in Thintent.</p>
+<p>The customer paid <strong>${formatPence(summary.totalPence)}</strong>. ${refundText}</p>
 <p><a href="${escapeHtml(adminUrl)}">Open in admin</a></p>
 </div>`;
   return { subject, text, html };
