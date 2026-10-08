@@ -10,13 +10,14 @@ import {
   parseSortOrder,
   parseTemplatePages,
   parseTrimMm,
+  parseVatTreatment,
 } from "@/lib/adminValidation";
 
 export const runtime = "nodejs";
 
 /**
- * PATCH /api/admin/products/:slug — edit label / blurb / occasion / sort /
- * active, and the format (size label, trim, template pages, sized-by-option,
+ * PATCH /api/admin/products/:slug — edit label / blurb / occasion / VAT
+ * treatment / sort / active, and the format (size label, trim, template pages, sized-by-option,
  * paper label). Not slug. The trim and template pages 409 once the product
  * has a template, since its layout is drawn on them.
  */
@@ -37,6 +38,7 @@ export async function PATCH(
     label,
     description,
     occasion,
+    vatTreatment,
     sortOrder,
     isActive,
     sizeLabel,
@@ -67,6 +69,11 @@ export async function PATCH(
     const parsed = parseProductOccasion(occasion);
     if (!parsed) return Response.json({ error: "Invalid occasion" }, { status: 400 });
     patch.occasion = parsed;
+  }
+  if (vatTreatment !== undefined) {
+    const parsed = parseVatTreatment(vatTreatment);
+    if (!parsed) return Response.json({ error: "Invalid VAT treatment" }, { status: 400 });
+    patch.vatTreatment = parsed;
   }
   if (sortOrder !== undefined) {
     const parsed = parseSortOrder(sortOrder);

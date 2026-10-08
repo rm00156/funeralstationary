@@ -29,6 +29,7 @@ import { parseLayoutPages, type TemplateStatus } from "@/lib/adminValidation";
 import { productFormatColumns } from "@/lib/catalogue.server";
 import { toProductFormat, type DesignPage, type ProductFormat } from "@/lib/designEditor";
 import type { ProductOccasion } from "@/lib/templates";
+import type { VatTreatment } from "@/lib/vat";
 
 // Re-exported for the admin routes; the helpers themselves live in
 // src/db/errors.ts so the orders seam can share them without importing the
@@ -55,6 +56,8 @@ export interface AdminProduct {
   label: string;
   description: string | null;
   occasion: ProductOccasion;
+  /** How the product is taxed — frozen onto each order line at the pay click. */
+  vatTreatment: VatTreatment;
   sortOrder: number;
   isActive: boolean;
   /** The format columns, flat as they're edited (ProductFormatRow). */
@@ -79,6 +82,7 @@ const productSelection = {
   label: products.label,
   description: products.description,
   occasion: products.occasion,
+  vatTreatment: products.vatTreatment,
   sortOrder: products.sortOrder,
   isActive: products.isActive,
   ...productFormatColumns,
@@ -123,6 +127,7 @@ export async function adminUpdateProduct(
     label?: string;
     description?: string | null;
     occasion?: ProductOccasion;
+    vatTreatment?: VatTreatment;
     sortOrder?: number;
     isActive?: boolean;
     sizeLabel?: string;

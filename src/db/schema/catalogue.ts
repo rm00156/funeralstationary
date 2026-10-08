@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/mysql-core";
 import type { DesignPage } from "@/lib/designEditor";
 import { PRODUCT_OCCASIONS } from "@/lib/templates";
+import { VAT_TREATMENTS } from "@/lib/vat";
 
 /**
  * Catalogue tables use surrogate int PKs (small, fast to join, and these
@@ -48,6 +49,8 @@ export const products = mysqlTable("products", {
   /** The page-count options are print sizes of one A-series design (a memory board). */
   sizedByOption: boolean("sized_by_option").notNull().default(false),
   paperLabel: varchar("paper_label", { length: 40 }).notNull().default("Paper"),
+  /** How the product (and its delivery) is taxed — see src/lib/vat.ts. Frozen onto order lines at the pay click. */
+  vatTreatment: mysqlEnum("vat_treatment", VAT_TREATMENTS).notNull().default("standard"),
   sortOrder: smallint("sort_order").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
 });

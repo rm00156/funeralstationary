@@ -17,6 +17,7 @@ import type { ArtworkSnapshot } from "@/lib/artwork";
 import type { DesignDoc, ProductFormat } from "@/lib/designEditor";
 import type { ReadinessIssue } from "@/lib/designReadiness";
 import type { Quote } from "@/lib/orderOfServicePricing";
+import { VAT_TREATMENTS } from "@/lib/vat";
 import { artworkUploads } from "./artwork";
 import { designs } from "./designs";
 import { users } from "./users";
@@ -91,6 +92,16 @@ export const orders = mysqlTable(
     stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }).unique(),
     stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
     paidAt: timestamp("paid_at"),
+    /**
+     * The shop's job for this order in Thintent, once it has been sent there
+     * (src/lib/thintent.server.ts). Null = not sent yet; the cron sweep and
+     * the admin "Send to Thintent" button look for exactly that.
+     */
+    thintentJobRef: varchar("thintent_job_ref", { length: 64 }),
+    thintentJobUrl: varchar("thintent_job_url", { length: 1024 }),
+    /** Set when Thintent reports the job dispatched — shown to the customer. */
+    shippedCourier: varchar("shipped_courier", { length: 120 }),
+    trackingRef: varchar("tracking_ref", { length: 120 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },
@@ -98,6 +109,8 @@ export const orders = mysqlTable(
     index("orders_user_idx").on(t.userId, t.createdAt),
     index("orders_guest_token_idx").on(t.guestToken),
     index("orders_status_placed_idx").on(t.status, t.placedAt),
+    // Stripe's refund events name the payment, not the order.
+    index("orders_payment_intent_idx").on(t.stripePaymentIntentId),
   ],
 );
 
@@ -137,6 +150,14 @@ export const orderItems = mysqlTable(
     deliveryOptionId: varchar("delivery_option_id", { length: 64 }),
     deliveryLabel: varchar("delivery_label", { length: 200 }),
     deliveryPricePence: int("delivery_price_pence"),
+    /**
+     * The product's VAT treatment at the pay click (products.vat_treatment),
+     * covering this line's print cost and its delivery. A snapshot like the
+     * spec columns: a product reclassified later must not rewrite what was
+     * charged. Null on a draft line and on lines paid before it existed —
+     * those were all charged the standard rate.
+     */
+    vatTreatment: mysqlEnum("vat_treatment", VAT_TREATMENTS),
     /**
      * The fully resolved Quote (labels, multipliers, rates) as the customer
      * saw it. Its `totalPence` includes this line's delivery —
@@ -256,4 +277,35 @@ export const orderEvents = mysqlTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [index("order_events_order_idx").on(t.orderId, t.createdAt)],
+);
+
+/**
+ * Refunds made in Stripe against an order's payment — the dashboard or the
+ * API, it doesn't matter which: the Stripe webhook re-reads every refund on
+ * the payment and upserts them here (src/lib/refunds.server.ts), so this is
+ * a mirror of Stripe, never written from a form. Money only ever moves in
+ * Stripe; a cancel (here or in Thintent) never creates a row.
+ *
+ * `status` is Stripe's own (pending / succeeded / failed / canceled /
+ * requires_action); only `succeeded` counts towards what was refunded.
+ */
+export const orderRefunds = mysqlTable(
+  "order_refunds",
+  {
+    id: char("id", { length: 36 }).primaryKey(),
+    orderId: char("order_id", { length: 36 })
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    stripeRefundId: varchar("stripe_refund_id", { length: 255 }).notNull().unique(),
+    amountPence: int("amount_pence").notNull(),
+    status: varchar("status", { length: 32 }).notNull(),
+    reason: varchar("reason", { length: 64 }),
+    /** When Stripe made it — not when we heard. */
+    refundedAt: timestamp("refunded_at").notNull(),
+    /** The credit note Thintent raised for it, once sent there. Null = not sent yet. */
+    thintentCreditRef: varchar("thintent_credit_ref", { length: 64 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [index("order_refunds_order_idx").on(t.orderId, t.refundedAt)],
 );

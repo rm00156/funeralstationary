@@ -18,6 +18,7 @@ import {
 } from "@/lib/designEditor";
 import { MAX_PAGES } from "@/lib/designs.server";
 import { PRODUCT_OCCASIONS, type ProductOccasion } from "@/lib/templates";
+import { isVatTreatment, type VatTreatment } from "@/lib/vat";
 
 /** Slugs are public identifiers and order-history snapshots — locked format. */
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -57,6 +58,10 @@ export function parseProductOccasion(value: unknown): ProductOccasion | null {
   return (PRODUCT_OCCASIONS as readonly unknown[]).includes(value)
     ? (value as ProductOccasion)
     : null;
+}
+
+export function parseVatTreatment(value: unknown): VatTreatment | null {
+  return isVatTreatment(value) ? value : null;
 }
 
 /** Integer pence, >= 0. */

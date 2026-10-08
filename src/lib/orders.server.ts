@@ -29,7 +29,15 @@
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
-import { designs, orderEvents, orderItems, orderProofPages, orderProofs, orders } from "@/db/schema";
+import {
+  designs,
+  orderEvents,
+  orderItems,
+  orderProofPages,
+  orderProofs,
+  orderRefunds,
+  orders,
+} from "@/db/schema";
 import {
   evaluateArtwork,
   parseServiceDate,
@@ -38,7 +46,12 @@ import {
   type ArtworkSnapshot,
 } from "@/lib/artwork";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
-import { getProductFormats, getProductLabels } from "@/lib/catalogue.server";
+import {
+  getProductFormats,
+  getProductLabels,
+  getProductVatTreatments,
+  vatTreatmentOf,
+} from "@/lib/catalogue.server";
 import {
   BOOKLET_FORMAT,
   docTrim,
@@ -56,12 +69,12 @@ import {
 import { checkDocReadiness } from "@/lib/designReadiness.server";
 import type { OrderEmailSummary } from "@/lib/orderEmails";
 import {
-  DEFAULT_VAT_RATE,
   computeOrderTotals,
   lineSpec,
   makeOrderNumber,
   resolveSelectionStrict,
   vatRateToDecimalString,
+  type OrderRefund,
   type OrderStatus,
   type OrderTotals,
   type SelectionAxis,
@@ -78,6 +91,7 @@ import {
 // loads collapse to one query set per distinct product.
 import { getPageCountOption, getPricingData } from "@/lib/pricing.server";
 import type { Owner } from "@/lib/session";
+import type { VatTreatment } from "@/lib/vat";
 import { analyseUpload, getUpload, resolveArtworkTarget } from "@/lib/uploads.server";
 
 /** A client-caused failure the route can map straight to a status code. */
@@ -204,6 +218,12 @@ export interface OrderDetailItem {
   unitPricePence: number;
   lineTotalPence: number;
   delivery: CartDelivery;
+  /**
+   * How the line (and its delivery) was taxed, frozen at the pay click. Null
+   * for a line paid before treatments existed — charged the standard rate —
+   * and for a draft.
+   */
+  vatTreatment: VatTreatment | null;
   proofs: OrderProofSummary[];
 }
 
@@ -236,6 +256,12 @@ export interface OrderDetail {
   items: OrderDetailItem[];
   events: OrderEvent[];
   stripe: { checkoutSessionId: string | null; paymentIntentId: string | null };
+  /** The shop's job in Thintent; null until the order has been sent there. */
+  thintent: { jobRef: string; jobUrl: string | null } | null;
+  /** Courier and tracking, as Thintent reported them on dispatch. */
+  tracking: { courier: string | null; ref: string | null };
+  /** Stripe refunds on the payment, oldest first — every status; see refundedPence. */
+  refunds: (OrderRefund & { thintentCreditRef: string | null })[];
 }
 
 export interface OrderSummary {
@@ -414,10 +440,11 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     if (item.designId) liveDesigns.set(item.designId, await getDesign(owner, item.designId));
   }
 
-  const [pricings, formats, labels] = await Promise.all([
+  const [pricings, formats, labels, vatTreatments] = await Promise.all([
     pricingByProduct(rows),
     getProductFormats(),
     getProductLabels(),
+    getProductVatTreatments(),
   ]);
 
   const items: CartItem[] = rows.map((item) => {
@@ -492,9 +519,13 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     };
   });
 
+  // The basket charges each product's live treatment; the pay click freezes it.
   const totals = computeOrderTotals(
-    items.map((item) => item.lineTotalPence),
-    items.reduce((sum, item) => sum + (item.delivery?.pricePence ?? 0), 0),
+    items.map((item) => ({
+      printPence: item.lineTotalPence,
+      deliveryPence: item.delivery?.pricePence ?? 0,
+      vatTreatment: vatTreatmentOf(vatTreatments, item.productId),
+    })),
   );
   const ready =
     items.length > 0 &&
@@ -871,10 +902,11 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
   const details = detailsFrom(order);
   if (!details) return { ok: false, status: 400, error: "Please enter your delivery details" };
 
-  const [pricings, formats, labels] = await Promise.all([
+  const [pricings, formats, labels, vatTreatments] = await Promise.all([
     pricingByProduct(items),
     getProductFormats(),
     getProductLabels(),
+    getProductVatTreatments(),
   ]);
 
   const frozenLines: {
@@ -986,9 +1018,11 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
   }
 
   const totals = computeOrderTotals(
-    frozenLines.map((line) => line.quote.printCostPence),
-    frozenLines.reduce((sum, line) => sum + line.quote.delivery.pricePence, 0),
-    DEFAULT_VAT_RATE,
+    frozenLines.map((line) => ({
+      printPence: line.quote.printCostPence,
+      deliveryPence: line.quote.delivery.pricePence,
+      vatTreatment: vatTreatmentOf(vatTreatments, line.item.productId),
+    })),
   );
 
   await db.transaction(async (tx) => {
@@ -1008,6 +1042,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
           lineTotalPence: line.quote.printCostPence,
           docSnapshot: line.doc,
           formatSnapshot: line.format,
+          vatTreatment: vatTreatmentOf(vatTreatments, line.item.productId),
         })
         .where(eq(orderItems.id, line.item.id));
     }
@@ -1152,7 +1187,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
   if (!order) return null;
 
   // Soft-deleted designs are joined on purpose: the order outlives the design.
-  const [itemRows, proofRows, eventRows, formats, labels] = await Promise.all([
+  const [itemRows, proofRows, eventRows, refundRows, formats, labels] = await Promise.all([
     db
       .select({ item: orderItems, designName: designs.name })
       .from(orderItems)
@@ -1174,6 +1209,17 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       .from(orderEvents)
       .where(eq(orderEvents.orderId, order.id))
       .orderBy(desc(orderEvents.createdAt), desc(orderEvents.id)),
+    db
+      .select({
+        stripeRefundId: orderRefunds.stripeRefundId,
+        amountPence: orderRefunds.amountPence,
+        status: orderRefunds.status,
+        refundedAt: orderRefunds.refundedAt,
+        thintentCreditRef: orderRefunds.thintentCreditRef,
+      })
+      .from(orderRefunds)
+      .where(eq(orderRefunds.orderId, order.id))
+      .orderBy(asc(orderRefunds.refundedAt)),
     getProductFormats(),
     getProductLabels(),
   ]);
@@ -1262,6 +1308,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
           label: item.deliveryLabel ?? item.quoteSnapshot.delivery.label,
           pricePence: item.deliveryPricePence ?? item.quoteSnapshot.delivery.pricePence,
         },
+        vatTreatment: item.vatTreatment,
         proofs: proofsByItem.get(item.id) ?? [],
       };
     }),
@@ -1278,6 +1325,9 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
       checkoutSessionId: order.stripeCheckoutSessionId,
       paymentIntentId: order.stripePaymentIntentId,
     },
+    thintent: order.thintentJobRef ? { jobRef: order.thintentJobRef, jobUrl: order.thintentJobUrl } : null,
+    tracking: { courier: order.shippedCourier, ref: order.trackingRef },
+    refunds: refundRows,
   };
 }
 

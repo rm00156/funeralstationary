@@ -13,6 +13,7 @@ import {
   type Quote,
   type Selection,
 } from "@/lib/orderOfServicePricing";
+import { LEGACY_VAT_TREATMENT, VAT_TREATMENT_RATE, type VatTreatment } from "@/lib/vat";
 
 /* ------------------------------------------------------------------ */
 /* Status machine                                                      */
@@ -60,11 +61,51 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
 };
 
 /* ------------------------------------------------------------------ */
+/* Refunds                                                             */
+/* ------------------------------------------------------------------ */
+
+/** A refund as Stripe reports it (order_refunds mirrors these). */
+export interface OrderRefund {
+  stripeRefundId: string;
+  amountPence: number;
+  /** Stripe's: pending / succeeded / failed / canceled / requires_action. */
+  status: string;
+  refundedAt: Date;
+}
+
+/** What has actually gone back to the customer — succeeded refunds only. */
+export function refundedPence(refunds: readonly Pick<OrderRefund, "amountPence" | "status">[]): number {
+  return refunds.reduce((sum, refund) => (refund.status === "succeeded" ? sum + refund.amountPence : sum), 0);
+}
+
+/**
+ * What a refund total means for the order's status:
+ * - `refund`: fully refunded and the status machine allows it (cancelled or
+ *   delivered) — move it to refunded;
+ * - `still-printing`: fully refunded but the job is still going ahead
+ *   (awaiting print / in production) — status changes in Thintent, so staff
+ *   are told to cancel it there rather than this silently stopping it here;
+ * - `none`: part-refunded, nothing refunded, or already settled.
+ *
+ * A shipped order is left alone: it reaches `refunded` once delivered.
+ */
+export function refundStatusEffect(
+  status: OrderStatus,
+  refunded: number,
+  totalPence: number,
+): "refund" | "still-printing" | "none" {
+  if (totalPence <= 0 || refunded < totalPence) return "none";
+  if (canTransition(status, "refunded")) return "refund";
+  if (status === "awaiting_print" || status === "in_production") return "still-printing";
+  return "none";
+}
+
+/* ------------------------------------------------------------------ */
 /* Money                                                               */
 /* ------------------------------------------------------------------ */
 
-/** Prices are VAT-inclusive; this is the rate backed out of them. */
-export const DEFAULT_VAT_RATE = 0.2;
+/** The standard rate — what every line was charged before products had a VAT treatment. */
+export const DEFAULT_VAT_RATE = VAT_TREATMENT_RATE.standard;
 
 /** 0.2 -> "0.2000", the decimal(5,4) string orders.vat_rate stores. */
 export function vatRateToDecimalString(rate: number): string {
@@ -76,33 +117,64 @@ export function vatFromInclusive(grossPence: number, rate: number = DEFAULT_VAT_
   return grossPence - Math.round(grossPence / (1 + rate));
 }
 
+/** One line's money as the totals see it: print cost and its own delivery, both VAT-inclusive. */
+export interface OrderLineMoney {
+  printPence: number;
+  deliveryPence: number;
+  /** The product's treatment; its delivery is taxed the same way (it's part of the same supply). */
+  vatTreatment: VatTreatment;
+}
+
 export interface OrderTotals {
   subtotalPence: number;
   deliveryPence: number;
   totalPence: number;
   vatPence: number;
+  /**
+   * orders.vat_rate: the one rate when every line shares a treatment, else
+   * the blended figure VAT ÷ net. A record, not an input — nothing prices
+   * from it.
+   */
   vatRate: number;
 }
 
 /**
- * subtotal = Σ line totals; total = subtotal + delivery; VAT backed out of
- * total. Delivery is chosen per line (each product ships on its own options),
- * so `deliveryPence` is the sum across lines.
+ * The VAT-inclusive pence charged at each treatment — every line's print
+ * cost and delivery added up by the line's treatment. VAT is backed out of
+ * each of these sums once (vatOfGroups), so a basket of ten 20% lines rounds
+ * once, as it always did.
  */
-export function computeOrderTotals(
-  lineTotalsPence: number[],
-  deliveryPence: number,
-  vatRate: number = DEFAULT_VAT_RATE,
-): OrderTotals {
-  const subtotalPence = lineTotalsPence.reduce((sum, pence) => sum + pence, 0);
+export function grossByTreatment(lines: readonly OrderLineMoney[]): Map<VatTreatment, number> {
+  const groups = new Map<VatTreatment, number>();
+  for (const line of lines) {
+    groups.set(line.vatTreatment, (groups.get(line.vatTreatment) ?? 0) + line.printPence + line.deliveryPence);
+  }
+  return groups;
+}
+
+function vatOfGroups(groups: Map<VatTreatment, number>): number {
+  let vat = 0;
+  for (const [treatment, gross] of groups) vat += vatFromInclusive(gross, VAT_TREATMENT_RATE[treatment]);
+  return vat;
+}
+
+/**
+ * subtotal = Σ print costs; delivery = Σ line deliveries (each product ships
+ * on its own options); total = subtotal + delivery; VAT backed out of what
+ * was charged at each treatment (grossByTreatment).
+ */
+export function computeOrderTotals(lines: readonly OrderLineMoney[]): OrderTotals {
+  const subtotalPence = lines.reduce((sum, line) => sum + line.printPence, 0);
+  const deliveryPence = lines.reduce((sum, line) => sum + line.deliveryPence, 0);
   const totalPence = subtotalPence + deliveryPence;
-  return {
-    subtotalPence,
-    deliveryPence,
-    totalPence,
-    vatPence: vatFromInclusive(totalPence, vatRate),
-    vatRate,
-  };
+  const groups = grossByTreatment(lines);
+  const vatPence = vatOfGroups(groups);
+  const treatments = [...groups.keys()];
+  const vatRate =
+    treatments.length <= 1
+      ? VAT_TREATMENT_RATE[treatments[0] ?? LEGACY_VAT_TREATMENT]
+      : Number(((totalPence - vatPence) > 0 ? vatPence / (totalPence - vatPence) : 0).toFixed(4));
+  return { subtotalPence, deliveryPence, totalPence, vatPence, vatRate };
 }
 
 /* ------------------------------------------------------------------ */

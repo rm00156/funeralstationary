@@ -9,12 +9,15 @@
  */
 
 import type { ProductFormat } from "@/lib/designEditor";
+import type { VatTreatment } from "@/lib/vat";
 
 export interface Product {
   id: string;
   label: string;
   /** Its trim, template structure and axis names (products.size_label, …). */
   format: ProductFormat;
+  /** How it's taxed (products.vat_treatment) — decides whether its price says "Includes VAT". */
+  vatTreatment: VatTreatment;
 }
 
 /** When a product is needed — the shop's grouping (products.occasion). */

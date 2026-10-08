@@ -22,6 +22,7 @@ import {
 import { toProductFormat, type DesignPage, type ProductFormat } from "@/lib/designEditor";
 import { cheapestQuote } from "@/lib/orderOfServicePricing";
 import { getPricingData } from "@/lib/pricing.server";
+import { LEGACY_VAT_TREATMENT, type VatTreatment } from "@/lib/vat";
 import type {
   Product,
   ProductShowcase,
@@ -41,14 +42,15 @@ export const productFormatColumns = {
 
 export const getProducts = cache(async (): Promise<Product[]> => {
   const rows = await db
-    .select({ slug: products.slug, label: products.label, ...productFormatColumns })
+    .select({ slug: products.slug, label: products.label, vatTreatment: products.vatTreatment, ...productFormatColumns })
     .from(products)
     .where(eq(products.isActive, true))
     .orderBy(asc(products.sortOrder), asc(products.id));
-  return rows.map(({ slug, label, ...format }) => ({
+  return rows.map(({ slug, label, vatTreatment, ...format }) => ({
     id: slug,
     label,
     format: toProductFormat(format),
+    vatTreatment,
   }));
 });
 
@@ -70,6 +72,20 @@ export const getProductLabels = cache(async (): Promise<Map<string, string>> => 
   const rows = await db.select({ slug: products.slug, label: products.label }).from(products);
   return new Map(rows.map((row) => [row.slug, row.label]));
 });
+
+/**
+ * Every product's VAT treatment, active or not, by slug — what a basket line
+ * is charged at until the pay click freezes it onto the line.
+ */
+export const getProductVatTreatments = cache(async (): Promise<Map<string, VatTreatment>> => {
+  const rows = await db.select({ slug: products.slug, vatTreatment: products.vatTreatment }).from(products);
+  return new Map(rows.map((row) => [row.slug, row.vatTreatment]));
+});
+
+/** A product's treatment from getProductVatTreatments; an unknown slug is charged the standard rate. */
+export function vatTreatmentOf(treatments: ReadonlyMap<string, VatTreatment>, productSlug: string): VatTreatment {
+  return treatments.get(productSlug) ?? LEGACY_VAT_TREATMENT;
+}
 
 export const getCategories = cache(async (): Promise<TemplateCategory[]> => {
   const rows = await db
@@ -97,6 +113,7 @@ export const getSellableProducts = cache(async (): Promise<ProductShowcase[]> =>
       label: products.label,
       description: products.description,
       occasion: products.occasion,
+      vatTreatment: products.vatTreatment,
       image: templates.previewImageUrl,
       ...productFormatColumns,
     })
@@ -113,7 +130,7 @@ export const getSellableProducts = cache(async (): Promise<ProductShowcase[]> =>
   // Rows arrive product-ordered then template-ordered, so the first row of
   // each group is both the card's image and the start of its count.
   const byProduct = new Map<string, Omit<ProductShowcase, "id" | "fromPence" | "fromCopies">>();
-  for (const { slug, label, description, occasion, image, ...format } of rows) {
+  for (const { slug, label, description, occasion, vatTreatment, image, ...format } of rows) {
     const existing = byProduct.get(slug);
     if (existing) {
       existing.templateCount += 1;
@@ -124,6 +141,7 @@ export const getSellableProducts = cache(async (): Promise<ProductShowcase[]> =>
         occasion,
         image,
         format: toProductFormat(format),
+        vatTreatment,
         templateCount: 1,
       });
     }

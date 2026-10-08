@@ -14,6 +14,7 @@ import {
   type PricingData,
   type Selection,
 } from "@/lib/orderOfServicePricing";
+import { priceVatNote, type VatTreatment } from "@/lib/vat";
 
 /** Each axis, with the narrowest its option buttons may get before wrapping. */
 const axes = (format: ProductFormat): { key: keyof Selection; label: string; minWidth: string }[] => [
@@ -40,11 +41,13 @@ export default function TemplateBuyBox({
   templateId,
   pricing,
   format,
+  vatTreatment,
 }: {
   productId: string;
   templateId: string;
   pricing: PricingData;
   format: ProductFormat;
+  vatTreatment: VatTreatment;
 }) {
   const [selection, setSelection] = useState<Selection>(() => defaultSelection(pricing));
   const quote = useMemo(() => getQuote(pricing, selection), [pricing, selection]);
@@ -125,7 +128,7 @@ export default function TemplateBuyBox({
             <span aria-live="polite" className="block font-display text-[34px] leading-none text-ink">
               {formatPence(quote.totalPence)}
             </span>
-            <span className="text-sm text-ink-3">Includes VAT</span>
+            <span className="text-sm text-ink-3">{priceVatNote(vatTreatment)}</span>
           </span>
         </div>
         <div className="flex items-start gap-3 rounded-lg bg-mist-2 px-3.5 py-3 text-base">

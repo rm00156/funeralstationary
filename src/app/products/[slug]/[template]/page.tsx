@@ -230,6 +230,7 @@ export default async function TemplatePage({
                   templateId={template.id}
                   pricing={pricing}
                   format={format}
+                  vatTreatment={product.vatTreatment}
                 />
 
                 <p className="text-base text-ink-2">
