@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 // scripts/vendor-fonts.ts; see there for why it isn't next/font/google.
 import "../fonts/fonts.css";
 import "./globals.css";
+import SiteAnalytics from "@/components/SiteAnalytics";
 
 export const metadata: Metadata = {
   title: "The Funeral Stationery | Order of Service booklets, printed and delivered",
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en-GB" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
         {children}
+        <SiteAnalytics />
       </body>
     </html>
   );
