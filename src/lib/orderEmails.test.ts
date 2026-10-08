@@ -30,6 +30,7 @@ const summary: OrderEmailSummary = {
   vatPence: 1667,
   totalPence: 9999,
   addressLines: ["1 High Street", "Leeds", "LS1 1AA"],
+  serviceDate: null,
 };
 
 describe("orderConfirmationEmail", () => {
@@ -53,6 +54,18 @@ describe("orderConfirmationEmail", () => {
   it("escapes HTML in customer-supplied text", () => {
     expect(email.html).toContain("Jane &lt;Doe&gt;");
     expect(email.html).not.toContain("<Doe>");
+  });
+
+  it("names the funeral date when one was given, and only then", () => {
+    expect(email.html).not.toContain(">Funeral<");
+    const dated = orderConfirmationEmail({ ...summary, serviceDate: "2026-10-16" }, "https://example.com/orders/abc");
+    expect(dated.html).toContain(">Funeral<");
+    expect(dated.html).toMatch(/Friday,? 16 October 2026/);
+    expect(dated.text).toMatch(/Funeral: Friday,? 16 October 2026/);
+  });
+
+  it("leads the inbox preview with the order, not the logo's alt text", () => {
+    expect(email.html).toMatch(/<div style="display:none[^"]*">We've received your order TFS-2026-004210/);
   });
 });
 
@@ -121,6 +134,37 @@ describe("adminSignInEmail", () => {
     expect(subject).toMatch(/admin sign-in link/i);
     expect(text).toContain(url);
     expect(html).toContain('href="https://tfs.example/admin/verify?token=a%2Bb&amp;x=1"');
+  });
+
+  it("is laid out in tables with a copyable fallback link", () => {
+    const url = "https://tfs.example/admin/verify?token=abc";
+    const { html } = adminSignInEmail(url);
+    expect(html).toContain('role="presentation"');
+    expect(html).toContain(">Sign in to admin</a>");
+    expect(html.split(`href="${url}"`)).toHaveLength(3);
+    expect(html).toContain("expires in 15 minutes");
+  });
+});
+
+describe("branded emails", () => {
+  const emails = {
+    orderConfirmation: orderConfirmationEmail(summary, "https://example.com/orders/abc"),
+    orderNotification: orderNotificationEmail(summary, "https://example.com/admin/orders/abc"),
+    orderCancelled: orderCancelledEmail(summary, "https://example.com/orders/abc"),
+    orderCancelledNotification: orderCancelledNotificationEmail(summary, "https://example.com/admin/orders/abc"),
+    signIn: signInEmail("https://tfs.example/api/auth/verify?token=abc"),
+    adminSignIn: adminSignInEmail("https://tfs.example/admin/verify?token=abc"),
+    adminInvite: adminInviteEmail({ signInPageUrl: "https://tfs.example/admin/login", invitedBy: "a@example.com" }),
+  };
+
+  it.each(Object.entries(emails))("%s carries the logo it shows, inline", (_, { html, attachments }) => {
+    const cids = [...html.matchAll(/src="cid:([^"]+)"/g)].map((m) => m[1]);
+    expect(cids).toHaveLength(1);
+    const logo = attachments?.find((a) => a.contentId === cids[0]);
+    expect(logo?.contentType).toBe("image/png");
+    // A real PNG, base64: the signature 89 50 4E 47.
+    expect(Buffer.from(logo!.content, "base64").subarray(0, 4).toString("hex")).toBe("89504e47");
+    expect(html).toContain('alt="The Funeral Stationery"');
   });
 });
 

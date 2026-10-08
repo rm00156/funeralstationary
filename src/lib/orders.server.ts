@@ -1406,6 +1406,12 @@ export async function getOrderEmailSummary(orderId: string): Promise<OrderEmailS
       order.address.city,
       order.address.postcode,
     ].filter((line): line is string => !!line),
+    // Checkout writes one funeral date onto every line; the earliest is safe if they differ.
+    serviceDate:
+      order.items
+        .map((item) => item.serviceDate)
+        .filter((date): date is string => !!date)
+        .sort()[0] ?? null,
   };
 }
 
