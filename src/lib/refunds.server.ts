@@ -13,11 +13,11 @@ import { and, eq, ne } from "drizzle-orm";
 
 import { db } from "@/db";
 import { isDuplicateKeyError } from "@/db/errors";
-import { orderEvents, orderRefunds, orders } from "@/db/schema";
+import { orderRefunds, orders } from "@/db/schema";
 import { moveOrderStatus } from "@/lib/adminOrders.server";
 import { formatPence } from "@/lib/orderOfServicePricing";
 import { refundStatusEffect, refundedPence } from "@/lib/orders";
-import { addOrderEvent } from "@/lib/orders.server";
+import { addOrderEvent, addOrderEventOnce } from "@/lib/orders.server";
 import { listPaymentRefunds } from "@/lib/stripe.server";
 
 export type RefundSyncOutcome =
@@ -67,13 +67,39 @@ export async function syncStripeRefunds(paymentIntentId: string): Promise<Refund
       await addOrderEvent(order.id, {
         type: "refund_failed",
         actor: "stripe",
-        note: `A ${formatPence(refund.amountPence)} refund ${refund.status === "failed" ? "failed" : "was cancelled"} in Stripe (${refund.stripeRefundId}) — the customer has not been paid back.`,
+        note: await refundFailedNote(order.id, refund),
       });
     }
   }
 
   await settleRefundedStatus(order.id);
   return { result: "synced", orderId: order.id, succeeded };
+}
+
+/**
+ * A refund can fail after it succeeded (a closed card). Nothing here undoes
+ * what its success did — Thintent has no way to take a credit note back, and
+ * `refunded` is a final status — so the note tells staff what to put right.
+ */
+async function refundFailedNote(
+  orderId: string,
+  refund: { stripeRefundId: string; amountPence: number; status: string },
+): Promise<string> {
+  const [[row], [order]] = await Promise.all([
+    db
+      .select({ creditRef: orderRefunds.thintentCreditRef })
+      .from(orderRefunds)
+      .where(eq(orderRefunds.stripeRefundId, refund.stripeRefundId))
+      .limit(1),
+    db.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).limit(1),
+  ]);
+  return [
+    `A ${formatPence(refund.amountPence)} refund ${refund.status === "failed" ? "failed" : "was cancelled"} in Stripe (${refund.stripeRefundId}) — the customer has not been paid back.`,
+    row?.creditRef ? `Thintent still shows it as credit note ${row.creditRef}: put that right there by hand.` : null,
+    order?.status === "refunded" ? "This order still says Refunded." : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
@@ -101,21 +127,13 @@ export async function settleRefundedStatus(orderId: string): Promise<void> {
       // A concurrent move wins; the next event settles it again.
       await moveOrderStatus(orderId, order.status, "refunded", `${formatPence(refunded)} refunded in Stripe`, "stripe");
       return;
-    case "still-printing": {
-      const [told] = await db
-        .select({ id: orderEvents.id })
-        .from(orderEvents)
-        .where(and(eq(orderEvents.orderId, orderId), eq(orderEvents.type, "refund_still_printing")))
-        .limit(1);
-      if (!told) {
-        await addOrderEvent(orderId, {
-          type: "refund_still_printing",
-          actor: "stripe",
-          note: "Refunded in full, but the order is still going to print. If it shouldn't be printed, cancel the job in Thintent.",
-        });
-      }
+    case "still-printing":
+      await addOrderEventOnce(orderId, {
+        type: "refund_still_printing",
+        actor: "stripe",
+        note: "Refunded in full, but the order is still going to print. If it shouldn't be printed, cancel the job in Thintent.",
+      });
       return;
-    }
     case "none":
       return;
   }

@@ -12,6 +12,7 @@ import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { fileSizeText } from "@/lib/artwork";
 import { trimText } from "@/lib/designEditor";
 import { ORDER_STATUS_LABELS, lineSpec, refundStatusEffect, refundedPence } from "@/lib/orders";
+import { canSendToThintent } from "@/lib/thintent";
 import { isThintentConfigured } from "@/lib/thintent.server";
 import { vatRateLabel } from "@/lib/vat";
 
@@ -320,13 +321,18 @@ export default async function AdminOrderPage({
                     </div>
                   )}
                 </>
-              ) : (
+              ) : canSendToThintent(order.status) ? (
                 <>
                   <p className="mb-3 font-body text-sm text-on-surface-variant">
                     Not in Thintent yet. It is retried every hour, or send it now.
                   </p>
                   <AdminThintentButton orderId={order.id} />
                 </>
+              ) : (
+                <p className="font-body text-sm text-on-surface-variant">
+                  Not in Thintent. It has moved on from awaiting print here, so it isn’t sent — that would make a
+                  second job for work already under way.
+                </p>
               )}
             </Section>
           )}

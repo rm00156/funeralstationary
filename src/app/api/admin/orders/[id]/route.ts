@@ -1,9 +1,10 @@
 import type { NextRequest } from "next/server";
 
-import { adminUpdateOrderStatus, OrderTransitionError } from "@/lib/adminOrders.server";
+import { adminGetOrder, adminUpdateOrderStatus, OrderTransitionError } from "@/lib/adminOrders.server";
 import { isAdmin, unauthorised } from "@/lib/adminSession";
 import { parseNote } from "@/lib/adminValidation";
 import { parseOrderStatus } from "@/lib/orders";
+import { settleRefundedStatus } from "@/lib/refunds.server";
 
 export const runtime = "nodejs";
 
@@ -28,9 +29,12 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/admin/
   }
 
   try {
-    const order = await adminUpdateOrderStatus(id, nextStatus, parsedNote ?? null);
-    if (!order) return Response.json({ error: "Order not found" }, { status: 404 });
-    return Response.json({ order });
+    const moved = await adminUpdateOrderStatus(id, nextStatus, parsedNote ?? null);
+    if (!moved) return Response.json({ error: "Order not found" }, { status: 404 });
+    // A refund made earlier settles once the order reaches a status it can
+    // (cancelled, delivered) — the Stripe event that recorded it came first.
+    await settleRefundedStatus(id);
+    return Response.json({ order: (await adminGetOrder(id)) ?? moved });
   } catch (error) {
     if (error instanceof OrderTransitionError) {
       return Response.json({ error: error.message }, { status: 409 });

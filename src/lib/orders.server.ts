@@ -421,6 +421,22 @@ async function insertEvent(
 /** Append an audit-trail row. Exported for fulfilment and the admin seam. */
 export const addOrderEvent = insertEvent;
 
+/**
+ * Append a staff notice unless the order already has one of its type — for
+ * notices a repeated webhook would otherwise add on every delivery.
+ */
+export async function addOrderEventOnce(
+  orderId: string,
+  event: { type: string; note: string; actor: string },
+): Promise<void> {
+  const [told] = await db
+    .select({ id: orderEvents.id })
+    .from(orderEvents)
+    .where(and(eq(orderEvents.orderId, orderId), eq(orderEvents.type, event.type)))
+    .limit(1);
+  if (!told) await insertEvent(orderId, event);
+}
+
 /* ------------------------------------------------------------------ */
 /* Basket                                                              */
 /* ------------------------------------------------------------------ */

@@ -178,12 +178,16 @@ export function splitDeliveryCharges(
   items: readonly Pick<OrderDetailItem, "delivery" | "vatTreatment">[],
   hasAddress: boolean,
 ): {
-  delivery: { pricePence: number; vatTreatment: VatTreatment | null };
+  delivery: { pricePence: number; vatTreatment: VatTreatment | null; label: string };
   asLines: ThintentOrderLine[];
 } {
   const groups = new Map<VatTreatment | null, { pence: number; labels: string[] }>();
+  const freeLabels: string[] = [];
   for (const item of items) {
-    if (item.delivery.pricePence <= 0) continue;
+    if (item.delivery.pricePence <= 0) {
+      if (!freeLabels.includes(item.delivery.label)) freeLabels.push(item.delivery.label);
+      continue;
+    }
     const group = groups.get(item.vatTreatment) ?? { pence: 0, labels: [] };
     group.pence += item.delivery.pricePence;
     if (!group.labels.includes(item.delivery.label)) group.labels.push(item.delivery.label);
@@ -209,10 +213,14 @@ export function splitDeliveryCharges(
       notes: null,
       dueDate: null,
     }));
+  // The charge's name covers what it charges for, plus the free options
+  // (which have no line of their own) — not the groups moved to lines.
+  const keptLabels = kept ? kept[1].labels : [];
+  const label = [...new Set([...keptLabels, ...freeLabels])].join(" + ") || "Delivery";
   return {
     delivery: kept
-      ? { pricePence: kept[1].pence, vatTreatment: kept[0] }
-      : { pricePence: 0, vatTreatment: items[0]?.vatTreatment ?? null },
+      ? { pricePence: kept[1].pence, vatTreatment: kept[0], label }
+      : { pricePence: 0, vatTreatment: items[0]?.vatTreatment ?? null, label },
     asLines,
   };
 }
@@ -295,7 +303,6 @@ export function buildThintentOrderPayload(
   // Thintent takes one delivery charge per order, at one VAT treatment; here
   // each line chose its own delivery (options are product-scoped) and it is
   // taxed as its product is. See splitDeliveryCharges.
-  const deliveryLabels = [...new Set(order.items.map((item) => item.delivery.label))];
   const { address } = order;
   const hasAddress = !!(address.line1 && address.city && address.postcode);
   const charges = splitDeliveryCharges(order.items, hasAddress);
@@ -307,7 +314,7 @@ export function buildThintentOrderPayload(
         city: address.city!,
         postcode: clip(address.postcode!, LIMITS.postcode),
         country: address.country,
-        label: clip(deliveryLabels.join(" + ") || "Delivery", LIMITS.deliveryLabel),
+        label: clip(charges.delivery.label, LIMITS.deliveryLabel),
         pricePence: charges.delivery.pricePence,
         vatTreatment: charges.delivery.vatTreatment,
       }
@@ -449,6 +456,16 @@ export function forwardStatusPath(current: OrderStatus, target: OrderStatus): Or
     at = step;
   }
   return steps;
+}
+
+/**
+ * Whether an order without a job may be sent to Thintent: paid and still
+ * waiting to reach the press. One an admin has already moved on by hand is
+ * being handled outside Thintent — sending it would make a second job for
+ * work already printed, and lock its status to that job.
+ */
+export function canSendToThintent(status: OrderStatus): boolean {
+  return status === "awaiting_print";
 }
 
 /**

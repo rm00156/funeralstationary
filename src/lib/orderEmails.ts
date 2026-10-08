@@ -174,18 +174,36 @@ ${itemsHtml(summary)}
   return { subject, text, html };
 }
 
-/** Sent to the business inbox when Thintent cancels a paid order: the refund is still to do. */
-export function orderCancelledNotificationEmail(summary: OrderEmailSummary, adminUrl: string): EmailContent {
-  const subject = `Cancelled: order ${summary.orderNumber} — refund ${formatPence(summary.totalPence)}?`;
+/**
+ * Sent to the business inbox when Thintent cancels a paid order. A cancel
+ * never moves money, so it says what has gone back so far (a refund can be
+ * made before the cancel) and what is left to decide.
+ */
+export function orderCancelledNotificationEmail(
+  summary: OrderEmailSummary,
+  adminUrl: string,
+  refundedPence = 0,
+): EmailContent {
+  const outstanding = summary.totalPence - refundedPence;
+  const subject =
+    outstanding <= 0
+      ? `Cancelled: order ${summary.orderNumber} — already refunded`
+      : `Cancelled: order ${summary.orderNumber} — refund ${formatPence(outstanding)}?`;
+  const refundText =
+    refundedPence <= 0
+      ? "Nothing has been refunded — if a refund is due, make it in Stripe."
+      : outstanding <= 0
+        ? `It has already been refunded in full (${formatPence(refundedPence)}) in Stripe — there is nothing more to refund.`
+        : `${formatPence(refundedPence)} of it has been refunded in Stripe so far — if more is due, make it there.`;
   const text = [
     `Order ${summary.orderNumber} from ${summary.contactName} <${summary.contactEmail}> was cancelled in Thintent.`,
-    `The customer paid ${formatPence(summary.totalPence)}. Nothing has been refunded — if a refund is due, make it in Stripe.`,
+    `The customer paid ${formatPence(summary.totalPence)}. ${refundText}`,
     "",
     `Order: ${adminUrl}`,
   ].join("\n");
   const html = `<div style="font-family:Georgia,serif;color:#2f2a26;max-width:560px">
 <p>Order <strong>${escapeHtml(summary.orderNumber)}</strong> from ${escapeHtml(summary.contactName)} &lt;${escapeHtml(summary.contactEmail)}&gt; was cancelled in Thintent.</p>
-<p>The customer paid <strong>${formatPence(summary.totalPence)}</strong>. Nothing has been refunded — if a refund is due, make it in Stripe.</p>
+<p>The customer paid <strong>${formatPence(summary.totalPence)}</strong>. ${refundText}</p>
 <p><a href="${escapeHtml(adminUrl)}">Open in admin</a></p>
 </div>`;
   return { subject, text, html };

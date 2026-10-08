@@ -10,7 +10,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import type { DesignDoc } from "@/lib/designEditor";
-import { designs, orderItems, orderProofPages, orderProofs } from "@/db/schema";
+import { designs, orderItems, orderProofPages, orderProofs, orderRefunds } from "@/db/schema";
 import { isEmailConfigured, sendEmail } from "@/lib/email.server";
 import {
   orderCancelledEmail,
@@ -19,6 +19,7 @@ import {
   orderNotificationEmail,
   type EmailContent,
 } from "@/lib/orderEmails";
+import { refundedPence } from "@/lib/orders";
 import { addOrderEvent, getOrderEmailSummary, loadOrderDetail } from "@/lib/orders.server";
 import { renderProofPdf } from "@/lib/proofPdf.server";
 import { renderProofPageImages } from "@/lib/proofRender.server";
@@ -201,9 +202,9 @@ export async function newestPrintPdfUrl(
 
 /**
  * Post-payment side effects, run from after() in the webhook / return
- * routes. Proofs first (skipped entirely without S3), then the job in
- * Thintent (skipped without THINTENT_*), then the customer confirmation and
- * the business notification. Never throws.
+ * routes. Proofs first (skipped entirely without S3), then the customer
+ * confirmation and the business notification, then the job in Thintent
+ * (skipped without THINTENT_*). Never throws.
  *
  * Two origins because they answer different questions: `site` is the public
  * origin the emailed links must carry; `render` is where this server's own
@@ -231,11 +232,16 @@ export async function runPostPaymentSideEffects(
     }
   }
 
-  // After the proofs, so the job in Thintent gets a print-PDF link rather
-  // than "no proof yet" (see lineFiles in thintent.ts); before
-  // the email early return, so a site without Resend still sends it.
-  if (isThintentConfigured()) await pushOrderToThintent(orderId, origins.site);
+  await sendOrderConfirmationEmails(orderId, origins.site);
 
+  // After the proofs, so the job in Thintent gets a print-PDF link rather
+  // than "no proof yet" (see lineFiles in thintent.ts); after the emails,
+  // because a send that runs out of time is retried by the hourly sweep and
+  // an email is never retried.
+  if (isThintentConfigured()) await pushOrderToThintent(orderId, origins.site);
+}
+
+async function sendOrderConfirmationEmails(orderId: string, siteOrigin: string): Promise<void> {
   if (!isEmailConfigured()) return;
   const summary = await getOrderEmailSummary(orderId);
   if (!summary) return;
@@ -244,7 +250,7 @@ export async function runPostPaymentSideEffects(
     {
       label: "customer confirmation",
       to: summary.contactEmail,
-      content: orderConfirmationEmail(summary, `${origins.site}/orders/${orderId}`),
+      content: orderConfirmationEmail(summary, `${siteOrigin}/orders/${orderId}`),
     },
   ];
   const notify = process.env.ORDER_NOTIFY_EMAIL;
@@ -252,7 +258,7 @@ export async function runPostPaymentSideEffects(
     sends.push({
       label: "business notification",
       to: notify,
-      content: orderNotificationEmail(summary, `${origins.site}/admin/orders/${orderId}`),
+      content: orderNotificationEmail(summary, `${siteOrigin}/admin/orders/${orderId}`),
     });
   }
   await sendOrderEmails(orderId, summary.orderNumber, sends);
@@ -281,10 +287,23 @@ export async function sendOrderCancelledEmails(orderId: string, siteOrigin: stri
     sends.push({
       label: "business cancellation notice",
       to: notify,
-      content: orderCancelledNotificationEmail(summary, `${siteOrigin}/admin/orders/${orderId}`),
+      content: orderCancelledNotificationEmail(
+        summary,
+        `${siteOrigin}/admin/orders/${orderId}`,
+        await orderRefundedPence(orderId),
+      ),
     });
   }
   await sendOrderEmails(orderId, summary.orderNumber, sends);
+}
+
+/** What has gone back to the customer so far — a refund can come before the cancel. */
+async function orderRefundedPence(orderId: string): Promise<number> {
+  const refunds = await db
+    .select({ amountPence: orderRefunds.amountPence, status: orderRefunds.status })
+    .from(orderRefunds)
+    .where(eq(orderRefunds.orderId, orderId));
+  return refundedPence(refunds);
 }
 
 interface OrderEmailSend {

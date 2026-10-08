@@ -11,6 +11,7 @@ import {
   pressFileUrl,
   verifyPressFileSignature,
   buildThintentRefundPayload,
+  canSendToThintent,
   forwardStatusPath,
   parseThintentJobEvent,
   thintentStatusMoves,
@@ -186,7 +187,7 @@ describe("buildThintentOrderPayload", () => {
       ]),
       options,
     );
-    expect(payload.delivery).toMatchObject({ pricePence: 1998, vatTreatment: "standard" });
+    expect(payload.delivery).toMatchObject({ pricePence: 1998, vatTreatment: "standard", label: "Next day" });
     expect(payload.lines.at(-1)).toMatchObject({
       externalRef: "delivery-zero",
       title: "Delivery — Standard delivery (zero-rated items)",
@@ -197,6 +198,18 @@ describe("buildThintentOrderPayload", () => {
     expect(payload.totals).toMatchObject({ subtotalPence: 11_499, deliveryPence: 1998, totalPence: 13_497 });
     expect(addsUp(payload)).toBe(true);
     expect(thintentAcceptsVat(payload)).toBe(true);
+  });
+
+  it("names the delivery after what it charges for and the free options, not the charges moved to lines", () => {
+    const payload = buildThintentOrderPayload(
+      taxedOrder([
+        ["zero", 6000, 999, "Next day"],
+        ["standard", 3000, 399, "Standard"],
+        ["standard", 2000, 0, "Collect in person"],
+      ]),
+      options,
+    );
+    expect(payload.delivery).toMatchObject({ pricePence: 999, label: "Next day + Collect in person" });
   });
 
   it("sends every delivery charge as a line when there's no address to deliver to", () => {
@@ -472,5 +485,14 @@ describe("press file links", () => {
     expect(verifyPressFileSignature("order-1", "item-1", "abc", "key")).toBe(false);
     expect(verifyPressFileSignature("order-1", "item-1", sig.slice(0, 62) + "zz", "key")).toBe(false);
     expect(verifyPressFileSignature("order-1", "item-1", sig, "")).toBe(false);
+  });
+});
+
+describe("canSendToThintent", () => {
+  it("sends only a paid order still waiting for the press", () => {
+    expect(canSendToThintent("awaiting_print")).toBe(true);
+    for (const status of ["draft", "in_production", "shipped", "delivered", "cancelled", "refunded"] as OrderStatus[]) {
+      expect(canSendToThintent(status)).toBe(false);
+    }
   });
 });

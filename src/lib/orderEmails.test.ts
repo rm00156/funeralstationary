@@ -88,6 +88,17 @@ describe("orderCancelledNotificationEmail", () => {
     expect(email.text).toContain("Nothing has been refunded");
     expect(email.text).toContain("https://example.com/admin/orders/abc");
   });
+
+  it("says what has been refunded already", () => {
+    const part = orderCancelledNotificationEmail(summary, "https://example.com/admin/orders/abc", 2000);
+    expect(part.subject).toContain("refund £79.99?");
+    expect(part.text).toContain("£20.00 of it has been refunded");
+    expect(part.text).not.toContain("Nothing has been refunded");
+
+    const full = orderCancelledNotificationEmail(summary, "https://example.com/admin/orders/abc", 9999);
+    expect(full.subject).toContain("already refunded");
+    expect(full.text).toContain("refunded in full (£99.99)");
+  });
 });
 
 describe("signInEmail", () => {

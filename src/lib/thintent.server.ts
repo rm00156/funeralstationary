@@ -12,29 +12,28 @@
  * Unset THINTENT_API_URL / THINTENT_API_KEY → everything here is a silent
  * no-op, like storage and email.
  */
-import { and, asc, desc, eq, gte, isNotNull, isNull, lte, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import { orderEvents, orderRefunds, orders } from "@/db/schema";
 import { formatPence } from "@/lib/orderOfServicePricing";
 import { moveOrderStatus } from "@/lib/adminOrders.server";
 import { getProductLabels } from "@/lib/catalogue.server";
-import { addOrderEvent, loadOrderDetail } from "@/lib/orders.server";
+import { addOrderEvent, addOrderEventOnce, loadOrderDetail } from "@/lib/orders.server";
 import { settleRefundedStatus } from "@/lib/refunds.server";
 import { isStripeConfigured, retrievePaymentFeePence } from "@/lib/stripe.server";
 import {
   buildThintentOrderPayload,
   buildThintentRefundPayload,
+  canSendToThintent,
   thintentStatusMoves,
+  thintentTargetStatus,
   type ThintentJobEvent,
 } from "@/lib/thintent";
 
 export function isThintentConfigured(): boolean {
   return !!process.env.THINTENT_API_URL && !!process.env.THINTENT_API_KEY;
 }
-
-/** Statuses an order can't be sent from: the basket, and orders that won't be printed. */
-const UNSENDABLE = ["draft", "cancelled", "refunded"] as const;
 
 export type ThintentPushResult =
   | { ok: true; jobRef: string; jobUrl: string | null; duplicate: boolean }
@@ -56,7 +55,7 @@ export async function pushOrderToThintent(
     const order = await loadOrderDetail(orderId);
     if (!order) return { ok: false, error: "Order not found" };
     orderNumber = order.orderNumber;
-    if ((UNSENDABLE as readonly string[]).includes(order.status)) {
+    if (!canSendToThintent(order.status)) {
       return { ok: false, error: `A ${order.status} order isn't sent to Thintent` };
     }
 
@@ -67,26 +66,11 @@ export async function pushOrderToThintent(
       pressKey: process.env.THINTENT_API_KEY!,
       feePence: await orderFeePence(order.stripe.paymentIntentId, order.orderNumber),
     });
-    const response = await fetch(new URL("/api/v1/orders", process.env.THINTENT_API_URL), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.THINTENT_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(15_000),
-    });
-    const body = (await response.json().catch(() => ({}))) as {
-      jobNumber?: number | string;
-      url?: string;
-      duplicate?: boolean;
-      error?: string;
-      issues?: string[];
-    };
-    if (!response.ok || body.jobNumber === undefined) {
-      const detail = [body.error, ...(body.issues ?? [])].filter(Boolean).join("; ");
-      throw new Error(`Thintent answered ${response.status}${detail ? `: ${detail}` : ""}`);
-    }
+    const body = await postToThintent<{ jobNumber?: number | string; url?: string; duplicate?: boolean }>(
+      "/api/v1/orders",
+      payload,
+      (answer) => answer.jobNumber !== undefined,
+    );
 
     const jobRef = String(body.jobNumber);
     const jobUrl = body.url ?? null;
@@ -105,6 +89,30 @@ export async function pushOrderToThintent(
     await recordPushFailure(orderId, actor, message).catch(() => undefined);
     return { ok: false, error: message };
   }
+}
+
+/**
+ * POST a JSON body to Thintent's API and return its answer. Throws, with
+ * Thintent's own error and issues in the message, on a refusal or an answer
+ * that lacks what `accepted` looks for.
+ */
+async function postToThintent<T extends object>(
+  path: string,
+  payload: unknown,
+  accepted: (answer: T) => boolean,
+): Promise<T> {
+  const response = await fetch(new URL(path, process.env.THINTENT_API_URL), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.THINTENT_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const body = (await response.json().catch(() => ({}))) as T & { error?: string; issues?: string[] };
+  if (!response.ok || !accepted(body)) {
+    const detail = [body.error, ...(body.issues ?? [])].filter(Boolean).join("; ");
+    throw new Error(`Thintent answered ${response.status}${detail ? `: ${detail}` : ""}`);
+  }
+  return body;
 }
 
 /**
@@ -171,25 +179,11 @@ export async function pushOrderRefundsToThintent(orderId: string, actor = "syste
 
     for (const refund of pending) {
       try {
-        const response = await fetch(
-          new URL(`/api/v1/orders/${encodeURIComponent(order.orderNumber)}/refunds`, process.env.THINTENT_API_URL),
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${process.env.THINTENT_API_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify(buildThintentRefundPayload(refund)),
-            signal: AbortSignal.timeout(15_000),
-          },
+        const body = await postToThintent<{ creditNoteNumber?: number; duplicate?: boolean }>(
+          `/api/v1/orders/${encodeURIComponent(order.orderNumber)}/refunds`,
+          buildThintentRefundPayload(refund),
+          (answer) => answer.creditNoteNumber !== undefined,
         );
-        const body = (await response.json().catch(() => ({}))) as {
-          creditNoteNumber?: number;
-          duplicate?: boolean;
-          error?: string;
-          issues?: string[];
-        };
-        if (!response.ok || body.creditNoteNumber === undefined) {
-          const detail = [body.error, ...(body.issues ?? [])].filter(Boolean).join("; ");
-          throw new Error(`Thintent answered ${response.status}${detail ? `: ${detail}` : ""}`);
-        }
         const creditRef = `CN-${body.creditNoteNumber}`;
         // Conditional, so an overlapping send doesn't write the event twice.
         const [update] = await db
@@ -264,18 +258,26 @@ async function recordPushFailure(orderId: string, actor: string, note: string): 
  * Paid orders from the last `days` that never reached Thintent — what the
  * hourly sweep retries. Bounded so an order that can never be accepted
  * (Thintent refusing it with a 422) stops being retried after a week; its
- * thintent_failed events stay on the order for an admin to see.
+ * thintent_failed events stay on the order for an admin to see. One paid
+ * less than `minAgeMinutes` ago is left to fulfilment's own send, which
+ * waits for the proofs: a repeat send only returns the job already made, so
+ * a job sent before its proofs would link "no proof yet" for good.
+ * Only awaiting_print orders (canSendToThintent).
  */
-export async function listOrdersAwaitingThintent(days = 7, now = new Date()): Promise<string[]> {
-  const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+export async function listOrdersAwaitingThintent(
+  days = 7,
+  minAgeMinutes = 10,
+  now = new Date(),
+): Promise<string[]> {
   const rows = await db
     .select({ id: orders.id })
     .from(orders)
     .where(
       and(
         isNull(orders.thintentJobRef),
-        notInArray(orders.status, [...UNSENDABLE]),
-        gte(orders.paidAt, since),
+        eq(orders.status, "awaiting_print"),
+        gte(orders.paidAt, new Date(now.getTime() - days * 24 * 60 * 60 * 1000)),
+        lte(orders.paidAt, new Date(now.getTime() - minAgeMinutes * 60 * 1000)),
       ),
     );
   return rows.map((row) => row.id);
@@ -346,21 +348,25 @@ export async function applyThintentJobEvent(event: ThintentJobEvent): Promise<Th
     order.status === "cancelled" && !!order.paidAt && (await cancelledByThintent(order.id));
   const steps = thintentStatusMoves(order.status, event.status, reopenable);
 
+  // Staff notices are written once, not on every later save of the job.
   if (event.status === "cancelled" && !steps.length && (order.status === "shipped" || order.status === "delivered")) {
-    // Too late to cancel here: it has already gone out. Staff are told
-    // once, not on every later save of the cancelled job.
-    const [told] = await db
-      .select({ id: orderEvents.id })
-      .from(orderEvents)
-      .where(and(eq(orderEvents.orderId, order.id), eq(orderEvents.type, "thintent_cancelled")))
-      .limit(1);
-    if (!told) {
-      await addOrderEvent(order.id, {
-        type: "thintent_cancelled",
-        actor: "thintent",
-        note: `The job was cancelled in Thintent, but this order is already ${order.status} so it stays as it is. Refund it in Stripe if that's what's wanted.`,
-      });
-    }
+    // Too late to cancel here: it has already gone out.
+    await addOrderEventOnce(order.id, {
+      type: "thintent_cancelled",
+      actor: "thintent",
+      note: `The job was cancelled in Thintent, but this order is already ${order.status} so it stays as it is. Refund it in Stripe if that's what's wanted.`,
+    });
+  }
+  const target = thintentTargetStatus(event.status);
+  if (order.status === "refunded" && target && target !== "cancelled" && target !== "delivered") {
+    // Refunded is final here, so a job reopened after the refund can't move
+    // this order — but the shop may be about to print work it paid back. (A
+    // delivered order refunded afterwards has a completed job: no notice.)
+    await addOrderEventOnce(order.id, {
+      type: "thintent_reopened_refunded",
+      actor: "thintent",
+      note: `The job is ${event.status} in Thintent, but this order was refunded. If it shouldn't be printed, cancel the job there again; if it should, the customer has been paid back.`,
+    });
   }
 
   const note = event.jobNumber !== null ? `Thintent job #${event.jobNumber}: ${event.status}` : null;
