@@ -68,6 +68,26 @@ export function filterTemplates(
 }
 
 /**
+ * The designs the home page's "Choose a design to begin" grid shows: `count`
+ * of them, the ones in `categoryId` first (the plain designs that suit a first
+ * look, chosen by tagging them in /admin), then the rest to fill the grid, and
+ * in each group a design the hero already pictures (`heroIds`) only when
+ * nothing else is left. Catalogue order holds within each group.
+ */
+export function homeDesignPicks(
+  templates: Template[],
+  { categoryId, heroIds, count }: { categoryId: string; heroIds: string[]; count: number },
+): Template[] {
+  const rank = (template: Template) =>
+    (template.categories.includes(categoryId) ? 0 : 2) + (heroIds.includes(template.id) ? 1 : 0);
+  return templates
+    .map((template, index) => ({ template, index, rank: rank(template) }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .slice(0, count)
+    .map(({ template }) => template);
+}
+
+/**
  * A product the shop can actually sell — it has published templates and a
  * complete set of pricing options — as shown on the home page's product
  * cards, the header's shop menu and the product page. Products that aren't
