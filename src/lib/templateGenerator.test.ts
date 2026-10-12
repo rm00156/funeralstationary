@@ -3,6 +3,9 @@ import { TEMPLATE_PAGE_COUNT } from "@/lib/designEditor";
 import {
   ARCHETYPE_IDS,
   ARTWORK_ARCHETYPE_IDS,
+  PLACEHOLDER_AFTERWARDS,
+  PLACEHOLDER_OFFICIANT,
+  PLACEHOLDER_SERVICE_FULL,
   SOLID_ARCHETYPE_IDS,
   SPRAY_ARCHETYPE_IDS,
   TEMPLATE_PALETTES,
@@ -307,6 +310,36 @@ describe("TEMPLATE_SPECS", () => {
       const [cover] = buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg", accentUrl: "/accent.png" });
       for (const el of cover.elements) {
         if (el.type === "text") expect(el.y, `${entry.slug}: ${el.text}`).toBeLessThan(placement.y);
+      }
+    }
+  });
+
+  it("gives every photo-led cover the full service block and minister, and its back page the gathering afterwards", () => {
+    const photoLed = TEMPLATE_SPECS.filter((entry) =>
+      ["band-framed", "band-oval", "silk-frame", "inset-frame"].includes(entry.archetype),
+    );
+    expect(photoLed.length).toBeGreaterThan(0);
+    for (const entry of photoLed) {
+      const [cover, , back] = buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg", accentUrl: "/accent.png" });
+      const flagged = (page: typeof cover) =>
+        page.elements.filter((el) => el.type === "text" && el.placeholder).map((el) => el.type === "text" && el.text);
+      expect(flagged(cover), entry.slug).toEqual(
+        expect.arrayContaining([PLACEHOLDER_SERVICE_FULL, PLACEHOLDER_OFFICIANT]),
+      );
+      expect(flagged(back), entry.slug).toContain(PLACEHOLDER_AFTERWARDS);
+    }
+  });
+
+  it("puts the booklet's flower bands in the bottom third, below all the cover's type", () => {
+    for (const entry of TEMPLATE_SPECS) {
+      if (entry.archetype !== "band-framed" && entry.archetype !== "band-oval") continue;
+      expect(entry.background, entry.slug).toMatch(/-low$/);
+      const [cover, , back] = buildTemplateLayout(entry, { backgroundUrl: "/bg.jpg" });
+      for (const page of [cover, back]) {
+        for (const el of page.elements) {
+          // The officiating line is the lowest, and about 3% of the page tall.
+          if (el.type === "text") expect(el.y + 3, `${entry.slug}: ${el.text}`).toBeLessThanOrEqual(66);
+        }
       }
     }
   });

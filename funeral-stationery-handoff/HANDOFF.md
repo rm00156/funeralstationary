@@ -31,10 +31,10 @@ Removed on purpose: the separate "How it works" section and the "Prices" item in
 
 | Token | Hex | Use |
 |---|---|---|
-| `--plum` | `#5A2760` | Brand colour: primary buttons, links, active states, accents |
-| `--plum-hover` | `#45204B` | Primary button hover |
-| `--plum-deep` | `#3E1A43` | Utility bar, dark promo cards, link hover |
-| `--plum-night` | `#2E1631` | Footer background |
+| `--plum` | `#894586` | Brand colour (the logo's purple): primary buttons, links, active states, accents |
+| `--plum-hover` | `#763B73` | Primary button hover |
+| `--plum-deep` | `#6A3567` | Utility bar, dark promo cards, link hover |
+| `--plum-night` | `#552A53` | Footer background |
 | `--ink` | `#2B2230` | Headings and main text |
 | `--text-2` | `#4E4552` | Body copy, descriptions |
 | `--text-3` | `#5E5560` | Captions, meta text, breadcrumbs (still passes 4.5:1 on the background) |

@@ -254,12 +254,8 @@ export function sprayElement(
 
 const BOTANICAL_PALETTES: readonly PaletteId[] = ["plum", "forest", "bronze", "stone"];
 
-/**
- * The curated manifest. Every entry was checked against its source API
- * (object exists, has a high-resolution image, and is public domain). Add to
- * this list; never rename an id, since generated templates reference them.
- */
-export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
+/** The curated photographs and plates; see BACKGROUND_SPECS. */
+const MANIFEST: readonly BackgroundSpec[] = [
   {
     id: "redoute-frankfort-rose",
     name: "Frankfort Rose",
@@ -685,6 +681,59 @@ export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [
     // A ruled border inside the sheet: trimmed past it.
     { tolerance: 36, inset: 0.09, minIsland: 0.003 }),
 ];
+
+/**
+ * The booklet's flower bands and corners, set low. On the A5 order of service
+ * the band above it rose past half the page, which left the cover two lines
+ * for the service — but a family needs the church and its address, the
+ * committal and the officiating minister there, and the back page needs room
+ * for where everyone gathers afterwards. These keep the same photographs at
+ * the foot of the page (the bottom third, fully in from 80%).
+ *
+ * Their own ids, not a re-render of the originals: the memorial cards and
+ * bookmarks are composed around the taller band and keep it, a design saved
+ * on the old picture keeps it, and scripts/sync-templates.ts copies only keys
+ * production doesn't have yet — a re-render under the same key would never
+ * reach it. No bookmark render; the bookmarks use the originals.
+ */
+const LOW_BAND = { placement: { x: 0, y: 68, w: 100, h: 32 }, fade: { edge: "top", start: 80, end: 68 } } as const;
+const BOOKLET_BANDS: ReadonlyArray<[baseId: string, layout: BackgroundLayout]> = [
+  ["crocus-meadow", LOW_BAND],
+  ["white-blossom", LOW_BAND],
+  ["pastel-rose-band", LOW_BAND],
+  ["red-petal-band", LOW_BAND],
+  ["rose-bush-band", LOW_BAND],
+  // Corners shrink into the corner instead, clear of the centred type.
+  [
+    "pastel-rose-corner",
+    { placement: { x: 34, y: 56, w: 72, h: 50 }, radialFade: { cx: 100, cy: 100, inner: 22, outer: 48 } },
+  ],
+  [
+    "white-rose-corner",
+    { placement: { x: 36, y: 58, w: 70, h: 48 }, radialFade: { cx: 100, cy: 100, inner: 20, outer: 46 } },
+  ],
+];
+
+/** The id of a background's low, booklet version. */
+export function lowBandId(baseId: string): string {
+  return `${baseId}-low`;
+}
+
+function lowBand([baseId, layout]: (typeof BOOKLET_BANDS)[number]): BackgroundSpec {
+  const base = MANIFEST.find((spec) => spec.id === baseId);
+  if (!base) throw new Error(`Unknown background "${baseId}"`);
+  const spec: BackgroundSpec = { ...base, id: lowBandId(baseId), name: `${base.name} (low)`, ...layout };
+  delete spec.bookmark;
+  return spec;
+}
+
+/**
+ * Every background: the curated manifest. Each entry was checked against its
+ * source API (object exists, has a high-resolution image, and is public
+ * domain). Add to it; never rename an id, since generated templates reference
+ * them.
+ */
+export const BACKGROUND_SPECS: readonly BackgroundSpec[] = [...MANIFEST, ...BOOKLET_BANDS.map(lowBand)];
 
 /** A full-bleed photographic scene, rendered for the A5 page and the bookmark. */
 function scene(

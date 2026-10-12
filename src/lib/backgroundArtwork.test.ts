@@ -6,6 +6,7 @@ import {
   backgroundFormats,
   backgroundLayout,
   getBackgroundSpec,
+  lowBandId,
   mergeCredits,
 } from "./backgroundArtwork";
 import { FULL_BLEED_BOX, fullBleedBox } from "./designEditor";
@@ -51,6 +52,36 @@ describe("BACKGROUND_SPECS", () => {
     for (const spec of BACKGROUND_SPECS) {
       if (!spec.bookmark || !spec.placement) continue;
       expect(backgroundLayout(spec, "bookmark").placement!.y, spec.id).toBeGreaterThanOrEqual(58);
+    }
+  });
+
+  it("gives the booklet low versions of its flower bands, leaving the originals alone", () => {
+    const crocus = getBackgroundSpec("crocus-meadow")!;
+    const low = getBackgroundSpec(lowBandId("crocus-meadow"))!;
+    // Same photograph, same palettes...
+    expect(low.source).toEqual(crocus.source);
+    expect(low.palettes).toEqual(crocus.palettes);
+    // ...but the band starts in the bottom third, and the bookmark keeps the original.
+    expect(crocus.placement!.y).toBeLessThan(60);
+    expect(low.placement!.y).toBeGreaterThanOrEqual(68);
+    expect(low.bookmark).toBeUndefined();
+    expect(crocus.bookmark).toBeDefined();
+    expect(backgroundAssetKey(low.id, "violet")).toBe("templates/backgrounds/crocus-meadow-low-violet.jpg");
+  });
+
+  it("keeps every low band and corner out of the top two thirds of the page", () => {
+    for (const spec of BACKGROUND_SPECS.filter((s) => s.id.endsWith("-low"))) {
+      if (spec.fade) {
+        expect(spec.placement!.y, spec.id).toBeGreaterThanOrEqual(68);
+        expect(spec.fade.end, spec.id).toBeGreaterThanOrEqual(68);
+      } else {
+        // A corner: its fade must not reach above two thirds at the right edge.
+        const fade = spec.radialFade!;
+        const heightPerWidth = 210 / 148;
+        const reach = fade.cy - fade.outer / heightPerWidth;
+        expect(fade.cx, spec.id).toBe(100);
+        expect(reach, spec.id).toBeGreaterThanOrEqual(64);
+      }
     }
   });
 

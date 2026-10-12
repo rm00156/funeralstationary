@@ -6,9 +6,10 @@ import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import type { ProductShowcase, Template } from "@/lib/templates";
 
 /**
- * "Choose a design to begin" — the first few designs of the shop's lead
- * product, which is where the hero's "Browse designs" lands. Every design in
- * a product costs the same, so each card carries the product's "from" price.
+ * "Choose a design to begin" — six of the shop's lead product's designs, its
+ * simple ones first (see homeDesignPicks), which is where the hero's "Browse
+ * designs" lands. Every design in a product costs the same, so each card
+ * carries the product's "from" price.
  */
 export default function HomeDesigns({
   product,
@@ -41,7 +42,9 @@ export default function HomeDesigns({
           </Link>
         </div>
 
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-8">
+        {/* Two across on a phone and tablet, three on a desktop, so six designs
+            always make full rows. */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-8 lg:grid-cols-3">
           {templates.map((template, index) => (
             <TemplateCard
               trim={product.format.trim}
@@ -51,6 +54,7 @@ export default function HomeDesigns({
               image={template.image}
               priority={index === 0}
               meta={from}
+              size="large"
             />
           ))}
         </div>
