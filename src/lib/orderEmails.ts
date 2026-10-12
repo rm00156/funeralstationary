@@ -77,7 +77,7 @@ const freeOr = (pence: number) => (pence === 0 ? "Free" : formatPence(pence));
  * inline attachment, so an email built on this returns `brandedAttachments()`
  * beside its html.
  */
-const PLUM = "#5a2760";
+const PLUM = "#894586";
 const INK = "#2b2230";
 const INK_2 = "#4e4552";
 const LABEL = "#6a5f6c";
