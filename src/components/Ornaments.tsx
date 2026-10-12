@@ -262,3 +262,25 @@ export function HeartBranch({ size }: OrnamentProps) {
     </Ornament>
   );
 }
+
+/** Where each toe sits around a paw's pad. */
+const PAW_TOES: Array<[cx: number, cy: number, rx: number, ry: number, rotate: number]> = [
+  [5.2, 9.4, 2.1, 2.7, -25],
+  [9.2, 6.2, 2.2, 2.9, -8],
+  [14.8, 6.2, 2.2, 2.9, 8],
+  [18.8, 9.4, 2.1, 2.7, 25],
+];
+
+/** A single paw print. */
+export function PawPrint({ size }: OrnamentProps) {
+  return (
+    <Ornament size={size} viewBox="0 0 24 24">
+      <g fill="currentColor">
+        <path d="M12 11.5 C8.4 11.5 5.6 14.8 5.6 17.6 C5.6 20.2 7.6 21 9.2 20.6 C10.4 20.3 11.2 19.8 12 19.8 C12.8 19.8 13.6 20.3 14.8 20.6 C16.4 21 18.4 20.2 18.4 17.6 C18.4 14.8 15.6 11.5 12 11.5 Z" />
+        {PAW_TOES.map(([cx, cy, rx, ry, rotate]) => (
+          <ellipse key={cx} cx={cx} cy={cy} rx={rx} ry={ry} transform={`rotate(${rotate} ${cx} ${cy})`} />
+        ))}
+      </g>
+    </Ornament>
+  );
+}

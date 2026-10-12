@@ -70,6 +70,7 @@ import {
   HeartBranch,
   LatinCross,
   OutlineCross,
+  PawPrint,
   ScrollDivider,
   ScrollFrame,
   Swash,
@@ -107,6 +108,7 @@ export const CLIPARTS: {
   { id: "corner-knot", label: "Corner knot", Icon: CornerKnot },
   { id: "corner-curl", label: "Corner curl", Icon: CornerCurl },
   { id: "heart-branch", label: "Heart branch", Icon: HeartBranch },
+  { id: "paw-print", label: "Paw print", Icon: PawPrint },
 ];
 
 /**

@@ -53,14 +53,30 @@ export const STUDIO_PORTRAIT_IDS = [
   "portrait-21",
 ] as const;
 
+/**
+ * Stand-ins that aren't adults: a baby for the child covers, and pets for the
+ * pet covers. CC0 photographs from Wikimedia Commons (credits in
+ * docs/placeholder-portrait-credits.md), pinned per template like the studio
+ * set and never dealt out automatically.
+ */
+export const SUBJECT_PORTRAIT_IDS = [
+  "portrait-22", // baby
+  "portrait-23", // brown rabbit
+  "portrait-24", // white rabbit
+  "portrait-25", // dog
+  "portrait-26", // cat
+] as const;
+
 export const PLACEHOLDER_PORTRAIT_IDS = [
   ...MONO_PORTRAIT_IDS,
   ...COLOUR_PORTRAIT_IDS,
   ...STUDIO_PORTRAIT_IDS,
+  ...SUBJECT_PORTRAIT_IDS,
 ] as const;
 
 export type PlaceholderPortraitId = (typeof PLACEHOLDER_PORTRAIT_IDS)[number];
 export type StudioPortraitId = (typeof STUDIO_PORTRAIT_IDS)[number];
+export type SubjectPortraitId = (typeof SUBJECT_PORTRAIT_IDS)[number];
 
 /**
  * Who each studio portrait shows, so a template previewed with one carries a
@@ -87,6 +103,7 @@ const PORTRAIT_SETS: ReadonlyArray<readonly PlaceholderPortraitId[]> = [
   MONO_PORTRAIT_IDS,
   COLOUR_PORTRAIT_IDS,
   STUDIO_PORTRAIT_IDS,
+  SUBJECT_PORTRAIT_IDS,
 ];
 
 export function isPlaceholderPortraitId(value: unknown): value is PlaceholderPortraitId {

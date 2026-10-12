@@ -46,6 +46,7 @@ import { FULL_BLEED_BOX, uid, type CanvasElement, type DesignPage } from "@/lib/
 import {
   STUDIO_PORTRAIT_GENDER,
   type StudioPortraitId,
+  type SubjectPortraitId,
 } from "@/lib/placeholderPortraits";
 import {
   PLACEHOLDER_NAME,
@@ -859,6 +860,72 @@ function rugby(art: ArtworkUrls): ClassicDesign {
 }
 
 /* ------------------------------------------------------------------ */
+/* Child and pets                                                      */
+/* ------------------------------------------------------------------ */
+
+/** A baby's or child's dates: a short life, set out as the cover prints it. */
+export const CHILD_SUNRISE_SUNSET = "Sunrise: 17th April 2023 - Sunset: 5th October 2024";
+/** A pet's years. */
+export const PET_YEARS = "2012 - 2024";
+
+function rainbowSky(): ClassicDesign {
+  const blue = "#5aa8e0";
+  return {
+    paper: "#ffffff",
+    chrome: () => [ground(art("rainbow-sky.svg"))],
+    cover: () => [
+      fixed({ text: "In Loving Memory", fontFamily: "merriweather", fontSize: 16.5, bold: true, color: blue, x: 15, y: 8.2, w: 70, h: 0 }),
+      photo({ x: 30, y: 16.6, w: 40, h: 36.4 }),
+      shape({ shape: "rect", color: "#7cb9e8", strokeWidth: 2.5, x: 30, y: 16.6, w: 40, h: 36.4 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "merriweather", fontSize: 22, bold: true, uppercase: true, color: blue, x: 4, y: 55.6, w: 92, h: 0 }),
+      field({ text: CHILD_SUNRISE_SUNSET, fontFamily: "lato", fontSize: 11.5, bold: true, color: blue, x: 4, y: 62.4, w: 92, h: 0 }),
+      artwork(art("abc-blocks.svg"), { x: 40, y: 68.4, w: 20, h: squareH(20) }),
+    ],
+    type: { heading: "merriweather", body: "lato", script: "courgette", ink: "#3d7fb8", muted: "#4f6a85", accent: "#7cb9e8" },
+  };
+}
+
+/** A pet's portrait large on a pastel card, "In Loving Memory of", the name and years. */
+function petCard(ground: string, paws?: string): ClassicDesign {
+  const ink = "#1f1f1f";
+  const paw = (x: number, y: number, w: number, rotation: number) =>
+    ornament({ icon: "paw-print", color: paws ?? ground, rotation, x, y, w, h: squareH(w) });
+  return {
+    paper: "#ffffff",
+    chrome: () => [
+      shape({ shape: "rect", color: ground, fill: ground, strokeWidth: 1, x: 4, y: 3, w: 92, h: 94 }),
+      frame({ variant: "single", color: "#ffffff", x: 5.4, y: 4, w: 89.2, h: 92 }),
+      ...(paws ? [paw(8, 74, 7, -20), paw(15, 82, 6, -10), paw(84, 74, 7, 20), paw(77, 82, 6, 10)] : []),
+    ],
+    cover: () => [
+      photo({ border: "single", borderColor: "#ffffff", x: 18.3, y: 9, w: 62.3, h: 61.5 }),
+      fixed({ text: "In Loving Memory of", fontFamily: "courgette", fontSize: 19, color: ink, x: 12, y: 71.8, w: 76, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "quicksand", fontSize: 40, bold: true, uppercase: true, color: ink, x: 6, y: 76, w: 88, h: 0 }),
+      field({ text: PET_YEARS, fontFamily: "quicksand", fontSize: 19, color: ink, x: 20, y: 85.6, w: 60, h: 0 }),
+    ],
+    type: { heading: "quicksand", body: "quicksand", script: "courgette", ink, muted: "#4a4a4a", accent: "#7aa9c4" },
+  };
+}
+
+function whiteRabbits(): ClassicDesign {
+  const ink = "#1f1f1f";
+  return {
+    paper: "#c6e6f7",
+    chrome: () => [],
+    cover: () => [
+      shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 23.4, y: 6.6, w: 53.6, h: 49 }),
+      photo({ x: 24.5, y: 7.6, w: 51.4, h: 47 }),
+      fixed({ text: "In Loving Memory of", fontFamily: "courgette", fontSize: 18, color: ink, x: 12, y: 56.4, w: 76, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "quicksand", fontSize: 38, bold: true, uppercase: true, color: ink, x: 6, y: 60.4, w: 88, h: 0 }),
+      field({ text: PET_YEARS, fontFamily: "quicksand", fontSize: 18, color: ink, x: 20, y: 69.6, w: 60, h: 0 }),
+      artwork(art("bunny.svg"), { x: 0, y: 66, w: 30, h: squareH(30) / 0.6 }),
+      artwork(art("bunny-left.svg"), { x: 70, y: 66, w: 30, h: squareH(30) / 0.6 }),
+    ],
+    type: { heading: "quicksand", body: "quicksand", script: "courgette", ink, muted: "#4a4a4a", accent: "#7aa9c4" },
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Registry                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -912,6 +979,11 @@ const THEMED_DESIGNS = {
   football,
   golf,
   rugby,
+  "rainbow-sky": rainbowSky,
+  "rabbit-blue": () => petCard("#c6e6f7"),
+  "white-rabbits": whiteRabbits,
+  "paw-prints-green": () => petCard("#dcefd8", "#9cc58e"),
+  "paw-prints-lilac": () => petCard("#e6def4", "#b3a3d6"),
   "kickboxer-yellow": () => martialArts("#f3f2e3", "karate-silhouette.svg", { x: 20, y: 14, w: 76 }),
 } satisfies Record<string, (art: ArtworkUrls) => ClassicDesign>;
 
@@ -923,7 +995,8 @@ export const THEMED_DESIGN_IDS = Object.keys(THEMED_DESIGNS) as ThemedDesignId[]
 export interface Person {
   name: string;
   nickname: string;
-  gender: "woman" | "man";
+  /** Unset for a pet; the wording that would need one isn't on a pet's cover. */
+  gender?: "woman" | "man";
 }
 
 const person = (portrait: StudioPortraitId, name: string, nickname: string): Person => ({
@@ -947,6 +1020,18 @@ export const STUDIO_PEOPLE: Record<StudioPortraitId, Person> = {
   "portrait-20": person("portrait-20", "Rebecca Lewis", "Becky"),
   "portrait-21": person("portrait-21", "Peter Walsh", "Pete"),
 };
+
+/** The baby and the pets the subject portraits show. */
+export const SUBJECT_PEOPLE: Record<SubjectPortraitId, Person> = {
+  "portrait-22": { name: "Oliver Hughes", nickname: "Ollie", gender: "man" },
+  "portrait-23": { name: "Bramble", nickname: "Bramble" },
+  "portrait-24": { name: "Snowy", nickname: "Snowy" },
+  "portrait-25": { name: "Buddy", nickname: "Buddy" },
+  "portrait-26": { name: "Misty", nickname: "Misty" },
+};
+
+/** Who each pinnable stand-in shows. */
+const PEOPLE: Record<StudioPortraitId | SubjectPortraitId, Person> = { ...STUDIO_PEOPLE, ...SUBJECT_PEOPLE };
 
 /**
  * The designs' sample wording that names or genders the person, and what it
@@ -985,7 +1070,7 @@ export interface ThemedTemplateSpec {
   design: ThemedDesignId;
   categories: string[];
   /** The stand-in portrait its preview is drawn with, pinned on create. */
-  portrait: StudioPortraitId;
+  portrait: StudioPortraitId | SubjectPortraitId;
   /** Who the template is shown as — named and worded to match the portrait. */
   person: Person;
   /**
@@ -1000,7 +1085,7 @@ const CURATED_THEMED: Array<
     name: string,
     design: ThemedDesignId,
     categories: string[],
-    portrait: StudioPortraitId,
+    portrait: StudioPortraitId | SubjectPortraitId,
     backgrounds?: Array<[id: string, palette: PaletteId]>,
   ]
 > = [
@@ -1038,6 +1123,11 @@ const CURATED_THEMED: Array<
   ["Football", "football", ["sport"], "portrait-17", [["grass-band", "ink"]]],
   ["Golf", "golf", ["sport", "calm"], "portrait-19", [["sky-clouds", "ink"]]],
   ["Rugby", "rugby", ["sport"], "portrait-20", [["sky-clouds", "ink"]]],
+  ["Rainbow Sky", "rainbow-sky", ["child", "colourful"], "portrait-22"],
+  ["Rabbit Blue", "rabbit-blue", ["pets"], "portrait-23"],
+  ["White Rabbits", "white-rabbits", ["pets"], "portrait-24"],
+  ["Paw Prints Green", "paw-prints-green", ["pets"], "portrait-25"],
+  ["Paw Prints Lilac", "paw-prints-lilac", ["pets"], "portrait-26"],
 ];
 
 export const THEMED_TEMPLATE_SPECS: ThemedTemplateSpec[] = CURATED_THEMED.map(
@@ -1047,7 +1137,7 @@ export const THEMED_TEMPLATE_SPECS: ThemedTemplateSpec[] = CURATED_THEMED.map(
     design,
     categories,
     portrait,
-    person: STUDIO_PEOPLE[portrait],
+    person: PEOPLE[portrait],
     ...(backgrounds?.length ? { backgrounds } : {}),
   }),
 );
