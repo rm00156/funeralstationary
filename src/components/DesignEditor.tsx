@@ -69,6 +69,7 @@ import {
   FRAME_VARIANTS,
   INK_PALETTE,
   PAGE_BACKGROUND_PALETTE,
+  clipartBox,
   docTrim,
   instantiateLayout,
   makeStarterDoc,
@@ -751,6 +752,13 @@ export default function DesignEditor({
   const trim = docTrim(doc);
   const metrics = pageMetrics(trim);
   const pageLabel = (index: number) => templatePageLabel(index, format.templatePages);
+  const newClipart = (icon: string, aspect: number): CanvasElement => ({
+    id: uid("clipart"),
+    type: "clipart",
+    icon,
+    color: templateAccent(activeTemplate),
+    ...clipartBox(aspect, trim),
+  });
 
   /* ------------------------------ drag / resize ----------------------- */
 
@@ -1402,6 +1410,24 @@ export default function DesignEditor({
             </div>
           )}
 
+          {selected.type === "shape" && selected.shape !== "line" && (
+            <div className="flex items-center gap-1">
+              <div className="mx-1 h-6 w-px bg-outline-variant/50" aria-hidden />
+              <span className="font-body text-xs text-on-surface-variant">Fill</span>
+              <ToolbarButton
+                label="No fill"
+                active={!selected.fill}
+                onClick={() => updateSelected({ fill: undefined })}
+              >
+                <Ban size={16} aria-hidden />
+              </ToolbarButton>
+              <ColorPicker
+                value={selected.fill ?? "#ffffff"}
+                onChange={(fill) => updateSelected({ fill })}
+              />
+            </div>
+          )}
+
           {adjusting && (
             <>
               <span className="font-body text-sm text-on-surface-variant">
@@ -1829,23 +1855,12 @@ export default function DesignEditor({
             <div>
               <PanelHeading>Cliparts</PanelHeading>
               <div className="grid grid-cols-3 gap-2">
-                {CLIPARTS.map(({ id, label, Icon }) => (
+                {CLIPARTS.map(({ id, label, Icon, aspect = 1 }) => (
                   <button
                     key={id}
                     type="button"
                     aria-label={`Add ${label} clipart`}
-                    onClick={() =>
-                      addElement({
-                        id: uid("clipart"),
-                        type: "clipart",
-                        icon: id,
-                        color: templateAccent(activeTemplate),
-                        x: 42,
-                        y: 42,
-                        w: 16,
-                        h: 11.3,
-                      })
-                    }
+                    onClick={() => addElement(newClipart(id, aspect))}
                     className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-outline-variant/50 bg-surface-container-lowest text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
                   >
                     <Icon size={26} strokeWidth={1.5} aria-hidden />
@@ -2247,6 +2262,27 @@ export default function DesignEditor({
                       }
                     >
                       <FrameSwatch variant={variant} className="h-8 w-6" />
+                    </ElementSwatch>
+                  ))}
+                  {(["single", "double"] as const).map((variant) => (
+                    <ElementSwatch
+                      key={`notched-${variant}`}
+                      label={variant === "single" ? "notched" : "notched double"}
+                      onClick={() =>
+                        addElement({
+                          id: uid("frame"),
+                          type: "frame",
+                          variant,
+                          corners: "notched",
+                          color: "#1f1a1e",
+                          x: 4,
+                          y: 3,
+                          w: 92,
+                          h: 94,
+                        })
+                      }
+                    >
+                      <NotchedIcon size={30} />
                     </ElementSwatch>
                   ))}
                 </div>
@@ -2693,6 +2729,24 @@ function ArchIcon({ size = 16 }: { size?: number | string }) {
   );
 }
 
+function NotchedIcon({ size = 16 }: { size?: number | string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M8 4h8a4 4 0 0 0 4 4v8a4 4 0 0 0-4 4H8a4 4 0 0 0-4-4V8a4 4 0 0 0 4-4z" />
+    </svg>
+  );
+}
+
 const FRAME_VARIANT_LABELS: Record<FrameVariant, string> = {
   single: "Single",
   double: "Double",
@@ -2733,6 +2787,7 @@ const PHOTO_SHAPE_OPTIONS: {
   { id: "rect", label: "Rectangular photo", Icon: Square },
   { id: "oval", label: "Oval photo", Icon: Circle },
   { id: "arch", label: "Arch photo", Icon: ArchIcon },
+  { id: "notched", label: "Notched-corner photo", Icon: NotchedIcon },
 ];
 
 function ToolbarButton({

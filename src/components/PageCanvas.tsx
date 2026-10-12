@@ -41,6 +41,9 @@ import {
   pageMetrics,
   frameDepth,
   frameRings,
+  imageShape,
+  notchedMask,
+  notchedRingPath,
   photoBorderRadius,
   photoCrop,
   photoCropRect,
@@ -58,8 +61,15 @@ import {
   type ShapeElement,
   type TextElement,
 } from "@/lib/designEditor";
+import { Dove, ScrollDivider, ScrollFrame, Swash } from "@/components/Ornaments";
 
-export const CLIPARTS: { id: string; label: string; Icon: ComponentType<{ size?: number | string; strokeWidth?: number; color?: string }> }[] = [
+export const CLIPARTS: {
+  id: string;
+  label: string;
+  Icon: ComponentType<{ size?: number | string; strokeWidth?: number; color?: string }>;
+  /** Width ÷ height of the artwork, for one that isn't square. */
+  aspect?: number;
+}[] = [
   { id: "flower", label: "Flower", Icon: Flower2 },
   { id: "leaf", label: "Leaf", Icon: Leaf },
   { id: "bird", label: "Bird", Icon: Bird },
@@ -72,14 +82,22 @@ export const CLIPARTS: { id: string; label: string; Icon: ComponentType<{ size?:
   { id: "sparkles", label: "Sparkles", Icon: Sparkles },
   { id: "tree", label: "Tree", Icon: TreeDeciduous },
   { id: "candle", label: "Candle", Icon: Flame },
+  { id: "dove", label: "Dove", Icon: Dove, aspect: 64 / 48 },
+  { id: "swash", label: "Swash", Icon: Swash, aspect: 80 / 20 },
+  { id: "scroll-divider", label: "Scroll divider", Icon: ScrollDivider, aspect: 160 / 20 },
+  { id: "scroll-frame", label: "Scroll frame", Icon: ScrollFrame, aspect: 135 / 200 },
 ];
 
 /**
- * The trim width of the page being drawn, in base px. An arch window's radius
- * is half its width in px, and its width is a percentage of this — set by
- * PageCanvas and StaticPage so the element views don't each need the trim.
+ * The trim size of the page being drawn, in base px. An arch window's radius
+ * is half its width in px, and a notched frame is drawn at its own px size —
+ * both from element percentages of this. Set by PageCanvas and StaticPage so
+ * the element views don't each need the trim.
  */
-const PageWidthContext = createContext(pageMetrics(A5_TRIM).pageW);
+const PageSizeContext = createContext({
+  pageW: pageMetrics(A5_TRIM).pageW,
+  pageH: pageMetrics(A5_TRIM).pageH,
+});
 
 const fontCss = (id: FontFamilyId) =>
   FONT_OPTIONS.find((f) => f.id === id)?.css ?? "var(--font-body)";
@@ -154,7 +172,7 @@ export function PageCanvas({
 }) {
   const { pageW, pageH, artboardW, artboardH } = pageMetrics(trim);
   return (
-    <PageWidthContext.Provider value={pageW}>
+    <PageSizeContext.Provider value={{ pageW, pageH }}>
       <div
         style={{ width: artboardW * zoom, height: artboardH * zoom }}
         className="relative shrink-0"
@@ -252,7 +270,7 @@ export function PageCanvas({
           )}
         </div>
       </div>
-    </PageWidthContext.Provider>
+    </PageSizeContext.Provider>
   );
 }
 
@@ -453,12 +471,17 @@ function ImageContent({
   element: ImageElement;
   adjusting?: boolean;
 }) {
-  const pageW = useContext(PageWidthContext);
+  const { pageW, pageH } = useContext(PageSizeContext);
   const border = element.border;
   const inset = border ? frameDepth(border) : 0;
   const innerRadius = border ? photoInnerBorderRadius(element, inset, pageW) : undefined;
   const cover = element.fit !== "contain";
   const crop = photoCrop(element);
+  // A notched window is cut by a mask, not a border-radius; the photo inside
+  // a border is cut concentrically so it never shows past the border's notch.
+  const notched = imageShape(element) === "notched";
+  const outerMask = notched ? maskStyle(notchedMask()) : undefined;
+  const innerMask = notched ? maskStyle(notchedMask(inset)) : undefined;
   return (
     <>
       {adjusting && cover && element.src && (
@@ -468,12 +491,12 @@ function ImageContent({
         className={`relative h-full w-full overflow-hidden ${
           element.src || border ? "" : "border-2 border-dashed border-[#d3c2cd]"
         } ${element.src ? "" : "bg-[#faf6f8]"}`}
-        style={{ borderRadius: photoBorderRadius(element, pageW), padding: inset }}
+        style={{ borderRadius: photoBorderRadius(element, pageW), padding: inset, ...outerMask }}
       >
         <div
           data-photo-window
           className="relative h-full w-full overflow-hidden"
-          style={{ borderRadius: innerRadius ?? photoBorderRadius(element, pageW) }}
+          style={{ borderRadius: innerRadius ?? photoBorderRadius(element, pageW), ...innerMask }}
         >
           {element.src ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -496,11 +519,20 @@ function ImageContent({
         </div>
         {border && (
           <div className="pointer-events-none absolute inset-0">
-            <FrameRings
-              variant={border}
-              color={element.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR}
-              radiusAt={(offset) => photoInnerBorderRadius(element, offset, pageW)}
-            />
+            {notched ? (
+              <NotchedRings
+                variant={border}
+                color={element.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR}
+                w={(element.w / 100) * pageW}
+                h={(element.h / 100) * pageH}
+              />
+            ) : (
+              <FrameRings
+                variant={border}
+                color={element.borderColor ?? DEFAULT_PHOTO_BORDER_COLOR}
+                radiusAt={(offset) => photoInnerBorderRadius(element, offset, pageW)}
+              />
+            )}
           </div>
         )}
       </div>
@@ -581,6 +613,7 @@ function ShapeContent({ element }: { element: ShapeElement }) {
       style={{
         border: `${element.strokeWidth}px solid ${element.color}`,
         borderRadius: element.shape === "circle" ? "50%" : 0,
+        backgroundColor: element.fill,
       }}
     />
   );
@@ -596,7 +629,60 @@ function ClipartContent({ element }: { element: ClipartElement }) {
 }
 
 function FrameContent({ element }: { element: FrameElement }) {
+  const { pageW, pageH } = useContext(PageSizeContext);
+  if (element.corners === "notched") {
+    return (
+      <NotchedRings
+        variant={element.variant}
+        color={element.color}
+        w={(element.w / 100) * pageW}
+        h={(element.h / 100) * pageH}
+      />
+    );
+  }
   return <FrameRings variant={element.variant} color={element.color} />;
+}
+
+/** Both spellings: Chromium prints the unprefixed one, older Safari needs -webkit-. */
+const maskStyle = (mask: string): React.CSSProperties => ({ mask, WebkitMask: mask });
+
+/**
+ * A frame's lines with notched corners, drawn as SVG at the box's own px size
+ * so each notch is a true quarter circle whatever the box's shape. The same
+ * line widths and gaps as FrameRings, so a notched border matches a square
+ * one beside it.
+ */
+function NotchedRings({
+  variant,
+  color,
+  w,
+  h,
+}: {
+  variant: FrameVariant;
+  color: string;
+  w: number;
+  h: number;
+}) {
+  const rings = frameRings(variant);
+  const paths = rings.map((width, i) => {
+    // This ring's outer edge: every ring and gap outside it.
+    const offset = rings.slice(0, i).reduce((sum, ring) => sum + ring + FRAME_RING_GAP, 0);
+    return { width, d: notchedRingPath(w, h, offset + width / 2) };
+  });
+  return (
+    <svg
+      width="100%"
+      height="100%"
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      className="block overflow-visible"
+      aria-hidden
+    >
+      {paths.map(({ width, d }) => (
+        <path key={d} d={d} fill="none" stroke={color} strokeWidth={width} />
+      ))}
+    </svg>
+  );
 }
 
 /**
@@ -654,7 +740,7 @@ export function StaticPage({
 }) {
   const { pageW, pageH } = pageMetrics(trim);
   return (
-    <PageWidthContext.Provider value={pageW}>
+    <PageSizeContext.Provider value={{ pageW, pageH }}>
       <div
         style={{ width: pageW * scale, height: pageH * scale }}
         className={`relative shrink-0 overflow-hidden ${
@@ -693,6 +779,6 @@ export function StaticPage({
           ))}
         </div>
       </div>
-    </PageWidthContext.Provider>
+    </PageSizeContext.Provider>
   );
 }
