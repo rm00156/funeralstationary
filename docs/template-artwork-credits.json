@@ -329,6 +329,34 @@
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gander_Bay_lake_sunset._(Unsplash).jpg"
   },
   {
+    "id": "meadow-wash",
+    "name": "Meadow",
+    "licence": "CC0",
+    "credit": "Flowering grass up close, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Flowering_grass_up_close_(Unsplash).jpg"
+  },
+  {
+    "id": "waterfall-band",
+    "name": "Waterfall",
+    "licence": "CC0",
+    "credit": "Idyllic landscape with a waterfall, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Idyllic_landscape_with_a_waterfall_(Unsplash).jpg"
+  },
+  {
+    "id": "grass-band",
+    "name": "Grass",
+    "licence": "CC0",
+    "credit": "Great Grass, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Great_Grass_(Unsplash).jpg"
+  },
+  {
+    "id": "red-sunset-band",
+    "name": "Red Sunset",
+    "licence": "CC0",
+    "credit": "The setting sun over the ocean islands, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:The_setting_sun_over_the_ocean_islands_(Unsplash).jpg"
+  },
+  {
     "id": "museum-guitar",
     "name": "Guitar",
     "licence": "CC0",

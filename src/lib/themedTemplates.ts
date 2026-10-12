@@ -22,6 +22,7 @@ import {
   SERVICE_TIME,
   SERVICE_WHEN,
   SERVICE_WHEN_AT,
+  SERVICE_WHEN_DASH,
   SERVICE_WHEN_LINE,
   SUNRISE_SUNSET,
   SUNRISE_SUNSET_STACKED,
@@ -671,6 +672,189 @@ function martialArts(paper: string, silhouette: string, box: { x: number; y: num
 }
 
 /* ------------------------------------------------------------------ */
+/* Landscapes and sport                                                */
+/* ------------------------------------------------------------------ */
+
+/** A drawn sports piece (public/elements/templates) at its own proportions. */
+const kit = (file: string, aspect: number, x: number, y: number, w: number) =>
+  artwork(art(file), { x, y, w, h: squareH(w) / aspect });
+
+/** The drawn turf along the foot of a sky — no free photograph has a low enough horizon. */
+const turf = () => artwork(art("turf.svg"), { x: -4, y: 81.6, w: 108, h: squareH(108) / (154 / 40) });
+
+function fields(art: ArtworkUrls): ClassicDesign {
+  const navy = "#24408e";
+  const ink = "#1f2a44";
+  return {
+    paper: "#e6ece2",
+    chrome: () => [
+      ground(art.background("meadow-wash", "ink")),
+      shape({ shape: "rect", color: navy, strokeWidth: 2.5, x: 3.2, y: 2.4, w: 93.6, h: 95.2 }),
+    ],
+    cover: () => [
+      fixed({ text: "A Celebration of the Life of", fontFamily: "ebGaramond", fontSize: 13, color: ink, x: 15, y: 7.2, w: 70, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 22, bold: true, uppercase: true, color: navy, x: 6, y: 11.2, w: 88, h: 0 }),
+      field({ text: DATES_LONG, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: ink, x: 15, y: 19.4, w: 70, h: 0 }),
+      shape({ shape: "rect", color: "#111111", strokeWidth: 4, x: 26.4, y: 24, w: 47.2, h: 47 }),
+      photo({ border: "single", borderColor: "#ffffff", x: 27.6, y: 24.9, w: 44.8, h: 45.2 }),
+      fixed({ text: "Funeral Mass", fontFamily: "ebGaramond", fontSize: 15, bold: true, color: navy, x: 25, y: 75.2, w: 50, h: 0 }),
+      field({ text: SERVICE_WHEN_DASH, fontFamily: "ebGaramond", fontSize: 11.5, bold: true, color: ink, x: 12, y: 81.2, w: 76, h: 0 }),
+      field({ text: VENUE_LINE, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 8, y: 86.6, w: 84, h: 0 }),
+      field({ text: PLACEHOLDER_OFFICIANT, fontFamily: "ebGaramond", fontSize: 11, bold: true, italic: true, color: ink, x: 12, y: 89.2, w: 76, h: 0 }),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: navy },
+    interior: plainInterior({ heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: navy }),
+  };
+}
+
+function mountainWaterfall(art: ArtworkUrls): ClassicDesign {
+  const ink = "#1f2a44";
+  return {
+    paper: "#93a8dc",
+    chrome: () => [ground(art.background("waterfall-band", "periwinkle"))],
+    cover: () => [
+      fixed({ text: "Memorial & Thanksgiving Service For", fontFamily: "pinyonScript", fontSize: 18, color: ink, x: 10, y: 5.8, w: 80, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "pinyonScript", fontSize: 28, color: ink, x: 10, y: 9.4, w: 80, h: 0 }),
+      shape({ shape: "rect", color: "#2b2b2b", fill: "#ffffff", strokeWidth: 1, x: 29.6, y: 15.8, w: 42.4, h: 36.2 }),
+      photo({ x: 30.6, y: 16.6, w: 40.4, h: 34.6 }),
+      field({ text: DATES_LONG, fontFamily: "pinyonScript", fontSize: 18, color: ink, x: 10, y: 53, w: 80, h: 0 }),
+      field({ text: "Forever loved, forever missed,\nalways in our hearts.", fontFamily: "ebGaramond", fontSize: 11, italic: true, color: ink, x: 12, y: 57.8, w: 76, h: 0 }),
+      field({ text: VENUE_TWO_LINES, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: ink, x: 12, y: 63, w: 76, h: 0 }),
+      field({ text: SERVICE_WHEN_LINE, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: ink, x: 12, y: 68.4, w: 76, h: 0 }),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: "#2f5597" },
+    interior: plainInterior({ heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: "#2f5597" }),
+    backTop: 22,
+  };
+}
+
+function redSunset(art: ArtworkUrls): ClassicDesign {
+  const grey = "#6a6a6a";
+  return {
+    paper: "#ffffff",
+    chrome: () => [ground(art.background("red-sunset-band", "wine"))],
+    cover: () => [
+      fixed({ text: "In Loving Memory of", fontFamily: "inter", fontSize: 13, italic: true, color: "#8a8a8a", x: 15, y: 12.6, w: 70, h: 0 }),
+      field({ text: "a very special wife and friend", fontFamily: "inter", fontSize: 11.5, italic: true, color: "#8a8a8a", x: 12, y: 15.6, w: 76, h: 0 }),
+      photo({ shape: "oval", border: "single", borderColor: "#b5b5b5", x: 30.4, y: 21, w: 39.2, h: 32.4 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "inter", fontSize: 23, bold: true, color: "#555555", x: 8, y: 56.8, w: 84, h: 0 }),
+      field({ text: DATES_LONG, fontFamily: "inter", fontSize: 13, italic: true, color: grey, x: 12, y: 62, w: 76, h: 0 }),
+      field({ text: `${VENUE_SHORT}\n${SERVICE_WHEN_LINE}`, fontFamily: "inter", fontSize: 11, color: "#8a8a8a", x: 10, y: 68.6, w: 80, h: 0 }),
+    ],
+    type: { heading: "inter", body: "inter", script: "pinyonScript", ink: "#555555", muted: grey, accent: "#a3325f" },
+    backTop: 30,
+  };
+}
+
+/** The sports covers' shared head: an overline, the name, Sunrise/Sunset. */
+const sportHead = (overline: CanvasElement, ink: string, nameSize = 21) => [
+  overline,
+  field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: nameSize, bold: true, uppercase: true, color: ink, x: 6, y: 11.8, w: 88, h: 0 }),
+  field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: ink, x: 8, y: 17.4, w: 84, h: 0 }),
+];
+
+/** "SERVICE:" / "VENUE:" blocks, centred or set left. */
+function serviceBlocks(ink: string, top: number, align: "center" | "left" = "center"): CanvasElement[] {
+  const x = align === "left" ? 7 : 12;
+  const w = align === "left" ? 46 : 76;
+  return [
+    fixed({ text: "Service:", fontFamily: "marcellus", fontSize: 12, bold: true, uppercase: true, align, color: ink, x, y: top, w, h: 0 }),
+    field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11.5, bold: true, align, color: ink, x, y: top + 2.6, w, h: 0 }),
+    fixed({ text: "Venue:", fontFamily: "marcellus", fontSize: 12, bold: true, uppercase: true, align, color: ink, x, y: top + 9.8, w, h: 0 }),
+    field({ text: VENUE_TWO_LINES, fontFamily: "ebGaramond", fontSize: 11.5, bold: true, align, color: ink, x, y: top + 12.4, w, h: 0 }),
+  ];
+}
+
+function basketball(): ClassicDesign {
+  const ink = GREY_INK;
+  return {
+    paper: "#ffffff",
+    chrome: () => [frame({ variant: "single", corners: "notched", color: "#bdbdbd", x: 3.4, y: 2.4, w: 93.2, h: 95.2 })],
+    cover: () => [
+      ...sportHead(fixed({ text: "Celebrating the life of", fontFamily: "marcellus", fontSize: 12, uppercase: true, color: "#555555", x: 15, y: 7.8, w: 70, h: 0 }), ink, 22),
+      photo({ border: "single", borderColor: "#333333", x: 29.4, y: 22, w: 39.6, h: 33.2 }),
+      kit("basketball.svg", 1, 42.4, 58.8, 18),
+      kit("basketball-hoop.svg", 1, 51, 58.4, 56),
+      ...serviceBlocks(ink, 76.6, "left"),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#e06f1f" },
+  };
+}
+
+function cricket(art: ArtworkUrls): ClassicDesign {
+  const red = "#b8322a";
+  const ink = GREY_INK;
+  return {
+    paper: "#ffffff",
+    chrome: () => [ground(art.background("grass-band", "ink"))],
+    cover: () => [
+      fixed({ text: "In Loving Memory Of", fontFamily: "pinyonScript", fontSize: 25, color: ink, x: 15, y: 5.6, w: 70, h: 0 }),
+      photo({ x: 25, y: 12, w: 50, h: 45 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 18, uppercase: true, color: red, x: 8, y: 57.8, w: 84, h: 0 }),
+      field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: ink, x: 6, y: 62.8, w: 88, h: 0 }),
+      field({ text: VENUE, fontFamily: "ebGaramond", fontSize: 10.5, color: ink, x: 20, y: 66.6, w: 60, h: 0 }),
+      field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 10.5, color: ink, x: 20, y: 74.2, w: 60, h: 0 }),
+      kit("cricket-ball.svg", 1, 73.6, 82.4, 22),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: red },
+  };
+}
+
+function football(art: ArtworkUrls): ClassicDesign {
+  const ink = "#3a3a3a";
+  return {
+    paper: "#ffffff",
+    chrome: () => [ground(art.background("grass-band", "ink"))],
+    cover: () => [
+      fixed({ text: "In Loving Memory of", fontFamily: "pinyonScript", fontSize: 28, color: ink, x: 12, y: 13.6, w: 76, h: 0 }),
+      photo({ shape: "oval", border: "single", borderColor: "#c9c9c9", x: 33.8, y: 22, w: 32.4, h: 30 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "pinyonScript", fontSize: 38, color: ink, x: 6, y: 55, w: 88, h: 0 }),
+      field({ text: DATES_LONG, fontFamily: "pinyonScript", fontSize: 22, color: ink, x: 8, y: 62.6, w: 84, h: 0 }),
+      kit("football.svg", 1, 38, 80, 24),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#3f8f2f" },
+    backTop: 30,
+  };
+}
+
+function golf(art: ArtworkUrls): ClassicDesign {
+  const ink = "#1f2a44";
+  return {
+    paper: "#cfe2f5",
+    chrome: () => [ground(art.background("sky-clouds", "ink")), turf()],
+    cover: () => [
+      ...sportHead(fixed({ text: "In Loving Memory of", fontFamily: "pinyonScript", fontSize: 24, color: ink, x: 15, y: 5.8, w: 70, h: 0 }), ink, 20),
+      shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 30.8, y: 23.2, w: 36.8, h: 31.6 }),
+      photo({ x: 31.6, y: 23.9, w: 35.2, h: 30.2 }),
+      kit("golf-flag.svg", 16 / 44, 21, 50, 8),
+      ...serviceBlocks(ink, 57.8),
+      kit("golf-ball-tee.svg", 20 / 36, 67, 68, 12),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: "#3f8f2f" },
+    interior: plainInterior({ heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#3f8f2f" }),
+  };
+}
+
+function rugby(art: ArtworkUrls): ClassicDesign {
+  const ink = "#1f2a44";
+  return {
+    paper: "#cfe2f5",
+    chrome: () => [ground(art.background("sky-clouds", "ink")), turf()],
+    cover: () => [
+      ...sportHead(fixed({ text: "Celebrating the life of", fontFamily: "marcellus", fontSize: 12, uppercase: true, color: ink, x: 15, y: 7.4, w: 70, h: 0 }), ink),
+      shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 30, y: 21.4, w: 39.2, h: 34.2 }),
+      photo({ x: 30.8, y: 22.1, w: 37.6, h: 32.8 }),
+      ...serviceBlocks(ink, 58.2),
+      fixed({ text: "Officiating Minister:", fontFamily: "marcellus", fontSize: 11, uppercase: true, color: ink, x: 15, y: 77.6, w: 70, h: 0 }),
+      field({ text: "Reverend Jane Smith", fontFamily: "ebGaramond", fontSize: 10.5, bold: true, italic: true, color: ink, x: 20, y: 80, w: 60, h: 0 }),
+      kit("rugby-ball.svg", 60 / 38, 66, 79.6, 34),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: "#3f8f2f" },
+    interior: plainInterior({ heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#3f8f2f" }),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Registry                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -716,6 +900,14 @@ const THEMED_DESIGNS = {
   melody,
   bookworm,
   "karate-grey": () => martialArts("#eef1f6", "karate-silhouette-left.svg", { x: 0, y: 14, w: 78 }),
+  fields,
+  "mountain-waterfall": mountainWaterfall,
+  "red-sunset": redSunset,
+  basketball,
+  cricket,
+  football,
+  golf,
+  rugby,
   "kickboxer-yellow": () => martialArts("#f3f2e3", "karate-silhouette.svg", { x: 20, y: 14, w: 76 }),
 } satisfies Record<string, (art: ArtworkUrls) => ClassicDesign>;
 
@@ -777,6 +969,14 @@ const CURATED_THEMED: Array<
   ["Bookworm", "bookworm", ["sport", "simple"], "portrait-4", []],
   ["Karate Grey", "karate-grey", ["sport", "modern"], "portrait-7", []],
   ["Kickboxer Yellow", "kickboxer-yellow", ["sport", "modern"], "portrait-5", []],
+  ["Fields", "fields", ["nature", "calm"], "portrait-7", [["meadow-wash", "ink"]]],
+  ["Mountain Waterfall", "mountain-waterfall", ["nature", "calm"], "portrait-4", [["waterfall-band", "periwinkle"]]],
+  ["Red Sunset", "red-sunset", ["nature", "modern"], "portrait-9", [["red-sunset-band", "wine"]]],
+  ["Basketball", "basketball", ["sport"], "portrait-8", []],
+  ["Cricket", "cricket", ["sport"], "portrait-2", [["grass-band", "ink"]]],
+  ["Football", "football", ["sport"], "portrait-4", [["grass-band", "ink"]]],
+  ["Golf", "golf", ["sport", "calm"], "portrait-8", [["sky-clouds", "ink"]]],
+  ["Rugby", "rugby", ["sport"], "portrait-7", [["sky-clouds", "ink"]]],
 ];
 
 export const THEMED_TEMPLATE_SPECS: ThemedTemplateSpec[] = CURATED_THEMED.map(
