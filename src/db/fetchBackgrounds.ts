@@ -262,6 +262,7 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
       tint: spec.tint ?? DEFAULT_TINT,
       glow: layout.glow ?? null,
       shade: layout.shade ?? null,
+      mirror: spec.mirror ?? false,
     });
     const url = await saveBackgroundAsset(spec.id, palette, jpeg, format);
     console.log(`  ✓ ${spec.id}/${palette}/${format} → ${url} (${Math.round(jpeg.length / 1024)} KB)`);

@@ -32,9 +32,62 @@ export const COLOUR_PORTRAIT_IDS = [
   "portrait-8",
   "portrait-9",
 ] as const;
-export const PLACEHOLDER_PORTRAIT_IDS = [...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS] as const;
+/**
+ * Studio head-and-shoulders portraits on a plain grey ground, for the themed
+ * covers. Pinned per template (and offered in the admin picker) rather than
+ * dealt out automatically, so adding them didn't change any existing
+ * template's face. Each has a recorded gender — see STUDIO_PORTRAIT_GENDER.
+ */
+export const STUDIO_PORTRAIT_IDS = [
+  "portrait-10",
+  "portrait-11",
+  "portrait-12",
+  "portrait-13",
+  "portrait-14",
+  "portrait-15",
+  "portrait-16",
+  "portrait-17",
+  "portrait-18",
+  "portrait-19",
+  "portrait-20",
+  "portrait-21",
+] as const;
+
+export const PLACEHOLDER_PORTRAIT_IDS = [
+  ...MONO_PORTRAIT_IDS,
+  ...COLOUR_PORTRAIT_IDS,
+  ...STUDIO_PORTRAIT_IDS,
+] as const;
 
 export type PlaceholderPortraitId = (typeof PLACEHOLDER_PORTRAIT_IDS)[number];
+export type StudioPortraitId = (typeof STUDIO_PORTRAIT_IDS)[number];
+
+/**
+ * Who each studio portrait shows, so a template previewed with one carries a
+ * matching name and wording ("husband" or "wife") — a man's face over a
+ * woman's name reads as a mistake.
+ */
+export const STUDIO_PORTRAIT_GENDER: Record<StudioPortraitId, "woman" | "man"> = {
+  "portrait-10": "woman",
+  "portrait-11": "man",
+  "portrait-12": "woman",
+  "portrait-13": "man",
+  "portrait-14": "woman",
+  "portrait-15": "man",
+  "portrait-16": "woman",
+  "portrait-17": "man",
+  "portrait-18": "woman",
+  "portrait-19": "man",
+  "portrait-20": "woman",
+  "portrait-21": "man",
+};
+
+/** The sets a pick can belong to; a rotation stays inside its pick's set. */
+const PORTRAIT_SETS: ReadonlyArray<readonly PlaceholderPortraitId[]> = [
+  MONO_PORTRAIT_IDS,
+  COLOUR_PORTRAIT_IDS,
+  STUDIO_PORTRAIT_IDS,
+];
 
 export function isPlaceholderPortraitId(value: unknown): value is PlaceholderPortraitId {
   return (PLACEHOLDER_PORTRAIT_IDS as readonly unknown[]).includes(value);
@@ -113,9 +166,7 @@ export function portraitRotationFor(
 ): PlaceholderPortraitId[] {
   const pick = isPlaceholderPortraitId(chosen) ? chosen : null;
   const set = pick
-    ? (MONO_PORTRAIT_IDS as readonly PlaceholderPortraitId[]).includes(pick)
-      ? MONO_PORTRAIT_IDS
-      : COLOUR_PORTRAIT_IDS
+    ? PORTRAIT_SETS.find((candidate) => candidate.includes(pick))!
     : portraitSetForPage(cover);
   const start = set.indexOf(pick ?? portraitIdForSeed(seed, set));
   return set.map((_, i) => set[(start + i) % set.length]);

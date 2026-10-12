@@ -2,7 +2,7 @@
  * Bulk template generator (`npm run templates:generate`).
  *
  * Turns the curated specs in src/lib/templateGenerator.ts and
- * src/lib/classicTemplates.ts (booklets) and
+ * src/lib/classicTemplates.ts and src/lib/themedTemplates.ts (booklets) and
  * src/lib/flatTemplates.ts (cards, bookmarks, the memory board) into real
  * catalogue rows: one templates row per spec, its layout published, and a
  * preview thumbnail rendered from the first page at its product's trim.
@@ -67,6 +67,7 @@ import {
   type FlatTemplateSpec,
 } from "@/lib/flatTemplates";
 import { CLASSIC_TEMPLATE_SPECS, buildClassicLayout } from "@/lib/classicTemplates";
+import { THEMED_TEMPLATE_SPECS, buildThemedLayout } from "@/lib/themedTemplates";
 import {
   TEMPLATE_SPECS,
   buildTemplateLayout,
@@ -238,6 +239,33 @@ async function jobs(): Promise<Job[]> {
           trim: booklet.trim,
           portrait: spec.portrait,
           build: async () => buildClassicLayout(spec.design),
+        }),
+      ),
+    );
+    list.push(
+      ...THEMED_TEMPLATE_SPECS.map(
+        (spec): Job => ({
+          slug: spec.slug,
+          name: spec.name,
+          productSlug: bookletProduct,
+          categories: spec.categories,
+          trim: booklet.trim,
+          portrait: spec.portrait,
+          build: async () => {
+            for (const [id, palette] of spec.backgrounds ?? []) {
+              if (!isStorageConfigured() && !(await backgroundAssetExists(id, palette))) {
+                return { missing: `background "${id}/${palette}"` };
+              }
+            }
+            return buildThemedLayout(
+              spec.design,
+              {
+                background: (id, palette) => backgroundAssetUrl(id, palette),
+                spray: (id) => sprayAssetUrl(id),
+              },
+              spec.person,
+            );
+          },
         }),
       ),
     );
