@@ -157,6 +157,12 @@ export interface BackgroundSpec {
      */
     monochrome?: string;
   };
+  /**
+   * Flip the photograph left to right — a cross that stands on the right of
+   * its frame, where the layout needs it on the left. `focus` still refers to
+   * the source as it was taken.
+   */
+  mirror?: boolean;
   /** Which zone compositions should put the name and dates in. */
   textZone: TextZone;
   /** Palettes to render a tinted variant for. Empty for a plate used only as a cutout. */
@@ -680,6 +686,78 @@ const MANIFEST: readonly BackgroundSpec[] = [
     "Twee vlinders bij een lelie, RP-T-1957-339. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
     // A ruled border inside the sheet: trimmed past it.
     { tolerance: 36, inset: 0.09, minIsland: 0.003 }),
+
+  // The themed covers (themedTemplates.ts). Full-page skies are unshaded:
+  // their type is dark, set on the pale part of the sky, not light type on
+  // a darkened edge.
+  sky("sky-rays", "Sunbeams", "File:Clouds and sun rays.jpg",
+    "Clouds and sun rays, by Urmila Suthar. Via Wikimedia Commons.",
+    // The inset loses the date stamp, roof and tree tip along the bottom;
+    // the wash lifts its deep blue enough for dark type.
+    { x: 0.4, y: 0.45 }, 0.08, 0.35),
+    // Mirrored: the cross stands on the left, the portrait beside it.
+  { ...sky("cross-sky", "Wooden Cross", "File:Aaron Burden 2016-03-21 (Unsplash).jpg",
+    "Wooden cross against the sky, by Aaron Burden, via Unsplash. Via Wikimedia Commons.",
+    { x: 0.62, y: 0.45 }, 0.02), mirror: true },
+  sky("sky-clouds", "Blue Sky", "File:Bright blue sky with scenic white cloud patterns.jpg",
+    "Bright blue sky with scenic white cloud patterns, by Trixia Lao. Via Wikimedia Commons.",
+    { x: 0.5, y: 0.6 }, 0.02),
+  {
+    id: "sheet-music",
+    name: "Sheet Music",
+    source: { kind: "commons", file: "File:Hand-music-musician-compose (24218546222).jpg" },
+    licence: "CC0",
+    credit: "Hand, music, musician, compose. Via Wikimedia Commons.",
+    // Knocked right back: the whole cover's type sits on it.
+    focus: { x: 0.6, y: 0.5 },
+    inset: 0,
+    wash: 0.78,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "piano-keys",
+    name: "Piano Keys",
+    source: { kind: "commons", file: "File:Lauberger & Gloss keyboard in black and white (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Lauberger & Gloss keyboard in black and white, via Unsplash. Via Wikimedia Commons.",
+    // The keys and the hands, below the maker's name on the fallboard.
+    placement: { x: 0, y: 66, w: 100, h: 34 },
+    focus: { x: 0.5, y: 0.8 },
+    inset: 0,
+    fade: { edge: "top", start: 73, end: 66 },
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["noir"],
+  },
+  {
+    id: "lake-sunset-ember",
+    name: "Lake at Sunset (ember sky)",
+    source: { kind: "commons", file: "File:Gander Bay lake sunset. (Unsplash).jpg" },
+    licence: "CC0",
+    credit: "Gander Bay lake sunset, via Unsplash. Via Wikimedia Commons.",
+    placement: { x: 0, y: 50, w: 100, h: 50 },
+    focus: { x: 0.6, y: 0.55 },
+    inset: 0,
+    fade: { edge: "top", start: 64, end: 50 },
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ember"],
+  },
+  cutout("museum-guitar", "Guitar",
+    { kind: "commons", file: "File:Gitarre-Museum für Kunst und Gewerbe Hamburg-1992.32.tif" },
+    "CC0",
+    "Gitarre, Museum für Kunst und Gewerbe Hamburg, 1992.32. Via Wikimedia Commons.",
+    { tolerance: 30, inset: 0.02, cropBottom: 0, minIsland: 0.002 }),
+  cutout("old-books", "Old Books",
+    { kind: "commons", file: "File:Old Books 01.JPG" },
+    "CC0",
+    "Old Books 01. Via Wikimedia Commons.",
+    // Black and white, as the Bookworm cover prints it.
+    { tolerance: 40, inset: 0.02, cropBottom: 0, minIsland: 0.003, monochrome: "#2b2b2b" }),
 ];
 
 /**
@@ -757,6 +835,31 @@ function scene(
     tint: 0,
     shade: { color: "#0d0b10", ...shade },
     bookmark: bookmarkFocus ? { focus: bookmarkFocus } : {},
+    textZone: "top",
+    palettes: ["ink"],
+  };
+}
+
+/** A full-page sky for a themed cover: untinted, unwashed, unshaded. */
+function sky(
+  id: string,
+  name: string,
+  file: string,
+  credit: string,
+  focus: { x: number; y: number },
+  inset: number,
+  wash = 0,
+): BackgroundSpec {
+  return {
+    id,
+    name,
+    source: { kind: "commons", file },
+    licence: "CC0",
+    credit,
+    focus,
+    inset,
+    wash,
+    tint: 0,
     textZone: "top",
     palettes: ["ink"],
   };

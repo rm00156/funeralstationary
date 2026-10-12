@@ -167,6 +167,12 @@ export const TEMPLATE_PALETTES = {
   wine: { accent: "#7a1f2e", ink: "#1f1a1e", muted: "#4f434c", paper: "#ffffff" },
   violet: { accent: "#5e3a8c", ink: "#1f1a1e", muted: "#4f434c", paper: "#ffffff" },
   blue: { accent: "#2f5597", ink: "#1f1a1e", muted: "#4f434c", paper: "#ffffff" },
+  // Grounds a photograph fades into on the themed covers (themedTemplates.ts):
+  // the dark sky over Golden Sunset, the evening blue over Mountain Waterfall,
+  // the black above Grand Piano's keys.
+  ember: { accent: "#7a1f2e", ink: "#ffffff", muted: "#f4f1ee", paper: "#2a0d0b" },
+  periwinkle: { accent: "#2f5597", ink: "#1f1a1e", muted: "#4f434c", paper: "#93a8dc" },
+  noir: { accent: "#5b4a2f", ink: "#ffffff", muted: "#f4f1ee", paper: "#000000" },
 } as const satisfies Record<string, Omit<TemplateStyle, "heading" | "body" | "script" | "icon">>;
 
 export type PaletteId = keyof typeof TEMPLATE_PALETTES;

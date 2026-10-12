@@ -61,6 +61,8 @@ export interface BackgroundRenderOptions {
   tint: number;
   glow: BackgroundSpec["glow"] | null;
   shade: BackgroundSpec["shade"] | null;
+  /** Draw the photograph flipped left to right. */
+  mirror: boolean;
   /** Which artboard to render: the A5 page (default) or the bookmark. */
   format?: BackgroundFormat;
 }
@@ -110,7 +112,15 @@ async function drawInBrowser(input: DrawInput): Promise<string> {
   const sh = rh / scale;
   const sx = ix + (iw - sw) * input.focus.x;
   const sy = iy + (ih - sh) * input.focus.y;
-  ctx.drawImage(image, sx, sy, sw, sh, rx, ry, rw, rh);
+  if (input.mirror) {
+    ctx.save();
+    ctx.translate(rx * 2 + rw, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(image, sx, sy, sw, sh, rx, ry, rw, rh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(image, sx, sy, sw, sh, rx, ry, rw, rh);
+  }
 
   // Tint toward the accent (multiply keeps the drawing's own shading), then
   // wash toward paper so text set over it still has contrast.

@@ -413,6 +413,264 @@ function bobMarley(): ClassicDesign {
 }
 
 /* ------------------------------------------------------------------ */
+/* Photographs and candles                                             */
+/* ------------------------------------------------------------------ */
+
+/** The drawn candles (candles.svg / blue-candles.svg) in a cover's bottom-right corner. */
+const candles = (file: string, x: number, y: number, w: number) =>
+  artwork(art(file), { x, y, w, h: squareH(w) / (90 / 136) });
+
+/** A band of colour across the page, bleeding off both edges — Candlelight's years. */
+const yearsBand = (color: string, y: number, text: string) => [
+  shape({ shape: "rect", color, fill: color, strokeWidth: 1, x: -4, y, w: 108, h: 4.6 }),
+  field({ text: "1936", fontFamily: "ebGaramond", fontSize: 16, align: "left", color: text, x: 4, y: y + 0.6, w: 20, h: 0 }),
+  field({ text: "2024", fontFamily: "ebGaramond", fontSize: 16, align: "right", color: text, x: 76, y: y + 0.6, w: 20, h: 0 }),
+];
+
+function blueCandles(): ClassicDesign {
+  const ink = "#3b4a6b";
+  return {
+    paper: "#4a86c8",
+    chrome: () => [ground(art("blue-fade.svg"))],
+    cover: () => [
+      fixed({ text: "In Loving Memory", fontFamily: "pinyonScript", fontSize: 24, color: ink, x: 20, y: 5.8, w: 60, h: 0 }),
+      shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 23.4, y: 13.4, w: 53.6, h: 42.8 }),
+      photo({ x: 25, y: 14.6, w: 50.4, h: 40.4 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "marcellus", fontSize: 18, uppercase: true, letterSpacing: 0.5, color: "#ffffff", x: 10, y: 58.2, w: 80, h: 0 }),
+      field({ text: DATES_LONG, fontFamily: "ebGaramond", fontSize: 11, color: "#ffffff", x: 15, y: 63, w: 70, h: 0 }),
+      field({ text: "88 years old", fontFamily: "ebGaramond", fontSize: 11, italic: true, color: "#ffffff", x: 25, y: 65.6, w: 50, h: 0 }),
+      ornament({ icon: "latin-cross", color: "#c9a35b", ...aspectBox(46.8, 69.6, 6.4, 20 / 32) }),
+      fixed({ text: "Please remember me in your prayers", fontFamily: "ebGaramond", fontSize: 10.5, italic: true, color: "#1d2f55", x: 4, y: 80.2, w: 56, h: 0 }),
+      candles("blue-candles.svg", 57, 62, 38),
+    ],
+    type: { heading: "marcellus", body: "ebGaramond", script: "pinyonScript", ink: "#1d2f55", muted: "#1d2f55", accent: "#ffffff" },
+  };
+}
+
+function candlelight(): ClassicDesign {
+  const ink = "#2b2b2b";
+  const maroon = "#6e2a3c";
+  return {
+    paper: "#cdbfa9",
+    chrome: () => [ground(art("candle-shine.svg"))],
+    cover: () => [
+      fixed({ text: "In Celebration of the life of", fontFamily: "pinyonScript", fontSize: 23, color: ink, x: 10, y: 5.6, w: 80, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 24, bold: true, uppercase: true, color: ink, x: 6, y: 12.6, w: 88, h: 0 }),
+      ...yearsBand(maroon, 43.2, "#ffffff"),
+      shape({ shape: "rect", color: maroon, fill: maroon, strokeWidth: 1, x: 24.6, y: 23.4, w: 50.8, h: 43.4 }),
+      photo({ x: 25.8, y: 24.3, w: 48.4, h: 41.6 }),
+      fixed({ text: "Church service led by:", fontFamily: "ebGaramond", fontSize: 10.5, bold: true, align: "left", color: ink, x: 7, y: 70.2, w: 50, h: 0 }),
+      field({ text: "Reverend Jane Smith, at", fontFamily: "ebGaramond", fontSize: 10.5, italic: true, align: "left", color: ink, x: 7, y: 72.6, w: 50, h: 0 }),
+      field({ text: `${VENUE}\n${SERVICE_TIME}`, fontFamily: "ebGaramond", fontSize: 10.5, italic: true, align: "left", color: ink, x: 7, y: 75, w: 50, h: 0 }),
+      fixed({ text: "Burial at:", fontFamily: "ebGaramond", fontSize: 10.5, bold: true, align: "left", color: ink, x: 7, y: 84.6, w: 50, h: 0 }),
+      field({ text: "Reading Cemetery, Cemetery Junction\n1.00pm", fontFamily: "ebGaramond", fontSize: 10.5, italic: true, align: "left", color: ink, x: 7, y: 87, w: 54, h: 0 }),
+      candles("candles.svg", 63, 63, 35),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: maroon },
+  };
+}
+
+function goldenShineCandles(): ClassicDesign {
+  const ink = "#2b2015";
+  const brown = "#4a3520";
+  return {
+    paper: "#b89a63",
+    chrome: () => [ground(art("golden-shine.svg"))],
+    cover: () => [
+      field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 24, bold: true, uppercase: true, color: ink, x: 6, y: 13.4, w: 88, h: 0 }),
+      field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: ink, x: 6, y: 19.6, w: 88, h: 0 }),
+      ...yearsBand(brown, 46.4, "#ffffff"),
+      shape({ shape: "rect", color: brown, fill: brown, strokeWidth: 1, x: 25.8, y: 24.6, w: 48.4, h: 42 }),
+      photo({ x: 27, y: 25.5, w: 46, h: 40.2 }),
+      field({ text: `${SERVICE_WHEN_LINE}\n${VENUE_SHORT}`, fontFamily: "ebGaramond", fontSize: 12, bold: true, color: ink, x: 5, y: 69.6, w: 70, h: 0 }),
+      candles("candles.svg", 62, 65, 36),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: brown },
+  };
+}
+
+function doveInTheClouds(art: ArtworkUrls): ClassicDesign {
+  const blue = "#2c5aa0";
+  const navy = "#1b2f55";
+  return {
+    paper: "#cfe2f5",
+    chrome: () => [ground(art.background("sky-rays", "ink"))],
+    cover: () => [
+      fixed({ text: "In Loving Memory", fontFamily: "marcellus", fontSize: 15, uppercase: true, letterSpacing: 0.5, color: "#ffffff", x: 15, y: 6.2, w: 70, h: 0 }),
+      shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 28.6, y: 12.4, w: 42.8, h: 35.8 }),
+      photo({ x: 29.4, y: 13, w: 41.2, h: 34.6 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "marcellus", fontSize: 19, uppercase: true, color: "#ffffff", x: 8, y: 50.8, w: 84, h: 0 }),
+      field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: navy, x: 8, y: 55.6, w: 84, h: 0 }),
+      ornament({ icon: "dove", color: "#ffffff", ...aspectBox(40, 60.6, 20, 64 / 48) }),
+      fixed({ text: "Service:", fontFamily: "marcellus", fontSize: 12, bold: true, uppercase: true, color: navy, x: 30, y: 78.6, w: 40, h: 0 }),
+      field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: navy, x: 20, y: 81, w: 60, h: 0 }),
+      fixed({ text: "Venue:", fontFamily: "marcellus", fontSize: 12, bold: true, uppercase: true, color: navy, x: 30, y: 87.6, w: 40, h: 0 }),
+      field({ text: VENUE_TWO_LINES, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: navy, x: 12, y: 90, w: 76, h: 0 }),
+    ],
+    type: { heading: "marcellus", body: "ebGaramond", script: "pinyonScript", ink: navy, muted: navy, accent: blue },
+    interior: plainInterior({ heading: "marcellus", body: "ebGaramond", script: "pinyonScript", ink: navy, muted: navy, accent: blue }),
+  };
+}
+
+function religiousCrossSunlight(art: ArtworkUrls): ClassicDesign {
+  const white = "#ffffff";
+  const navy = "#1b2f55";
+  return {
+    paper: "#b9d3ee",
+    chrome: () => [ground(art.background("cross-sky", "ink"))],
+    cover: () => [
+      fixed({ text: "Celebrating The Life Of", fontFamily: "pinyonScript", fontSize: 22, color: white, x: 15, y: 6.2, w: 70, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "marcellus", fontSize: 26, uppercase: true, color: white, x: 6, y: 11.2, w: 88, h: 0 }),
+      field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: navy, x: 8, y: 18.4, w: 84, h: 0 }),
+      photo({ border: "single", borderColor: white, x: 35, y: 24.4, w: 41.6, h: 35.4 }),
+      fixed({ text: "Funeral Service:", fontFamily: "ebGaramond", fontSize: 12.5, bold: true, italic: true, color: navy, x: 32, y: 66.2, w: 56, h: 0 }),
+      field({ text: `${SERVICE_WHEN_LINE}\n${VENUE_TWO_LINES}`, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: navy, x: 30, y: 69, w: 60, h: 0 }),
+      fixed({ text: "Committal:", fontFamily: "ebGaramond", fontSize: 12, bold: true, italic: true, color: navy, x: 32, y: 78.6, w: 56, h: 0 }),
+      field({ text: "Reading Crematorium, 1.00pm", fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: navy, x: 30, y: 81.2, w: 60, h: 0 }),
+      fixed({ text: "Reception:", fontFamily: "ebGaramond", fontSize: 12, bold: true, italic: true, color: navy, x: 32, y: 85.6, w: 56, h: 0 }),
+      field({ text: "The Crown, High Street, Reading", fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: navy, x: 30, y: 88.2, w: 60, h: 0 }),
+    ],
+    type: { heading: "marcellus", body: "ebGaramond", script: "pinyonScript", ink: navy, muted: navy, accent: "#2c5aa0" },
+    interior: plainInterior({ heading: "marcellus", body: "ebGaramond", script: "pinyonScript", ink: navy, muted: navy, accent: "#2c5aa0" }),
+  };
+}
+
+function goldenSunset(art: ArtworkUrls): ClassicDesign {
+  const white = "#ffffff";
+  const cream = "#f6e6cf";
+  return {
+    paper: "#2a0d0b",
+    chrome: () => [ground(art.background("lake-sunset-ember", "ember"))],
+    cover: () => [
+      fixed({ text: "Funeral Service\nand celebration of the life of", fontFamily: "ebGaramond", fontSize: 15, italic: true, color: cream, x: 10, y: 6.4, w: 80, h: 0 }),
+      shape({ shape: "rect", color: white, fill: white, strokeWidth: 1, x: 28.6, y: 18, w: 42.8, h: 39 }),
+      photo({ x: 29.6, y: 18.8, w: 40.8, h: 37.4 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 19, bold: true, uppercase: true, color: white, x: 8, y: 59.2, w: 84, h: 0 }),
+      field({ text: DATES_LONG, fontFamily: "ebGaramond", fontSize: 11, color: cream, x: 15, y: 64, w: 70, h: 0 }),
+      field({ text: `${CHURCH}\n${SERVICE_DAY}\n${SERVICE_TIME}`, fontFamily: "ebGaramond", fontSize: 11, bold: true, italic: true, color: cream, x: 15, y: 69.6, w: 70, h: 0 }),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink: white, muted: cream, accent: "#d9822b" },
+    interior: plainInterior({ heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink: GREY_INK, muted: GREY_MUTED, accent: "#7a1f2e" }),
+  };
+}
+
+function grandPiano(art: ArtworkUrls): ClassicDesign {
+  const gold = "#c9a35b";
+  const white = "#ffffff";
+  return {
+    paper: "#000000",
+    chrome: () => [
+      ground(art.background("piano-keys", "noir")),
+      frame({ variant: "single", corners: "notched", color: gold, x: 4.6, y: 3, w: 90.8, h: 94 }),
+    ],
+    cover: () => [
+      fixed({ text: "Celebrating the life of", fontFamily: "pinyonScript", fontSize: 23, color: white, x: 15, y: 6.4, w: 70, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 24, bold: true, uppercase: true, color: white, x: 7, y: 11.6, w: 86, h: 0 }),
+      field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: white, x: 8, y: 17.6, w: 84, h: 0 }),
+      photo({ border: "double", borderColor: gold, x: 30.4, y: 22.4, w: 39.2, h: 33.8 }),
+      fixed({ text: "Service:", fontFamily: "marcellus", fontSize: 11.5, uppercase: true, color: white, x: 30, y: 58.4, w: 40, h: 0 }),
+      field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11, color: white, x: 20, y: 60.8, w: 60, h: 0 }),
+      fixed({ text: "Venue:", fontFamily: "marcellus", fontSize: 11.5, uppercase: true, color: white, x: 30, y: 67.2, w: 40, h: 0 }),
+      field({ text: VENUE_TWO_LINES, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: white, x: 12, y: 69.6, w: 76, h: 0 }),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink: white, muted: white, accent: gold },
+    interior: {
+      type: { paper: "#ffffff", heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink: GREY_INK, muted: GREY_MUTED, accent: gold },
+      chrome: () => [frame({ variant: "single", corners: "notched", color: gold, x: 4.6, y: 3, w: 90.8, h: 94 })],
+    },
+    backTop: 30,
+  };
+}
+
+/** The music and bookworm covers: script, name, Sunrise/Sunset, framed portrait, the service. */
+function musicCover(ink: string, photoBorder: "single" | "double"): CanvasElement[] {
+  return [
+    fixed({ text: "Celebrating the life of", fontFamily: "pinyonScript", fontSize: 23, color: ink, x: 15, y: 6.6, w: 70, h: 0 }),
+    field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 24, bold: true, uppercase: true, color: ink, x: 7, y: 12.2, w: 86, h: 0 }),
+    field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: ink, x: 8, y: 18.2, w: 84, h: 0 }),
+    photo({ border: photoBorder, borderColor: "#333333", x: 29.6, y: 23.4, w: 40.8, h: 32.4 }),
+  ];
+}
+
+function guitar(art: ArtworkUrls): ClassicDesign {
+  const ink = GREY_INK;
+  return {
+    paper: "#ffffff",
+    chrome: () => [],
+    cover: () => [
+      ...musicCover(ink, "single"),
+      fixed({ text: "Service:", fontFamily: "marcellus", fontSize: 11.5, uppercase: true, color: ink, x: 30, y: 58.6, w: 40, h: 0 }),
+      field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 20, y: 61, w: 60, h: 0 }),
+      fixed({ text: "Venue:", fontFamily: "marcellus", fontSize: 11.5, uppercase: true, color: ink, x: 30, y: 67.6, w: 40, h: 0 }),
+      field({ text: VENUE_TWO_LINES, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 12, y: 70, w: 76, h: 0 }),
+      { ...artwork(art.spray("museum-guitar"), { x: 38, y: 50, w: 26, h: 70 }), rotation: 100 },
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#b98a4e" },
+  };
+}
+
+function melody(art: ArtworkUrls): ClassicDesign {
+  const ink = GREY_INK;
+  return {
+    paper: "#ffffff",
+    chrome: () => [ground(art.background("sheet-music", "ink"))],
+    cover: () => [
+      ...musicCover(ink, "double"),
+      field({ text: "“Forever in our hearts, and in every song”", fontFamily: "ebGaramond", fontSize: 11, italic: true, color: "#7a1f2e", x: 8, y: 58.6, w: 84, h: 0 }),
+      fixed({ text: "Service:", fontFamily: "marcellus", fontSize: 11.5, uppercase: true, color: ink, x: 30, y: 63, w: 40, h: 0 }),
+      field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 20, y: 65.4, w: 60, h: 0 }),
+      fixed({ text: "Venue:", fontFamily: "marcellus", fontSize: 11.5, uppercase: true, color: ink, x: 30, y: 72, w: 40, h: 0 }),
+      field({ text: VENUE_TWO_LINES, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 12, y: 74.4, w: 76, h: 0 }),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#7a1f2e" },
+    interior: plainInterior({ heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#7a1f2e" }),
+  };
+}
+
+function bookworm(art: ArtworkUrls): ClassicDesign {
+  const ink = GREY_INK;
+  return {
+    paper: "#ffffff",
+    chrome: () => [],
+    cover: () => [
+      fixed({ text: "In loving memory of", fontFamily: "pinyonScript", fontSize: 26, color: "#444444", x: 15, y: 7.8, w: 70, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 19, bold: true, uppercase: true, color: ink, x: 8, y: 14.6, w: 84, h: 0 }),
+      field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: ink, x: 8, y: 19.6, w: 84, h: 0 }),
+      photo({ border: "single", borderColor: "#999999", x: 30.2, y: 24.8, w: 39.6, h: 42.6 }),
+      artwork(art.spray("old-books"), { x: 14, y: 69, w: 72, h: 30 }),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#8a8a8a" },
+  };
+}
+
+/** A martial-arts silhouette behind the portrait, inside a fine double rule. */
+function martialArts(paper: string, silhouette: string, box: { x: number; y: number; w: number }): ClassicDesign {
+  const ink = GREY_INK;
+  const rule = "#a9b0bb";
+  return {
+    paper,
+    chrome: () => [
+      shape({ shape: "rect", color: rule, strokeWidth: 2, x: 3.6, y: 2.6, w: 92.8, h: 94.8 }),
+      frame({ variant: "single", color: rule, x: 5, y: 3.6, w: 90, h: 92.8 }),
+    ],
+    cover: () => [
+      artwork(art(silhouette), { ...box, h: squareH(box.w) / (226.78 / 253.33) }),
+      fixed({ text: "Celebrating the life of", fontFamily: "marcellus", fontSize: 12, uppercase: true, color: "#555555", x: 15, y: 7.8, w: 70, h: 0 }),
+      field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 21, bold: true, uppercase: true, color: ink, x: 8, y: 11.4, w: 84, h: 0 }),
+      field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: ink, x: 8, y: 16.8, w: 84, h: 0 }),
+      photo({ border: "single", borderColor: "#888888", x: 30, y: 22.4, w: 38.4, h: 36.8 }),
+      fixed({ text: "Service:", fontFamily: "ebGaramond", fontSize: 11.5, bold: true, color: ink, x: 30, y: 62.6, w: 40, h: 0 }),
+      field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 20, y: 65, w: 60, h: 0 }),
+      fixed({ text: "Venue:", fontFamily: "ebGaramond", fontSize: 11.5, bold: true, color: ink, x: 30, y: 72, w: 40, h: 0 }),
+      field({ text: VENUE_TWO_LINES, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 12, y: 74.4, w: 76, h: 0 }),
+      fixed({ text: "Officiating Minister:", fontFamily: "ebGaramond", fontSize: 11.5, bold: true, color: ink, x: 25, y: 81.6, w: 50, h: 0 }),
+      field({ text: "Reverend Jane Smith", fontFamily: "ebGaramond", fontSize: 11, bold: true, italic: true, color: ink, x: 20, y: 84, w: 60, h: 0 }),
+    ],
+    type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: rule },
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Registry                                                            */
 /* ------------------------------------------------------------------ */
 
@@ -447,6 +705,18 @@ const THEMED_DESIGNS = {
   "guyana-thanksgiving": guyanaThanksgiving,
   "golden-shine": goldenShine,
   "bob-marley": bobMarley,
+  "blue-candles": blueCandles,
+  candlelight,
+  "golden-shine-candles": goldenShineCandles,
+  "dove-in-the-clouds": doveInTheClouds,
+  "religious-cross-sunlight": religiousCrossSunlight,
+  "golden-sunset": goldenSunset,
+  "grand-piano": grandPiano,
+  guitar,
+  melody,
+  bookworm,
+  "karate-grey": () => martialArts("#eef1f6", "karate-silhouette-left.svg", { x: 0, y: 14, w: 78 }),
+  "kickboxer-yellow": () => martialArts("#f3f2e3", "karate-silhouette.svg", { x: 20, y: 14, w: 76 }),
 } satisfies Record<string, (art: ArtworkUrls) => ClassicDesign>;
 
 export type ThemedDesignId = keyof typeof THEMED_DESIGNS;
@@ -473,7 +743,13 @@ export interface ThemedTemplateSpec {
 }
 
 const CURATED_THEMED: Array<
-  [name: string, design: ThemedDesignId, categories: string[], portrait: PlaceholderPortraitId]
+  [
+    name: string,
+    design: ThemedDesignId,
+    categories: string[],
+    portrait: PlaceholderPortraitId,
+    backgrounds?: Array<[id: string, palette: PaletteId]>,
+  ]
 > = [
   ["Celtic Cross", "celtic-cross", ["religious", "classic"], "portrait-6"],
   ["Grey Cross", "grey-cross", ["religious", "simple"], "portrait-8"],
@@ -489,8 +765,27 @@ const CURATED_THEMED: Array<
   ["Guyana Thanksgiving", "guyana-thanksgiving", ["cultural", "colourful"], "portrait-2"],
   ["Golden Shine", "golden-shine", ["classic", "religious"], "portrait-7"],
   ["Bob Marley", "bob-marley", ["music", "cultural", "colourful"], "portrait-7"],
+  ["Blue Candles", "blue-candles", ["religious", "calm"], "portrait-4", []],
+  ["Candlelight", "candlelight", ["religious", "classic"], "portrait-7", []],
+  ["Golden Shine Candles", "golden-shine-candles", ["religious", "classic"], "portrait-9", []],
+  ["Dove in the Clouds", "dove-in-the-clouds", ["religious", "birds", "calm"], "portrait-6", [["sky-rays", "ink"]]],
+  ["Religious Cross Sunlight", "religious-cross-sunlight", ["religious", "calm"], "portrait-8", [["cross-sky", "ink"]]],
+  ["Golden Sunset", "golden-sunset", ["nature", "calm"], "portrait-4", [["lake-sunset-ember", "ember"]]],
+  ["Grand Piano", "grand-piano", ["music", "classic"], "portrait-2", [["piano-keys", "noir"]]],
+  ["Guitar", "guitar", ["music", "simple"], "portrait-9", []],
+  ["Melody", "melody", ["music", "calm"], "portrait-5", [["sheet-music", "ink"]]],
+  ["Bookworm", "bookworm", ["sport", "simple"], "portrait-4", []],
+  ["Karate Grey", "karate-grey", ["sport", "modern"], "portrait-7", []],
+  ["Kickboxer Yellow", "kickboxer-yellow", ["sport", "modern"], "portrait-5", []],
 ];
 
 export const THEMED_TEMPLATE_SPECS: ThemedTemplateSpec[] = CURATED_THEMED.map(
-  ([name, design, categories, portrait]) => ({ slug: slugForName(name), name, design, categories, portrait }),
+  ([name, design, categories, portrait, backgrounds]) => ({
+    slug: slugForName(name),
+    name,
+    design,
+    categories,
+    portrait,
+    ...(backgrounds?.length ? { backgrounds } : {}),
+  }),
 );

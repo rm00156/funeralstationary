@@ -287,6 +287,62 @@
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Twee_vlinders_bij_een_lelie,_RP-T-1957-339.jpg"
   },
   {
+    "id": "sky-rays",
+    "name": "Sunbeams",
+    "licence": "CC0",
+    "credit": "Clouds and sun rays, by Urmila Suthar. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Clouds_and_sun_rays.jpg"
+  },
+  {
+    "id": "cross-sky",
+    "name": "Wooden Cross",
+    "licence": "CC0",
+    "credit": "Wooden cross against the sky, by Aaron Burden, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Aaron_Burden_2016-03-21_(Unsplash).jpg"
+  },
+  {
+    "id": "sky-clouds",
+    "name": "Blue Sky",
+    "licence": "CC0",
+    "credit": "Bright blue sky with scenic white cloud patterns, by Trixia Lao. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Bright_blue_sky_with_scenic_white_cloud_patterns.jpg"
+  },
+  {
+    "id": "sheet-music",
+    "name": "Sheet Music",
+    "licence": "CC0",
+    "credit": "Hand, music, musician, compose. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hand-music-musician-compose_(24218546222).jpg"
+  },
+  {
+    "id": "piano-keys",
+    "name": "Piano Keys",
+    "licence": "CC0",
+    "credit": "Lauberger & Gloss keyboard in black and white, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lauberger_%26_Gloss_keyboard_in_black_and_white_(Unsplash).jpg"
+  },
+  {
+    "id": "lake-sunset-ember",
+    "name": "Lake at Sunset (ember sky)",
+    "licence": "CC0",
+    "credit": "Gander Bay lake sunset, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gander_Bay_lake_sunset._(Unsplash).jpg"
+  },
+  {
+    "id": "museum-guitar",
+    "name": "Guitar",
+    "licence": "CC0",
+    "credit": "Gitarre, Museum für Kunst und Gewerbe Hamburg, 1992.32. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gitarre-Museum_f%C3%BCr_Kunst_und_Gewerbe_Hamburg-1992.32.tif"
+  },
+  {
+    "id": "old-books",
+    "name": "Old Books",
+    "licence": "CC0",
+    "credit": "Old Books 01. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Old_Books_01.JPG"
+  },
+  {
     "id": "crocus-meadow-low",
     "name": "Crocus Meadow (low)",
     "licence": "CC0",
