@@ -68,7 +68,7 @@ describe("buildClassicLayout", () => {
       const ids = [...pages.map((p) => p.id), ...pages.flatMap((p) => p.elements.map((e) => e.id))];
       expect(new Set(ids).size).toBe(ids.length);
     }
-    const [a, b] = [buildClassicLayout("blue-oval"), buildClassicLayout("blue-oval")];
+    const [a, b] = [buildClassicLayout("star"), buildClassicLayout("star")];
     expect(a[0].elements[0].id).not.toBe(b[0].elements[0].id);
   });
 
@@ -93,7 +93,7 @@ describe("buildClassicLayout", () => {
   });
 
   it("sets a deep ground's interior on paper, so a running order stays readable", () => {
-    const [cover, interior, back] = buildClassicLayout("burgundy-gold");
+    const [cover, interior, back] = buildClassicLayout("classic-posh");
     expect(cover.background).toBe(back.background);
     expect(interior.background).not.toBe(cover.background);
   });

@@ -1,9 +1,9 @@
 /**
- * The classic family: the plain, formal covers most families actually order —
- * a line border (square or notched), a portrait, the name, "Sunrise / Sunset"
- * and the service details set out in full, on white, a pastel ground or a deep
- * one. Each design is its own composition, measured from the covers the
- * market sells, built only from the editor's own vocabulary (frames, filled
+ * The classic family: the business's own long-standing range of plain, formal
+ * covers, under their original names — a line border (square or notched), a
+ * portrait, the name, "Sunrise / Sunset" and the service details set out in
+ * full, on white, a pastel ground or a deep one. Each was measured from the
+ * existing covers and rebuilt from the editor's own vocabulary (frames, filled
  * panels, the hand-drawn ornaments in Ornaments.tsx) so a customer can edit
  * every part of it.
  *
@@ -387,18 +387,18 @@ function blueOval(): ClassicDesign {
 }
 
 const CLASSIC_DESIGNS = {
-  "notched-portrait": notchedPortrait,
-  "notched-border": notchedBorder,
-  "burgundy-gold": burgundyGold,
-  "simple-celebration": simpleCelebration,
-  "script-order": scriptOrder,
-  "powder-blue": () => pastelCard("#b3e0f6"),
-  "soft-apricot": () => pastelCard("#f7d5ae"),
-  "gilded-scroll": gildedScroll,
-  "silver-border": silverBorder,
-  "peach-scroll": peachScroll,
-  "dove-of-peace": doveOfPeace,
-  "blue-oval": blueOval,
+  "border-corner-2": notchedPortrait,
+  "border-corners": notchedBorder,
+  "classic-posh": burgundyGold,
+  "classic-template": simpleCelebration,
+  "classic-template-2": scriptOrder,
+  "classic-template-blue": () => pastelCard("#b3e0f6"),
+  "classic-template-peach": () => pastelCard("#f7d5ae"),
+  "order-of-gold": gildedScroll,
+  "outer-border": silverBorder,
+  "peach-tones": peachScroll,
+  "single-dove": doveOfPeace,
+  "star": blueOval,
 } satisfies Record<string, () => ClassicDesign>;
 
 export type ClassicDesignId = keyof typeof CLASSIC_DESIGNS;
@@ -455,18 +455,18 @@ export interface ClassicTemplateSpec {
 const CURATED_CLASSIC: Array<
   [name: string, design: ClassicDesignId, categories: string[], portrait: PlaceholderPortraitId]
 > = [
-  ["Notched Portrait", "notched-portrait", ["classic", "simple"], "portrait-4"],
-  ["Notched Border", "notched-border", ["classic", "simple"], "portrait-5"],
-  ["Burgundy and Gold", "burgundy-gold", ["classic", "colourful"], "portrait-1"],
-  ["Simple Celebration", "simple-celebration", ["simple", "minimalistic"], "portrait-6"],
-  ["Script Order of Service", "script-order", ["simple", "minimalistic", "classic"], "portrait-7"],
-  ["Powder Blue", "powder-blue", ["colourful", "calm"], "portrait-8"],
-  ["Soft Apricot", "soft-apricot", ["colourful", "calm"], "portrait-9"],
-  ["Gilded Scroll", "gilded-scroll", ["classic", "religious"], "portrait-6"],
-  ["Silver Border", "silver-border", ["classic", "simple"], "portrait-2"],
-  ["Peach Scroll", "peach-scroll", ["colourful", "classic"], "portrait-7"],
-  ["Dove of Peace", "dove-of-peace", ["religious", "birds", "classic"], "portrait-8"],
-  ["Blue Oval", "blue-oval", ["modern", "simple"], "portrait-5"],
+  ["Border Corner 2", "border-corner-2", ["classic", "simple"], "portrait-4"],
+  ["Border Corners", "border-corners", ["classic", "simple"], "portrait-5"],
+  ["Classic Posh", "classic-posh", ["classic", "colourful"], "portrait-1"],
+  ["Classic Template", "classic-template", ["simple", "minimalistic"], "portrait-6"],
+  ["Classic Template 2", "classic-template-2", ["simple", "minimalistic", "classic"], "portrait-7"],
+  ["Classic Template Blue", "classic-template-blue", ["colourful", "calm"], "portrait-8"],
+  ["Classic Template Peach", "classic-template-peach", ["colourful", "calm"], "portrait-9"],
+  ["Order of Gold", "order-of-gold", ["classic", "religious"], "portrait-6"],
+  ["Outer Border", "outer-border", ["classic", "simple"], "portrait-2"],
+  ["Peach Tones", "peach-tones", ["colourful", "classic"], "portrait-7"],
+  ["Single Dove", "single-dove", ["religious", "birds", "classic"], "portrait-8"],
+  ["Star", "star", ["modern", "simple"], "portrait-5"],
 ];
 
 export const CLASSIC_TEMPLATE_SPECS: ClassicTemplateSpec[] = CURATED_CLASSIC.map(
