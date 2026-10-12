@@ -250,8 +250,12 @@ describe("clipartBox", () => {
     expect(((box.w / 100) * 148) / ((box.h / 100) * 210)).toBeCloseTo(8, 2);
   });
 
-  it("adds a tall frame nearly filling the page", () => {
-    const box = clipartBox(135 / 200, A5_TRIM);
+  it("adds a small upright motif small, whatever its shape", () => {
+    expect(clipartBox(20 / 32, A5_TRIM).w).toBe(16);
+  });
+
+  it("adds a whole-page frame at the width it asks for", () => {
+    const box = clipartBox(135 / 200, A5_TRIM, 90);
     expect(box.w).toBe(90);
     expect(box.h).toBeLessThan(100);
     expect(box.y).toBeGreaterThan(0);

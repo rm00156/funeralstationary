@@ -61,7 +61,19 @@ import {
   type ShapeElement,
   type TextElement,
 } from "@/lib/designEditor";
-import { Dove, ScrollDivider, ScrollFrame, Swash } from "@/components/Ornaments";
+import {
+  BuddedCross,
+  CelticCross,
+  CornerCurl,
+  CornerKnot,
+  Dove,
+  HeartBranch,
+  LatinCross,
+  OutlineCross,
+  ScrollDivider,
+  ScrollFrame,
+  Swash,
+} from "@/components/Ornaments";
 
 export const CLIPARTS: {
   id: string;
@@ -69,6 +81,8 @@ export const CLIPARTS: {
   Icon: ComponentType<{ size?: number | string; strokeWidth?: number; color?: string }>;
   /** Width ÷ height of the artwork, for one that isn't square. */
   aspect?: number;
+  /** Percent of the page width it's added at, when the default (clipartBox) is wrong. */
+  width?: number;
 }[] = [
   { id: "flower", label: "Flower", Icon: Flower2 },
   { id: "leaf", label: "Leaf", Icon: Leaf },
@@ -85,7 +99,14 @@ export const CLIPARTS: {
   { id: "dove", label: "Dove", Icon: Dove, aspect: 64 / 48 },
   { id: "swash", label: "Swash", Icon: Swash, aspect: 80 / 20 },
   { id: "scroll-divider", label: "Scroll divider", Icon: ScrollDivider, aspect: 160 / 20 },
-  { id: "scroll-frame", label: "Scroll frame", Icon: ScrollFrame, aspect: 135 / 200 },
+  { id: "scroll-frame", label: "Scroll frame", Icon: ScrollFrame, aspect: 135 / 200, width: 90 },
+  { id: "latin-cross", label: "Plain cross", Icon: LatinCross, aspect: 20 / 32 },
+  { id: "outline-cross", label: "Outline cross", Icon: OutlineCross, aspect: 20 / 32 },
+  { id: "budded-cross", label: "Budded cross", Icon: BuddedCross, aspect: 20 / 32 },
+  { id: "celtic-cross", label: "Celtic cross", Icon: CelticCross, aspect: 20 / 32 },
+  { id: "corner-knot", label: "Corner knot", Icon: CornerKnot },
+  { id: "corner-curl", label: "Corner curl", Icon: CornerCurl },
+  { id: "heart-branch", label: "Heart branch", Icon: HeartBranch },
 ];
 
 /**

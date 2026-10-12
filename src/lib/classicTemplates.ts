@@ -60,14 +60,14 @@ export const VENUE_TWO_LINES = "St Mary's Church,\nChurch Road, Reading RG1 2AB"
 export const INTERMENT = "Reading Crematorium\nAll Hallows Road\nReading RG4 5LP";
 
 /** The square-box height (in % of page height) for a width in % of page width. */
-const squareH = (w: number) => (w * PAGE_W_MM) / PAGE_H_MM;
+export const squareH = (w: number) => (w * PAGE_W_MM) / PAGE_H_MM;
 
 type TextProps = Omit<TextElement, "id" | "type" | "placeholder" | "align"> & {
   align?: TextElement["align"];
 };
 
 /** Wording that is part of the design ("Service:", "In Loving Memory"). */
-const fixed = ({ align = "center", ...props }: TextProps): CanvasElement => ({
+export const fixed = ({ align = "center", ...props }: TextProps): CanvasElement => ({
   id: uid("text"),
   type: "text",
   align,
@@ -75,35 +75,35 @@ const fixed = ({ align = "center", ...props }: TextProps): CanvasElement => ({
 });
 
 /** Wording the family replaces — the name, dates, service details. */
-const field = (props: TextProps): CanvasElement => ({ ...fixed(props), placeholder: true }) as CanvasElement;
+export const field = (props: TextProps): CanvasElement => ({ ...fixed(props), placeholder: true }) as CanvasElement;
 
-const photo = (props: Omit<ImageElement, "id" | "type" | "src">): CanvasElement => ({
+export const photo = (props: Omit<ImageElement, "id" | "type" | "src">): CanvasElement => ({
   id: uid("image"),
   type: "image",
   src: null,
   ...props,
 });
 
-const frame = (props: Omit<FrameElement, "id" | "type">): CanvasElement => ({
+export const frame = (props: Omit<FrameElement, "id" | "type">): CanvasElement => ({
   id: uid("frame"),
   type: "frame",
   ...props,
 });
 
-const shape = (props: Omit<ShapeElement, "id" | "type">): CanvasElement => ({
+export const shape = (props: Omit<ShapeElement, "id" | "type">): CanvasElement => ({
   id: uid("shape"),
   type: "shape",
   ...props,
 });
 
-const ornament = (props: Omit<ClipartElement, "id" | "type">): CanvasElement => ({
+export const ornament = (props: Omit<ClipartElement, "id" | "type">): CanvasElement => ({
   id: uid("clipart"),
   type: "clipart",
   ...props,
 });
 
 /** A box `w`% wide holding artwork of the given width ÷ height. */
-const aspectBox = (x: number, y: number, w: number, aspect: number) => ({
+export const aspectBox = (x: number, y: number, w: number, aspect: number) => ({
   x,
   y,
   w,
@@ -111,7 +111,7 @@ const aspectBox = (x: number, y: number, w: number, aspect: number) => ({
 });
 
 /** What the interior and back pages are typeset in. */
-interface PageType {
+export interface PageType {
   paper: string;
   heading: FontFamilyId;
   body: FontFamilyId;
@@ -121,7 +121,7 @@ interface PageType {
   accent: string;
 }
 
-interface ClassicDesign {
+export interface ClassicDesign {
   /** Page colour of every page. */
   paper: string;
   /** The border, ground panels and ornaments — on every page. */
@@ -133,10 +133,15 @@ interface ClassicDesign {
    * too dark to read a running order on page after page.
    */
   interior?: { type: PageType; chrome: () => CanvasElement[] };
+  /**
+   * Where the back page's farewell starts (percent of page height), for a
+   * ground whose middle isn't clear — a flag's arrowhead. Default 37.
+   */
+  backTop?: number;
 }
 
-const GREY_INK = "#2b2b2b";
-const GREY_MUTED = "#4a4a4a";
+export const GREY_INK = "#2b2b2b";
+export const GREY_MUTED = "#4a4a4a";
 
 /** Notched line border, the portrait in a notched window to match. */
 function notchedPortrait(): ClassicDesign {
@@ -415,23 +420,27 @@ function interiorPage(type: PageType, chrome: CanvasElement[]): CanvasElement[] 
   ];
 }
 
-function backPage(type: PageType, chrome: CanvasElement[]): CanvasElement[] {
+function backPage(type: PageType, chrome: CanvasElement[], top = 37): CanvasElement[] {
   return [
     ...chrome,
-    fixed({ text: FAREWELL, fontFamily: type.script, fontSize: 30, color: type.ink, x: 10, y: 37, w: 80, h: 0 }),
-    fixed({ text: THANKS, fontFamily: type.body, fontSize: 13, color: type.muted, x: 15, y: 50, w: 70, h: 0 }),
+    fixed({ text: FAREWELL, fontFamily: type.script, fontSize: 30, color: type.ink, x: 10, y: top, w: 80, h: 0 }),
+    fixed({ text: THANKS, fontFamily: type.body, fontSize: 13, color: type.muted, x: 15, y: top + 13, w: 70, h: 0 }),
   ];
 }
 
 /** Cover, interior and back for one design — always TEMPLATE_PAGE_COUNT pages. */
 export function buildClassicLayout(id: ClassicDesignId): DesignPage[] {
-  const design = CLASSIC_DESIGNS[id]();
+  return buildDesignPages(CLASSIC_DESIGNS[id]());
+}
+
+/** The three pages of any design in this family's shape. */
+export function buildDesignPages(design: ClassicDesign): DesignPage[] {
   const type: PageType = { paper: design.paper, ...design.type };
   const interior = design.interior ?? { type, chrome: design.chrome };
   const pages: DesignPage[] = [
     { id: uid("page"), background: design.paper, elements: [...design.chrome(), ...design.cover()] },
     { id: uid("page"), background: interior.type.paper, elements: interiorPage(interior.type, interior.chrome()) },
-    { id: uid("page"), background: design.paper, elements: backPage(type, design.chrome()) },
+    { id: uid("page"), background: design.paper, elements: backPage(type, design.chrome(), design.backTop) },
   ];
   if (pages.length !== TEMPLATE_PAGE_COUNT) {
     throw new Error(`Expected ${TEMPLATE_PAGE_COUNT} pages, built ${pages.length}`);

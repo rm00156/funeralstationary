@@ -691,11 +691,15 @@ export function notchedMask(inset = 0, radius = NOTCH_RADIUS): string {
 
 /**
  * Where a newly added clipart lands: centred, at its artwork's proportions
- * (`aspect`, width ÷ height). A square motif is small, a divider spans a
- * column, and a tall whole-page frame nearly fills the page.
+ * (`aspect`, width ÷ height) and `width` percent of the page wide — by
+ * default a divider spans a column and anything else is a small motif.
  */
-export function clipartBox(aspect: number, trim: PageTrim = A5_TRIM): ElementBox {
-  const w = aspect < 1 ? 90 : aspect > 1.5 ? 40 : 16;
+export function clipartBox(
+  aspect: number,
+  trim: PageTrim = A5_TRIM,
+  width: number = aspect > 1.5 ? 40 : 16,
+): ElementBox {
+  const w = width;
   const h = round3((w * trim.widthMm) / trim.heightMm / aspect);
   return { x: 50 - w / 2, y: round3(50 - h / 2), w, h };
 }
@@ -899,6 +903,8 @@ export const CATEGORY_ACCENTS: Record<string, string> = {
   minimalistic: "#81737d",
   simple: "#81737d",
   colourful: "#6b2d6a",
+  cultural: "#7a1f2e",
+  music: "#1f1a1e",
 };
 
 export function templateAccent(template: Template): string {

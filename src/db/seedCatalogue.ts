@@ -126,6 +126,8 @@ export const CATEGORIES = [
   { id: "religious", label: "Religious" },
   { id: "simple", label: "Simple" },
   { id: "sport", label: "Sports and Hobbies" },
+  { id: "cultural", label: "Cultural and Heritage" },
+  { id: "music", label: "Music" },
 ];
 
 const ARTWORK = {

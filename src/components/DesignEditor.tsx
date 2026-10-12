@@ -752,12 +752,12 @@ export default function DesignEditor({
   const trim = docTrim(doc);
   const metrics = pageMetrics(trim);
   const pageLabel = (index: number) => templatePageLabel(index, format.templatePages);
-  const newClipart = (icon: string, aspect: number): CanvasElement => ({
+  const newClipart = (icon: string, aspect: number, width?: number): CanvasElement => ({
     id: uid("clipart"),
     type: "clipart",
     icon,
     color: templateAccent(activeTemplate),
-    ...clipartBox(aspect, trim),
+    ...clipartBox(aspect, trim, width),
   });
 
   /* ------------------------------ drag / resize ----------------------- */
@@ -1855,12 +1855,12 @@ export default function DesignEditor({
             <div>
               <PanelHeading>Cliparts</PanelHeading>
               <div className="grid grid-cols-3 gap-2">
-                {CLIPARTS.map(({ id, label, Icon, aspect = 1 }) => (
+                {CLIPARTS.map(({ id, label, Icon, aspect = 1, width }) => (
                   <button
                     key={id}
                     type="button"
                     aria-label={`Add ${label} clipart`}
-                    onClick={() => addElement(newClipart(id, aspect))}
+                    onClick={() => addElement(newClipart(id, aspect, width))}
                     className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-outline-variant/50 bg-surface-container-lowest text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
                   >
                     <Icon size={26} strokeWidth={1.5} aria-hidden />
