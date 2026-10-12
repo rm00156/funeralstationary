@@ -776,8 +776,9 @@ function basketball(): ClassicDesign {
     cover: () => [
       ...sportHead(fixed({ text: "Celebrating the life of", fontFamily: "marcellus", fontSize: 12, uppercase: true, color: "#555555", x: 15, y: 7.8, w: 70, h: 0 }), ink, 22),
       photo({ border: "single", borderColor: "#333333", x: 29.4, y: 22, w: 39.6, h: 33.2 }),
-      kit("basketball.svg", 1, 42.4, 58.8, 18),
       kit("basketball-hoop.svg", 1, 51, 58.4, 56),
+      // After the hoop, so the ball sits in front of the backboard.
+      kit("basketball.svg", 1, 42.4, 58.8, 18),
       ...serviceBlocks(ink, 76.6, "left"),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#e06f1f" },
