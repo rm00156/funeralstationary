@@ -905,6 +905,8 @@ export const CATEGORY_ACCENTS: Record<string, string> = {
   colourful: "#6b2d6a",
   cultural: "#7a1f2e",
   music: "#1f1a1e",
+  child: "#33506b",
+  pets: "#226b3d",
 };
 
 export function templateAccent(template: Template): string {

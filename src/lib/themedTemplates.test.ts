@@ -6,13 +6,19 @@ import { parseLayoutPages } from "@/lib/adminValidation";
 import { CLASSIC_TEMPLATE_SPECS } from "@/lib/classicTemplates";
 import { TEMPLATE_PAGE_COUNT, type CanvasElement, type TextElement } from "@/lib/designEditor";
 import { FLAT_TEMPLATE_SPECS } from "@/lib/flatTemplates";
-import { STUDIO_PORTRAIT_GENDER, isPlaceholderPortraitId } from "@/lib/placeholderPortraits";
+import {
+  STUDIO_PORTRAIT_GENDER,
+  SUBJECT_PORTRAIT_IDS,
+  isPlaceholderPortraitId,
+} from "@/lib/placeholderPortraits";
 import { CATEGORIES } from "@/db/seedCatalogue";
 import { PLACEHOLDER_INTERIOR, PLACEHOLDER_NAME, TEMPLATE_SPECS } from "@/lib/templateGenerator";
 import {
   ARTWORK_PATH,
   THEMED_DESIGN_IDS,
+  PET_YEARS,
   STUDIO_PEOPLE,
+  SUBJECT_PEOPLE,
   THEMED_TEMPLATE_SPECS,
   buildThemedLayout,
   personalise,
@@ -126,6 +132,24 @@ describe("personalise", () => {
     for (const [id, who] of Object.entries(STUDIO_PEOPLE)) {
       expect(who.gender, id).toBe(STUDIO_PORTRAIT_GENDER[id as keyof typeof STUDIO_PORTRAIT_GENDER]);
     }
+  });
+});
+
+describe("child and pet covers", () => {
+  it("previews every pet and the child with a subject stand-in, not an adult", () => {
+    for (const spec of THEMED_TEMPLATE_SPECS.filter((s) => s.categories.some((c) => c === "pets" || c === "child"))) {
+      expect(SUBJECT_PORTRAIT_IDS as readonly string[], spec.slug).toContain(spec.portrait);
+    }
+  });
+
+  it("names a pet cover after its pet, with its years flagged to replace", () => {
+    const cover = texts(buildThemedLayout("rabbit-blue", urls, SUBJECT_PEOPLE["portrait-23"])[0].elements);
+    expect(cover.find((t) => t.text === "Bramble")?.placeholder).toBe(true);
+    expect(cover.find((t) => t.text === PET_YEARS)?.placeholder).toBe(true);
+  });
+
+  it("gives every subject stand-in a sample name", () => {
+    for (const id of SUBJECT_PORTRAIT_IDS) expect(SUBJECT_PEOPLE[id].name, id).toBeTruthy();
   });
 });
 

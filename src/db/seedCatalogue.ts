@@ -128,6 +128,8 @@ export const CATEGORIES = [
   { id: "sport", label: "Sports and Hobbies" },
   { id: "cultural", label: "Cultural and Heritage" },
   { id: "music", label: "Music" },
+  { id: "child", label: "Child" },
+  { id: "pets", label: "Pets" },
 ];
 
 const ARTWORK = {
