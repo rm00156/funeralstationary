@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   COLOUR_PORTRAIT_IDS,
   MONO_PORTRAIT_IDS,
+  STUDIO_PORTRAIT_GENDER,
+  STUDIO_PORTRAIT_IDS,
   PLACEHOLDER_PORTRAIT_IDS,
   placeholderPortraitKey,
   portraitIdForSeed,
@@ -62,6 +64,25 @@ describe("portraitRotationFor", () => {
     const rotation = portraitRotationFor(cover, "quiet-modern");
     expect([...rotation].sort()).toEqual([...COLOUR_PORTRAIT_IDS].sort());
     expect(rotation[0]).toBe(portraitIdForSeed("quiet-modern", COLOUR_PORTRAIT_IDS));
+  });
+});
+
+describe("studio portraits", () => {
+  it("never enter the automatic sets, so existing templates keep their faces", () => {
+    for (const id of STUDIO_PORTRAIT_IDS) {
+      expect(MONO_PORTRAIT_IDS as readonly string[]).not.toContain(id);
+      expect(COLOUR_PORTRAIT_IDS as readonly string[]).not.toContain(id);
+    }
+  });
+
+  it("can be pinned, and rotate within their own set", () => {
+    const rotation = portraitRotationFor(page([photo(null)]), "golf", "portrait-15");
+    expect(rotation[0]).toBe("portrait-15");
+    expect([...rotation].sort()).toEqual([...STUDIO_PORTRAIT_IDS].sort());
+  });
+
+  it("each record who they show", () => {
+    expect(Object.keys(STUDIO_PORTRAIT_GENDER).sort()).toEqual([...STUDIO_PORTRAIT_IDS].sort());
   });
 });
 

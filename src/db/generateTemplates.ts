@@ -257,10 +257,14 @@ async function jobs(): Promise<Job[]> {
                 return { missing: `background "${id}/${palette}"` };
               }
             }
-            return buildThemedLayout(spec.design, {
-              background: (id, palette) => backgroundAssetUrl(id, palette),
-              spray: (id) => sprayAssetUrl(id),
-            });
+            return buildThemedLayout(
+              spec.design,
+              {
+                background: (id, palette) => backgroundAssetUrl(id, palette),
+                spray: (id) => sprayAssetUrl(id),
+              },
+              spec.person,
+            );
           },
         }),
       ),

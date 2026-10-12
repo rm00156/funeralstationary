@@ -6,14 +6,16 @@ import { parseLayoutPages } from "@/lib/adminValidation";
 import { CLASSIC_TEMPLATE_SPECS } from "@/lib/classicTemplates";
 import { TEMPLATE_PAGE_COUNT, type CanvasElement, type TextElement } from "@/lib/designEditor";
 import { FLAT_TEMPLATE_SPECS } from "@/lib/flatTemplates";
-import { isPlaceholderPortraitId } from "@/lib/placeholderPortraits";
+import { STUDIO_PORTRAIT_GENDER, isPlaceholderPortraitId } from "@/lib/placeholderPortraits";
 import { CATEGORIES } from "@/db/seedCatalogue";
 import { PLACEHOLDER_INTERIOR, PLACEHOLDER_NAME, TEMPLATE_SPECS } from "@/lib/templateGenerator";
 import {
   ARTWORK_PATH,
   THEMED_DESIGN_IDS,
+  STUDIO_PEOPLE,
   THEMED_TEMPLATE_SPECS,
   buildThemedLayout,
+  personalise,
   type ArtworkUrls,
 } from "@/lib/themedTemplates";
 
@@ -93,6 +95,37 @@ describe("buildThemedLayout", () => {
   it("moves the farewell clear of the Guyana flag's arrowhead", () => {
     const back = texts(buildThemedLayout("guyana-thanksgiving", urls)[2].elements);
     expect(back[0].y).toBeGreaterThan(60);
+  });
+});
+
+describe("personalise", () => {
+  const sue = STUDIO_PEOPLE["portrait-12"];
+
+  it("names every template after its own portrait, and keeps the name a placeholder", () => {
+    for (const spec of THEMED_TEMPLATE_SPECS) {
+      const cover = texts(buildThemedLayout(spec.design, urls, spec.person)[0].elements);
+      const name = cover.find((t) => t.text === spec.person.name);
+      expect(name?.placeholder, spec.slug).toBe(true);
+      expect(cover.some((t) => t.text === PLACEHOLDER_NAME), spec.slug).toBe(spec.person.name === PLACEHOLDER_NAME);
+    }
+  });
+
+  it("matches the person's gender wherever the wording has one", () => {
+    const pages = personalise(buildThemedLayout("red-sunset", urls), sue);
+    expect(texts(pages[0].elements).map((t) => t.text)).toContain("a very special wife and friend");
+    const bob = personalise(buildThemedLayout("red-sunset", urls), STUDIO_PEOPLE["portrait-13"]);
+    expect(texts(bob[0].elements).map((t) => t.text)).toContain("a very special husband and friend");
+  });
+
+  it("carries the nickname too", () => {
+    const pages = personalise(buildThemedLayout("cross-doves", urls), sue);
+    expect(texts(pages[0].elements).map((t) => t.text)).toContain("(fondly known as Sue)");
+  });
+
+  it("gives every studio portrait a person of the same gender", () => {
+    for (const [id, who] of Object.entries(STUDIO_PEOPLE)) {
+      expect(who.gender, id).toBe(STUDIO_PORTRAIT_GENDER[id as keyof typeof STUDIO_PORTRAIT_GENDER]);
+    }
   });
 });
 
