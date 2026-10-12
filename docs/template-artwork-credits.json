@@ -285,5 +285,54 @@
     "licence": "CC0 (Rijksmuseum)",
     "credit": "Twee vlinders bij een lelie, RP-T-1957-339. Rijksmuseum, Amsterdam. Via Wikimedia Commons.",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Twee_vlinders_bij_een_lelie,_RP-T-1957-339.jpg"
+  },
+  {
+    "id": "crocus-meadow-low",
+    "name": "Crocus Meadow (low)",
+    "licence": "CC0",
+    "credit": "Purple crocuses in grass, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Purple_crocuses_in_grass_(Unsplash).jpg"
+  },
+  {
+    "id": "white-blossom-low",
+    "name": "White Blossom (low)",
+    "licence": "CC0",
+    "credit": "White blossom branches, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:White_blossom_branches_(Unsplash).jpg"
+  },
+  {
+    "id": "pastel-rose-band-low",
+    "name": "Pastel Rose Band (low)",
+    "licence": "CC0",
+    "credit": "Pastel pink roses, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Pastel_pink_roses_(Unsplash).jpg"
+  },
+  {
+    "id": "red-petal-band-low",
+    "name": "Red Petal Band (low)",
+    "licence": "CC0",
+    "credit": "Flower Power, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Flower_Power_(Unsplash).jpg"
+  },
+  {
+    "id": "rose-bush-band-low",
+    "name": "Rose Bush Band (low)",
+    "licence": "CC0",
+    "credit": "Spring Rose Bush, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Spring_Rose_Bush_(Unsplash).jpg"
+  },
+  {
+    "id": "pastel-rose-corner-low",
+    "name": "Pastel Rose Corner (low)",
+    "licence": "CC0",
+    "credit": "Roses in pastel pink, via Unsplash. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Roses_in_pastel_pink_(Unsplash).jpg"
+  },
+  {
+    "id": "white-rose-corner-low",
+    "name": "White Rose Corner (low)",
+    "licence": "CC0",
+    "credit": "White Rose, via Flickr. Via Wikimedia Commons.",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:White_Rose_(18923655755).jpg"
   }
 ]

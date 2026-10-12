@@ -63,6 +63,37 @@ const serviceDetails = (
     h: 0,
   });
 
+/**
+ * A photo-led cover's service block from `y`: the church with its address, the
+ * time and the committal, then the officiating minister a little apart. About
+ * 11% of the page tall.
+ */
+const fullServiceDetails = (style: TemplateStyle, y: number, color: string): CanvasElement[] => [
+  text({
+    text: PLACEHOLDER_SERVICE_FULL,
+    fontFamily: style.body,
+    fontSize: 11,
+    align: "center",
+    color,
+    x: 12,
+    y,
+    w: 76,
+    h: 0,
+  }),
+  text({
+    text: PLACEHOLDER_OFFICIANT,
+    fontFamily: style.body,
+    fontSize: 11,
+    align: "center",
+    color,
+    italic: true,
+    x: 18,
+    y: y + 8.5,
+    w: 64,
+    h: 0,
+  }),
+];
+
 const text = (props: Omit<TextElement, "id" | "type" | "placeholder">): CanvasElement => ({
   id: uid("text"),
   type: "text",
@@ -174,6 +205,17 @@ const PLACEHOLDER_DIED = "12th June 2024";
 const THANKS =
   "The family would like to thank you\nfor your kindness, support and\npresence here today.";
 /**
+ * The fuller service block a photo-led cover has room for: the church with
+ * its address, the time and the committal — what a family actually prints
+ * there — followed by the officiating minister on a line of its own.
+ */
+export const PLACEHOLDER_SERVICE_FULL =
+  "St Mary's Church, Church Road, Reading\nTuesday 16th June 2026 at 11am\nfollowed by committal at Reading Crematorium";
+export const PLACEHOLDER_OFFICIANT = "Officiating: Reverend Jane Smith";
+/** Where everyone gathers after the service, on a photo-led back page. */
+export const PLACEHOLDER_AFTERWARDS =
+  "The family invite you to join them afterwards at\nThe Crown, High Street, Reading RG1 1AA";
+/**
  * The wording a customer must replace. FAREWELL and THANKS are deliberately
  * absent: plenty of families keep them, so they shouldn't nag at checkout.
  */
@@ -184,6 +226,9 @@ const PLACEHOLDER_TEXTS: ReadonlySet<string> = new Set([
   PLACEHOLDER_SERVICE,
   PLACEHOLDER_BORN,
   PLACEHOLDER_DIED,
+  PLACEHOLDER_SERVICE_FULL,
+  PLACEHOLDER_OFFICIANT,
+  PLACEHOLDER_AFTERWARDS,
 ]);
 
 /**
@@ -925,6 +970,9 @@ function sprayBackPage(style: TemplateStyle, src: string): CanvasElement[] {
  * The wash is knocked well back so it reads as tone behind the person, not as
  * a botanical print with type on it.
  */
+/** Where Blue Silk's corner roses sit, clear of the service block above. */
+const SILK_SPRAY_BOX = { x: 64, y: 74, w: 40, h: 28 };
+
 const ARTWORK_COVERS: Record<
   string,
   (style: TemplateStyle, zone: TextZone, accentUrl?: string) => CanvasElement[]
@@ -1012,9 +1060,9 @@ const ARTWORK_COVERS: Record<
 
   /**
    * The flower-band cover: script opening line, a framed portrait, name,
-   * dates and service in the paper above the band, which the background
-   * keeps clear (textZone "top"). Everything ends by ~56% of the page, where
-   * the band begins to fade in.
+   * dates and the full service block in the paper above the band, which the
+   * background keeps clear (textZone "top"). Everything ends by ~64% of the
+   * page; the booklet's bands begin to fade in at 68%.
    */
   "band-framed": (s) => [
     text({
@@ -1053,7 +1101,7 @@ const ARTWORK_COVERS: Record<
       w: 60,
       h: 0,
     }),
-    serviceDetails(s, 51, s.ink),
+    ...fullServiceDetails(s, 52, s.ink),
   ],
 
   /**
@@ -1069,7 +1117,7 @@ const ARTWORK_COVERS: Record<
         align: "center",
         color: s.accent,
         x,
-        y: 38,
+        y: 36,
         w: 26,
         h: 0,
       }),
@@ -1080,7 +1128,7 @@ const ARTWORK_COVERS: Record<
         align: "center",
         color: s.muted,
         x,
-        y: 43.5,
+        y: 41.5,
         w: 26,
         h: 0,
       }),
@@ -1110,11 +1158,10 @@ const ARTWORK_COVERS: Record<
         w: 84,
         h: 0,
       }),
-      photo({ shape: "oval", x: 29, y: 18, w: 42, h: 36, border: "single", borderColor: s.ink }),
+      photo({ shape: "oval", x: 29, y: 17, w: 42, h: 34, border: "single", borderColor: s.ink }),
       ...flank("Sunrise", PLACEHOLDER_BORN, 2),
       ...flank("Sunset", PLACEHOLDER_DIED, 72),
-      // Narrowed so it stays left of the corner flowers as they fade in.
-      { ...serviceDetails(s, 57, s.ink), x: 14, w: 56 } as CanvasElement,
+      ...fullServiceDetails(s, 54, s.ink),
     ];
   },
 
@@ -1159,8 +1206,8 @@ const ARTWORK_COVERS: Record<
       w: 60,
       h: 0,
     }),
-    serviceDetails(s, 59.5, s.paper),
-    ...(accentUrl ? [sprayElement(accentUrl, { x: 62, y: 70, w: 42, h: 32 })] : []),
+    ...fullServiceDetails(s, 59.5, s.paper),
+    ...(accentUrl ? [sprayElement(accentUrl, SILK_SPRAY_BOX)] : []),
   ],
 
   /**
@@ -1205,7 +1252,7 @@ const ARTWORK_COVERS: Record<
       h: 0,
     }),
     photo({ x: 31, y: 23.5, w: 38, h: 31, border: "double", borderColor: s.accent }),
-    serviceDetails(s, 58, s.ink),
+    ...fullServiceDetails(s, 58, s.ink),
   ],
 };
 
@@ -1328,7 +1375,8 @@ function artworkBackPage(style: TemplateStyle, zone: TextZone): CanvasElement[] 
 
 /**
  * The back page of a photo-led artwork template: the same picture, the
- * farewell in the clear upper half, and the cover's corner spray if it has one.
+ * farewell and thanks in the clear upper half, where everyone gathers
+ * afterwards below them, and the cover's corner spray if it has one.
  */
 function photoLedBackPage(style: TemplateStyle, light: boolean, accentUrl?: string): CanvasElement[] {
   return [
@@ -1339,7 +1387,7 @@ function photoLedBackPage(style: TemplateStyle, light: boolean, accentUrl?: stri
       align: "center",
       color: light ? style.paper : style.accent,
       x: 10,
-      y: 22,
+      y: 16,
       w: 80,
       h: 0,
     }),
@@ -1350,11 +1398,22 @@ function photoLedBackPage(style: TemplateStyle, light: boolean, accentUrl?: stri
       align: "center",
       color: light ? style.paper : style.muted,
       x: 15,
-      y: 34,
+      y: 27,
       w: 70,
       h: 0,
     }),
-    ...(accentUrl ? [sprayElement(accentUrl, { x: 62, y: 70, w: 42, h: 32 })] : []),
+    text({
+      text: PLACEHOLDER_AFTERWARDS,
+      fontFamily: style.body,
+      fontSize: 11,
+      align: "center",
+      color: light ? style.paper : style.ink,
+      x: 10,
+      y: 44,
+      w: 80,
+      h: 0,
+    }),
+    ...(accentUrl ? [sprayElement(accentUrl, SILK_SPRAY_BOX)] : []),
   ];
 }
 
@@ -1634,14 +1693,16 @@ const CURATED_ARTWORK: Array<
   ["Madonna Lily", "wash-portrait", "redoute-madonna-lily", "stone", "cormorant", "flower", ["floral", "religious"]],
   ["White Lily", "wash-arch", "redoute-madonna-lily", "bronze", "playfair", "flower", ["floral", "classic"]],
   // The flower-band family: a photograph of real flowers along the foot or
-  // in the corner of a white page, the portrait and type above it.
-  ["Purple Flowers", "band-framed", "crocus-meadow", "violet", "cormorant", "flower", ["floral", "nature", "colourful"]],
-  ["Orchid", "band-framed", "white-blossom", "bronze", "classic", "flower", ["floral", "calm"]],
-  ["Pink Aura", "band-framed", "pastel-rose-band", "rose", "garamond", "heart", ["floral", "calm"]],
-  ["Pink Roses", "band-framed", "pastel-rose-corner", "rose", "classic", "flower", ["floral", "colourful"]],
-  ["Red & White Roses", "band-framed", "red-petal-band", "ink", "prata", "heart", ["floral", "classic"]],
-  ["Rose Petals", "band-framed", "rose-bush-band", "wine", "baskerville", "flower", ["floral", "colourful"]],
-  ["White Roses", "band-oval", "white-rose-corner", "violet", "playfair", "flower", ["floral", "classic"]],
+  // in the corner of a white page, the portrait and type above it. The `-low`
+  // versions keep the flowers in the bottom third, so the cover has room for
+  // the full service details and the back page for the gathering afterwards.
+  ["Purple Flowers", "band-framed", "crocus-meadow-low", "violet", "cormorant", "flower", ["floral", "nature", "colourful"]],
+  ["Orchid", "band-framed", "white-blossom-low", "bronze", "classic", "flower", ["floral", "calm"]],
+  ["Pink Aura", "band-framed", "pastel-rose-band-low", "rose", "garamond", "heart", ["floral", "calm"]],
+  ["Pink Roses", "band-framed", "pastel-rose-corner-low", "rose", "classic", "flower", ["floral", "colourful"]],
+  ["Red & White Roses", "band-framed", "red-petal-band-low", "ink", "prata", "heart", ["floral", "classic"]],
+  ["Rose Petals", "band-framed", "rose-bush-band-low", "wine", "baskerville", "flower", ["floral", "colourful"]],
+  ["White Roses", "band-oval", "white-rose-corner-low", "violet", "playfair", "flower", ["floral", "classic"]],
   ["Roses", "inset-frame", "sky-blossom", "rose", "playfair", "flower", ["floral", "nature"]],
   // The Frankfort rose because its cut is clean: the other rose cutouts carry
   // ground specks and highlight holes that white paper hides and satin shows.
