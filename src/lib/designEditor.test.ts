@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  A5_TRIM,
+  NOTCH_RADIUS,
   RESIZE_HANDLES,
+  clipartBox,
+  notchedMask,
+  notchedRingPath,
   TEMPLATE_PAGE_COUNT,
   imageShape,
   instantiateLayout,
@@ -191,6 +196,65 @@ describe("frameRings", () => {
     expect(frameDepth("single")).toBe(5);
     expect(frameDepth("double")).toBe(11.5);
     expect(frameDepth("triple")).toBe(16.5);
+  });
+});
+
+describe("notchedRingPath", () => {
+  it("cuts a quarter-circle notch centred on each corner of the outer line", () => {
+    expect(notchedRingPath(100, 50, 0, 10)).toBe(
+      "M 10 0 L 90 0 A 10 10 0 0 0 100 10 L 100 40 A 10 10 0 0 0 90 50 " +
+        "L 10 50 A 10 10 0 0 0 0 40 L 0 10 A 10 10 0 0 0 10 0 Z",
+    );
+  });
+
+  it("keeps an inner line's notch concentric with the outer one", () => {
+    // Inset 6 on a radius-10 notch: the arc is radius 16 about the corner,
+    // meeting the inset line where 16² = x² + 6².
+    const path = notchedRingPath(100, 50, 6, 10);
+    const meet = Math.round(Math.sqrt(16 * 16 - 6 * 6) * 1000) / 1000;
+    expect(path.startsWith(`M ${meet} 6 L ${100 - meet} 6 A 16 16 0 0 0 94 ${meet}`)).toBe(true);
+  });
+
+  it("defaults to the shared notch radius, so a border and a photo match", () => {
+    expect(notchedRingPath(200, 300, 0)).toBe(notchedRingPath(200, 300, 0, NOTCH_RADIUS));
+  });
+});
+
+describe("notchedMask", () => {
+  it("cuts all four corners of the window", () => {
+    const mask = notchedMask();
+    expect(mask.match(/radial-gradient/g)).toHaveLength(4);
+    expect(mask).toContain(`circle at -0px -0px, transparent ${NOTCH_RADIUS}px`);
+    expect(mask).toContain("100% 100% / 51% 51% no-repeat");
+  });
+
+  it("centres an inset photo's notches on the outer corners, grown by the inset", () => {
+    const mask = notchedMask(5, 10);
+    expect(mask).toContain("circle at -5px -5px, transparent 15px, #000 15.5px");
+    expect(mask).toContain("circle at calc(100% + 5px) calc(100% + 5px), transparent 15px");
+  });
+});
+
+describe("clipartBox", () => {
+  it("adds a square motif small, centred and square on the page", () => {
+    const box = clipartBox(1, A5_TRIM);
+    expect(box.w).toBe(16);
+    expect((box.h / 100) * 210).toBeCloseTo((box.w / 100) * 148, 2);
+    expect(box.x + box.w / 2).toBe(50);
+    expect(box.y + box.h / 2).toBeCloseTo(50, 2);
+  });
+
+  it("adds a wide divider across a column at its own proportions", () => {
+    const box = clipartBox(8, A5_TRIM);
+    expect(box.w).toBe(40);
+    expect(((box.w / 100) * 148) / ((box.h / 100) * 210)).toBeCloseTo(8, 2);
+  });
+
+  it("adds a tall frame nearly filling the page", () => {
+    const box = clipartBox(135 / 200, A5_TRIM);
+    expect(box.w).toBe(90);
+    expect(box.h).toBeLessThan(100);
+    expect(box.y).toBeGreaterThan(0);
   });
 });
 

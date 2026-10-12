@@ -412,7 +412,7 @@ export interface TextElement extends ElementBase {
   placeholder?: boolean;
 }
 
-export type PhotoShape = "rect" | "oval" | "arch";
+export type PhotoShape = "rect" | "oval" | "arch" | "notched";
 
 export interface ImageElement extends ElementBase {
   type: "image";
@@ -630,10 +630,85 @@ export function photoInnerBorderRadius(
   return undefined;
 }
 
+/**
+ * Radius of a notched corner — a concave quarter circle cut into the corner,
+ * the classic order-of-service border — in base-page px. Fixed rather than a
+ * share of the box, so a notched page border and a notched photo on the same
+ * page cut the same size of notch.
+ */
+export const NOTCH_RADIUS = 11;
+
+const round3 = (value: number) => Math.round(value * 1000) / 1000;
+
+/**
+ * The SVG path of one line of a notched frame, `w` × `h` base px, its centre
+ * line `inset` px inside the outer edge. Each corner's notch is centred on
+ * the box's own corner, so a line further in cuts a concentric, larger notch
+ * and nested lines stay parallel, as a frame's rings do on a square corner.
+ */
+export function notchedRingPath(w: number, h: number, inset: number, radius = NOTCH_RADIUS): string {
+  const r = radius + inset;
+  // Where the inset line meets the notch's circle.
+  const a = Math.sqrt(r * r - inset * inset);
+  const n = (value: number) => round3(value);
+  const arc = (x: number, y: number) => `A ${n(r)} ${n(r)} 0 0 0 ${n(x)} ${n(y)}`;
+  return [
+    `M ${n(a)} ${n(inset)}`,
+    `L ${n(w - a)} ${n(inset)}`,
+    arc(w - inset, a),
+    `L ${n(w - inset)} ${n(h - a)}`,
+    arc(w - a, h - inset),
+    `L ${n(a)} ${n(h - inset)}`,
+    arc(inset, h - a),
+    `L ${n(inset)} ${n(a)}`,
+    arc(a, inset),
+    "Z",
+  ].join(" ");
+}
+
+/**
+ * The CSS mask that cuts a notched photo window's corners. `inset` is how far
+ * this box sits inside the window's outer edge (the photo inside a border):
+ * its notches stay centred on the outer corners, so the photo follows the
+ * border line's notch rather than poking out past it.
+ */
+export function notchedMask(inset = 0, radius = NOTCH_RADIUS): string {
+  const r = round3(radius + inset);
+  const o = round3(inset);
+  const corners = [
+    [`-${o}px -${o}px`, "0 0"],
+    [`calc(100% + ${o}px) -${o}px`, "100% 0"],
+    [`-${o}px calc(100% + ${o}px)`, "0 100%"],
+    [`calc(100% + ${o}px) calc(100% + ${o}px)`, "100% 100%"],
+  ];
+  return corners
+    .map(
+      ([centre, position]) =>
+        `radial-gradient(circle at ${centre}, transparent ${r}px, #000 ${round3(r + 0.5)}px) ${position} / 51% 51% no-repeat`,
+    )
+    .join(", ");
+}
+
+/**
+ * Where a newly added clipart lands: centred, at its artwork's proportions
+ * (`aspect`, width ÷ height). A square motif is small, a divider spans a
+ * column, and a tall whole-page frame nearly fills the page.
+ */
+export function clipartBox(aspect: number, trim: PageTrim = A5_TRIM): ElementBox {
+  const w = aspect < 1 ? 90 : aspect > 1.5 ? 40 : 16;
+  const h = round3((w * trim.widthMm) / trim.heightMm / aspect);
+  return { x: 50 - w / 2, y: round3(50 - h / 2), w, h };
+}
+
+/** A page border's corners: square (the default) or notched. */
+export type FrameCorners = "square" | "notched";
+
 export interface FrameElement extends ElementBase {
   type: "frame";
   variant: FrameVariant;
   color: string;
+  /** Undefined means square — every frame drawn before notches existed. */
+  corners?: FrameCorners;
 }
 
 export interface ShapeElement extends ElementBase {
@@ -641,6 +716,12 @@ export interface ShapeElement extends ElementBase {
   shape: "rect" | "circle" | "line";
   color: string;
   strokeWidth: number;
+  /**
+   * Fill colour for a rectangle or circle — a coloured panel behind a photo,
+   * a solid corner diamond. Undefined means outline only, as every shape was
+   * drawn before fills existed. Meaningless on a line.
+   */
+  fill?: string;
 }
 
 export interface ClipartElement extends ElementBase {

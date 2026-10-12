@@ -191,7 +191,7 @@ export const PLACEHOLDER_DATES = "1971 – 2024";
  * (`YOUR TEXT HERE`): the page that repeats must be generic, so it carries
  * decoration and an invitation to type, never specific content.
  */
-const PLACEHOLDER_INTERIOR = "YOUR TEXT HERE";
+export const PLACEHOLDER_INTERIOR = "YOUR TEXT HERE";
 export const FAREWELL = "Forever in our hearts";
 /**
  * Where and when the service is. Every competitor cover carries this under
@@ -202,7 +202,7 @@ export const PLACEHOLDER_SERVICE = "Reading Crematorium\nTuesday 16th June 2026,
 /** The flanking pair under a "Sunrise / Sunset" cover — the long form families use there. */
 const PLACEHOLDER_BORN = "1st May 1936";
 const PLACEHOLDER_DIED = "12th June 2024";
-const THANKS =
+export const THANKS =
   "The family would like to thank you\nfor your kindness, support and\npresence here today.";
 /**
  * The fuller service block a photo-led cover has room for: the church with

@@ -1,7 +1,8 @@
 /**
  * Bulk template generator (`npm run templates:generate`).
  *
- * Turns the curated specs in src/lib/templateGenerator.ts (booklets) and
+ * Turns the curated specs in src/lib/templateGenerator.ts and
+ * src/lib/classicTemplates.ts (booklets) and
  * src/lib/flatTemplates.ts (cards, bookmarks, the memory board) into real
  * catalogue rows: one templates row per spec, its layout published, and a
  * preview thumbnail rendered from the first page at its product's trim.
@@ -65,6 +66,7 @@ import {
   type FlatProductId,
   type FlatTemplateSpec,
 } from "@/lib/flatTemplates";
+import { CLASSIC_TEMPLATE_SPECS, buildClassicLayout } from "@/lib/classicTemplates";
 import {
   TEMPLATE_SPECS,
   buildTemplateLayout,
@@ -96,6 +98,8 @@ interface Job {
   productSlug: string;
   categories: string[];
   trim: PageTrim;
+  /** Stand-in portrait pinned when the row is created; null/absent = the automatic pick. */
+  portrait?: string;
   /** The layout, or why it can't be built yet. */
   build: () => Promise<DesignPage[] | { missing: string }>;
 }
@@ -167,6 +171,7 @@ async function generate(job: Job, sortOrder: number) {
       sortOrder,
       categories: job.categories,
     });
+    if (job.portrait) await adminUpdateTemplate(job.slug, { placeholderPortrait: job.portrait });
   }
 
   // Go through the normal draft→publish seam rather than writing `layout`
@@ -189,7 +194,7 @@ async function generate(job: Job, sortOrder: number) {
       pages[0],
       job.slug,
       job.trim,
-      existing?.placeholderPortrait,
+      existing ? existing.placeholderPortrait : job.portrait,
     );
     const url = await saveTemplateThumbnail(job.slug, png);
     await adminUpdateTemplate(job.slug, { previewImageUrl: url });
@@ -223,6 +228,19 @@ async function jobs(): Promise<Job[]> {
       );
     }
     list.push(...TEMPLATE_SPECS.map((spec) => bookletJob(spec, booklet.trim)));
+    list.push(
+      ...CLASSIC_TEMPLATE_SPECS.map(
+        (spec): Job => ({
+          slug: spec.slug,
+          name: spec.name,
+          productSlug: bookletProduct,
+          categories: spec.categories,
+          trim: booklet.trim,
+          portrait: spec.portrait,
+          build: async () => buildClassicLayout(spec.design),
+        }),
+      ),
+    );
   }
 
   if (!productFlag || flatOnly) {
