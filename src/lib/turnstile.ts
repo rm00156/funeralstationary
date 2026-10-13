@@ -19,15 +19,15 @@
  * visitor, so there is nothing to protect — and a build variable for it is
  * one more field the secret can be pasted into by mistake.
  *
- * Null until the widget is created in Cloudflare (Turnstile → Add widget,
- * hostname funeralstationary.vercel.app plus the real domain). While it is
- * null a production build fails on purpose (turnstileSiteKeyProblem), so the
+ * The widget is created in Cloudflare (Turnstile → Add widget, hostname
+ * funeralstationary.vercel.app plus the real domain). Were it null, a
+ * production build would fail on purpose (turnstileSiteKeyProblem), so the
  * forms can never go live unprotected or unable to send.
  *
  * The SECRET key never goes in this file: it is TURNSTILE_SECRET_KEY in
  * Vercel, Production only, read by turnstile.server.ts.
  */
-export const TURNSTILE_PRODUCTION_SITE_KEY: string | null = null;
+export const TURNSTILE_PRODUCTION_SITE_KEY: string | null = "0x4AAAAAAD6zdAj7DtanmzlU";
 
 /** Cloudflare's test keys: the widget always passes and siteverify always succeeds. */
 export const TURNSTILE_TEST_SITE_KEY = "1x00000000000000000000AA";
