@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { db } from "@/db";
 import { designAssets } from "@/db/schema";
 import { isAdmin } from "@/lib/adminAuth.server";
+import { adminDesignOwner } from "@/lib/adminDesigns.server";
 import { getOrCreateOwner, ownerKey } from "@/lib/session";
 import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 import {
@@ -25,7 +26,8 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   // Template preview uploads in /admin use this route too, and admin work
   // carries on while the shop is closed.
-  if (!(await isShopOpen()) && !(await isAdmin())) return shopClosedResponse();
+  const admin = await isAdmin();
+  if (!admin && !(await isShopOpen())) return shopClosedResponse();
   if (!isStorageConfigured()) {
     return Response.json(
       { error: "Photo uploads are not configured on this environment." },
@@ -58,7 +60,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const owner = await getOrCreateOwner();
+  // An admin adding a photo to a customer's design files it under that
+  // design's owner, like the customer's own photos — not under the admin's
+  // browser (or, worse, the admin's own shop account).
+  const forDesign =
+    admin && typeof designId === "string" && designId ? await adminDesignOwner(designId) : null;
+  const owner = forDesign ?? (await getOrCreateOwner());
   const id = crypto.randomUUID();
   const storageKey = `designs/${ownerKey(owner)}/${id}.${extensionFor(contentType)}`;
 

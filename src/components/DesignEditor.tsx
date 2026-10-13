@@ -46,6 +46,7 @@ import {
   Pipette,
   Plus,
   Redo2,
+  RefreshCw,
   Save,
   Shapes,
   Share2,
@@ -57,6 +58,7 @@ import {
   Type,
   Undo2,
   UploadCloud,
+  UserRound,
   X,
 } from "lucide-react";
 
@@ -115,6 +117,8 @@ import {
   type PricingData,
   type Selection,
 } from "@/lib/orderOfServicePricing";
+import type { DesignOrderState } from "@/lib/adminDesigns";
+import { createSerialQueue, isDesignConflict } from "@/lib/designRevision";
 import type { Template } from "@/lib/templates";
 
 /** A stable default, so memos keyed on initialSelection don't churn. */
@@ -223,6 +227,7 @@ export default function DesignEditor({
   initialLayout,
   initialSelection = NO_SELECTION,
   templateAuthoring,
+  adminEditing,
   savedDesign,
 }: {
   template: Template;
@@ -261,6 +266,18 @@ export default function DesignEditor({
     /** Whether the editor opened on unpublished changes. */
     hasDraftLayout: boolean;
   };
+  /**
+   * An admin editing a customer's design on their behalf (/admin/designs/:id),
+   * always with `savedDesign`. Saves PATCH /api/admin/designs/:id — the
+   * customer's own design, which they see next time they open it — and the
+   * basket and share link are hidden: those are the customer's to use.
+   */
+  adminEditing?: {
+    /** Whose design it is: an account's name or email, or "a guest". */
+    ownerLabel: string;
+    backHref: string;
+    orderState: DesignOrderState;
+  };
   /** An existing design loaded server-side from ?design=<id>, if any. */
   savedDesign?: {
     id: string;
@@ -268,9 +285,13 @@ export default function DesignEditor({
     doc: DesignDoc;
     pagesOptionId: string;
     paperId: string;
+    /** The revision loaded; every save sends it back (see designs.revision). */
+    revision: number;
   };
 }) {
   const authoring = !!templateAuthoring;
+  /** Basket, share link and quote are the customer's; neither mode shows them. */
+  const customerChrome = !authoring && !adminEditing;
   // The page-count option and the document's page count must agree from the
   // first render (autosave validates doc.pages.length against the option), so
   // both initialisers derive from this one resolution.
@@ -385,14 +406,38 @@ export default function DesignEditor({
     window.setTimeout(() => setToast(null), 2200);
   }, []);
 
+  /** The revision this editor last saved or loaded (see designs.revision). */
+  const revisionRef = useRef(savedDesign?.revision ?? 0);
+  /**
+   * The name as last saved or loaded. A save sends the name only when it has
+   * changed here (applying a template renames it), so it never undoes a
+   * rename made on /account while this editor was open.
+   */
+  const savedNameRef = useRef(savedDesign?.name ?? null);
+  /** The id as a ref too: a save queued behind the first must PATCH the row that one created. */
+  const designIdRef = useRef(designId);
+  /** Saves run one at a time (see createSerialQueue). */
+  const [enqueueSave] = useState(createSerialQueue);
+  /**
+   * Set when a save is refused because the design changed somewhere else (the
+   * customer's other tab, or an admin helping them). Nothing saves again until
+   * a reload, so neither copy silently overwrites the other.
+   */
+  const [conflict, setConflict] = useState(false);
+  const conflictRef = useRef(false);
+
   /**
    * Persist to the server. A design row is created lazily on the first save
    * rather than on page load, so simply opening the editor never litters the
    * database; once created we swap the id into the URL so a refresh (or a
    * shared link) reopens the same design.
    */
-  const persist = useCallback(
+  const save = useCallback(
     async (options: { silent?: boolean } = {}): Promise<string | null> => {
+      if (conflictRef.current) {
+        setSaveState("error");
+        return null;
+      }
       setSaveState("saving");
       try {
         // Authoring mode: the document IS the template layout — save it to
@@ -414,39 +459,62 @@ export default function DesignEditor({
           return null;
         }
 
+        const id = designIdRef.current;
         const payload = {
           doc,
           pagesOptionId,
           paperId,
-          name: designName,
           templateId: activeTemplate.id,
         };
-        const response = designId
-          ? await fetch(`/api/designs/${designId}`, {
+        const response = id
+          ? await fetch(adminEditing ? `/api/admin/designs/${id}` : `/api/designs/${id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
+              body: JSON.stringify({
+                ...payload,
+                ...(designName !== savedNameRef.current ? { name: designName } : {}),
+                revision: revisionRef.current,
+              }),
             })
           : await fetch("/api/designs", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...payload, productId }),
+              body: JSON.stringify({ ...payload, name: designName, productId }),
             });
 
-        if (!response.ok) throw new Error(await response.text());
-        const saved = (await response.json()) as { id: string };
+        if (!response.ok) {
+          const body: unknown = await response.json().catch(() => null);
+          if (isDesignConflict(response.status, body)) {
+            conflictRef.current = true;
+            setConflict(true);
+            setSaveState("error");
+            return null;
+          }
+          throw new Error(response.statusText);
+        }
+        const saved = (await response.json()) as { id: string; revision: number };
+        revisionRef.current = saved.revision;
+        savedNameRef.current = designName;
 
-        if (!designId) setDesignId(saved.id);
+        if (!id) {
+          designIdRef.current = saved.id;
+          setDesignId(saved.id);
+        }
         setSaveState("saved");
-        if (!options.silent) flash("Design saved");
-        return designId ?? saved.id;
+        if (!options.silent) flash(adminEditing ? "Saved to their design" : "Design saved");
+        return saved.id;
       } catch {
         setSaveState("error");
         if (!options.silent) flash("Could not save — please try again");
         return null;
       }
     },
-    [doc, pagesOptionId, paperId, designName, designId, activeTemplate.id, productId, templateAuthoring, flash],
+    [doc, pagesOptionId, paperId, designName, activeTemplate.id, productId, templateAuthoring, adminEditing, flash],
+  );
+
+  const persist = useCallback(
+    (options: { silent?: boolean } = {}) => enqueueSave(() => save(options)),
+    [enqueueSave, save],
   );
 
   const saveDesign = () => {
@@ -460,12 +528,13 @@ export default function DesignEditor({
    * (else the defaults) and stay editable on the basket page.
    */
   const addToCart = useCallback(async (acknowledgeDefaults = false) => {
-    if (authoring) return;
+    if (!customerChrome) return;
     setAddingToCart(true);
     const id = await persist({ silent: true });
     if (!id) {
       setAddingToCart(false);
-      flash("Could not save your design — please try again");
+      // A clash has its own notice, with the way out (reload).
+      if (!conflictRef.current) flash("Could not save your design — please try again");
       return;
     }
     try {
@@ -502,7 +571,7 @@ export default function DesignEditor({
       setAddingToCart(false);
       flash(error instanceof Error ? error.message : "Could not add to your basket — please try again");
     }
-  }, [authoring, persist, flash, router, setPreview, initialSelection.quantity, initialSelection.delivery]);
+  }, [customerChrome, persist, flash, router, setPreview, initialSelection.quantity, initialSelection.delivery]);
 
   /**
    * Authoring only: promote the draft to the live layout. Saves first, so
@@ -542,7 +611,8 @@ export default function DesignEditor({
    * of the design, so a refresh must still add the line on what was priced.
    */
   useEffect(() => {
-    if (!designId) return;
+    // An admin's editor lives at /admin/designs/:id, which already names it.
+    if (!designId || adminEditing) return;
     const url = new URL(window.location.href);
     const alreadyClean =
       url.searchParams.get("design") === designId &&
@@ -556,7 +626,7 @@ export default function DesignEditor({
     url.searchParams.set("design", designId);
     for (const [key, value] of lineChoice) url.searchParams.set(key, value);
     window.history.replaceState(null, "", url);
-  }, [designId]);
+  }, [designId, adminEditing]);
 
   /** Debounced autosave — the "saves automatically as you go" promise. */
   const firstRender = useRef(true);
@@ -569,11 +639,20 @@ export default function DesignEditor({
     persistRef.current = persist;
   }, [persist]);
   const pendingAutosaveRef = useRef(false);
+  /** Set when the editor swaps in a newer saved copy, which needs no saving back. */
+  const skipAutosaveRef = useRef(false);
+  /** Whether anything has been changed here since the editor opened. */
+  const editedRef = useRef(false);
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false;
+      return;
+    }
+    editedRef.current = true;
     pendingAutosaveRef.current = true;
     const timer = window.setTimeout(() => {
       pendingAutosaveRef.current = false;
@@ -581,6 +660,55 @@ export default function DesignEditor({
     }, 1500);
     return () => window.clearTimeout(timer);
   }, [doc, pagesOptionId, paperId]);
+
+  /**
+   * A saved design's page can come back from the router's cache (the Back
+   * button reuses it), carrying the copy as it was when first loaded. Ask for
+   * the latest once on opening, and take it up if it's newer and nothing has
+   * been changed here yet — otherwise the first save would be refused as a
+   * clash with this editor's own earlier saves. Once something has been
+   * changed, a newer copy elsewhere is a real clash, and the guard says so.
+   */
+  const savedDesignId = savedDesign?.id ?? null;
+  const adminEditingMode = !!adminEditing;
+  useEffect(() => {
+    if (!savedDesignId || authoring) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(
+          adminEditingMode ? `/api/admin/designs/${savedDesignId}` : `/api/designs/${savedDesignId}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok || cancelled) return;
+        const latest = (await response.json()) as {
+          name: string;
+          templateId: string;
+          doc: DesignDoc;
+          pagesOptionId: string;
+          paperId: string;
+          revision: number;
+        };
+        if (cancelled || editedRef.current || latest.revision <= revisionRef.current) return;
+        revisionRef.current = latest.revision;
+        savedNameRef.current = latest.name;
+        skipAutosaveRef.current = true;
+        setDoc(latest.doc);
+        setHistory([]);
+        setFuture([]);
+        setPagesOptionId(latest.pagesOptionId);
+        setPaperId(latest.paperId);
+        setDesignName(latest.name);
+        const latestTemplate = templates.find((item) => item.id === latest.templateId);
+        if (latestTemplate) setActiveTemplate(latestTemplate);
+      } catch {
+        // Offline or the like: carry on with the copy the page loaded.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [savedDesignId, adminEditingMode, authoring, templates]);
 
   // Flush a still-pending autosave when the editor unmounts — e.g. clicking
   // "Back" or navigating back right after an edit, before the 1.5s
@@ -1201,11 +1329,15 @@ export default function DesignEditor({
       {/* ------------------------------ top bar ------------------------ */}
       <header className="flex items-center gap-1 border-b border-outline-variant/40 bg-surface-container-lowest px-3 py-2">
         <Link
-          href={authoring ? `/admin/templates/${templateAuthoring.slug}` : "/templates"}
+          href={
+            authoring
+              ? `/admin/templates/${templateAuthoring.slug}`
+              : (adminEditing?.backHref ?? "/templates")
+          }
           className="flex items-center gap-2 rounded-lg border border-outline-variant/60 px-2.5 py-2 font-body text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary sm:px-3"
         >
-          {authoring ? <ArrowLeft size={16} aria-hidden /> : <Home size={16} aria-hidden />}
-          <span className="hidden sm:inline">{authoring ? "Back" : "Home"}</span>
+          {customerChrome ? <Home size={16} aria-hidden /> : <ArrowLeft size={16} aria-hidden />}
+          <span className="hidden sm:inline">{customerChrome ? "Home" : "Back"}</span>
         </Link>
 
         <div className="mx-1 h-7 w-px bg-outline-variant/50 sm:mx-2" aria-hidden />
@@ -1249,7 +1381,9 @@ export default function DesignEditor({
               : saveState === "saved"
                 ? authoring
                   ? "Draft saved"
-                  : "All changes saved"
+                  : adminEditing
+                    ? "Saved to their design"
+                    : "All changes saved"
                 : saveState === "error"
                   ? "Not saved"
                   : ""}
@@ -1288,14 +1422,16 @@ export default function DesignEditor({
               </span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={shareLink}
-            aria-label="Copy a link to this design"
-            className="hidden rounded-lg p-2.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary sm:block"
-          >
-            <Share2 size={18} aria-hidden />
-          </button>
+          {customerChrome && (
+            <button
+              type="button"
+              onClick={shareLink}
+              aria-label="Copy a link to this design"
+              className="hidden rounded-lg p-2.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary sm:block"
+            >
+              <Share2 size={18} aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setPreview(true)}
@@ -1304,7 +1440,7 @@ export default function DesignEditor({
             <Eye size={16} aria-hidden />
             <span className="hidden md:inline">Preview</span>
           </button>
-          {!authoring && (
+          {customerChrome && (
             <button
               type="button"
               onClick={() => void addToCart()}
@@ -1319,6 +1455,56 @@ export default function DesignEditor({
           )}
         </div>
       </header>
+
+      {adminEditing && (
+        <div className="flex items-start gap-2 border-b border-line bg-mist px-4 py-2 font-body text-sm text-ink">
+          <UserRound size={16} aria-hidden className="mt-0.5 shrink-0 text-plum-deep" />
+          <p>
+            You&rsquo;re editing <strong>{adminEditing.ownerLabel}</strong>&rsquo;s design.
+            Changes save straight to it, and they&rsquo;ll see them next time they open it
+            {adminEditing.orderState.inBasket && " — it’s in their basket, so it’s what they’ll pay for"}
+            .
+            {adminEditing.orderState.orders.length > 0 && (
+              <>
+                {" "}
+                Already ordered as{" "}
+                {adminEditing.orderState.orders.map((order, index) => (
+                  <span key={order.id}>
+                    {index > 0 && ", "}
+                    <Link href={`/admin/orders/${order.id}`} className="link">
+                      {order.orderNumber}
+                    </Link>
+                  </span>
+                ))}
+                : {adminEditing.orderState.orders.length === 1 ? "that order prints" : "those orders print"}{" "}
+                from the copy taken when it was paid for, so changes here won&rsquo;t alter{" "}
+                {adminEditing.orderState.orders.length === 1 ? "it" : "them"}.
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
+      {conflict && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 border-b border-line bg-warn-bg px-4 py-2 font-body text-sm text-warn-text"
+        >
+          <p className="flex-1">
+            {adminEditing
+              ? "This design has been changed somewhere else — most likely by the customer. Your latest change wasn’t saved. Reload to carry on from their version."
+              : "This design has been changed somewhere else — in another window, or by our team if you asked us to help. Your latest change wasn’t saved. Reload to carry on from the newest version."}
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="btn btn-outline min-h-11 px-4 text-base"
+          >
+            <RefreshCw size={16} aria-hidden />
+            Reload
+          </button>
+        </div>
+      )}
 
       {/* --------------------- contextual selection bar ----------------- */}
       {selected && (
@@ -1754,7 +1940,7 @@ export default function DesignEditor({
               </div>
               )}
 
-              {!authoring && (
+              {customerChrome && (
               <div className="rounded-xl border border-line bg-surface-container-lowest p-4 ambient-shadow">
                 <p className="font-body text-sm text-on-surface-variant">
                   {copiesText(quote.quantity.value)} for{" "}
@@ -2674,10 +2860,10 @@ export default function DesignEditor({
               </div>
             )}
             <div className="mt-4 flex flex-wrap justify-end gap-3">
-              {/* Admin-only. Customers review their proof on the order page
-                  after payment — the print-ready PDF is a press artefact,
+              {/* Admin-only (authoring a template, or editing a customer's
+                  design for them) — the print-ready PDF is a press artefact,
                   never something the customer downloads. */}
-              {authoring && (
+              {!customerChrome && (
                 <button
                   type="button"
                   onClick={downloadProof}
@@ -2688,7 +2874,7 @@ export default function DesignEditor({
                   {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
                 </button>
               )}
-              {!authoring && (
+              {customerChrome && (
                 <button
                   type="button"
                   onClick={() => void addToCart()}

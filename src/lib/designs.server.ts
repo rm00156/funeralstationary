@@ -2,7 +2,10 @@
  * Server-side reads/writes for saved designs.
  *
  * Every query is scoped by owner — a design is only ever reachable by the
- * visitor who owns it. Soft-deleted rows (deleted_at) are excluded everywhere.
+ * visitor who owns it. The one exception is adminFindDesign/adminWriteDesign,
+ * for an admin editing a customer's design on their behalf (reached only
+ * through adminDesigns.server.ts, behind isAdmin). Soft-deleted rows
+ * (deleted_at) are excluded everywhere.
  *
  * The catalogue (templates/products/pricing options) uses surrogate int PKs,
  * but the rest of the app is entirely slug-based — URLs, src/lib/templates.ts,
@@ -10,7 +13,7 @@
  * every write resolves an incoming slug to its surrogate id, and every read
  * joins back out to slugs, so nothing outside src/db ever sees a surrogate id.
  */
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   designs,
@@ -22,6 +25,7 @@ import {
   templates,
 } from "@/db/schema";
 import { A5_TRIM, docTrim, sameTrim, type DesignDoc, type PageTrim } from "@/lib/designEditor";
+import { changesContent } from "@/lib/designRevision";
 import type { Owner } from "@/lib/session";
 
 /** Max pages a doc may carry — mirrors the proof route's MAX_PAGES. */
@@ -45,7 +49,16 @@ export interface SavedDesign {
   pagesOptionId: string;
   paperId: string;
   pageCount: number;
+  /** Bumped on every save — see designs.revision. */
+  revision: number;
   updatedAt: Date;
+}
+
+/** A save made from an out-of-date copy of the design (see designs.revision). */
+export class DesignConflictError extends Error {
+  constructor() {
+    super("This design was changed somewhere else");
+  }
 }
 
 /** Owner predicate: a signed-in customer by user_id, a guest by guest_token. */
@@ -123,6 +136,7 @@ function savedDesignSelection() {
     name: designs.name,
     doc: designs.doc,
     pageCount: designs.pageCount,
+    revision: designs.revision,
     updatedAt: designs.updatedAt,
     templateSlug: templates.slug,
     templateName: templates.name,
@@ -139,6 +153,7 @@ type SelectedRow = {
   name: string;
   doc: DesignDoc;
   pageCount: number;
+  revision: number;
   updatedAt: Date;
   templateSlug: string;
   templateName: string;
@@ -162,6 +177,7 @@ function toSavedDesign(row: SelectedRow): SavedDesign {
     pagesOptionId: row.pageCountSlug,
     paperId: row.paperSlug,
     pageCount: row.pageCount,
+    revision: row.revision,
     updatedAt: row.updatedAt,
   };
 }
@@ -179,7 +195,8 @@ export async function listDesigns(owner: Owner): Promise<SavedDesign[]> {
   return rows.map(toSavedDesign);
 }
 
-export async function getDesign(owner: Owner, id: string): Promise<SavedDesign | null> {
+/** One live design within `scope` — an owner's, or (admin) anyone's. */
+async function findDesign(scope: SQL | undefined, id: string): Promise<SavedDesign | null> {
   const rows = await db
     .select(savedDesignSelection())
     .from(designs)
@@ -187,9 +204,13 @@ export async function getDesign(owner: Owner, id: string): Promise<SavedDesign |
     .innerJoin(products, eq(designs.productId, products.id))
     .innerJoin(pageCountOptions, eq(designs.pageCountOptionId, pageCountOptions.id))
     .innerJoin(paperOptions, eq(designs.paperOptionId, paperOptions.id))
-    .where(and(eq(designs.id, id), ownedBy(owner), isLiveDesign()))
+    .where(and(eq(designs.id, id), scope, isLiveDesign()))
     .limit(1);
   return rows[0] ? toSavedDesign(rows[0]) : null;
+}
+
+export async function getDesign(owner: Owner, id: string): Promise<SavedDesign | null> {
+  return findDesign(ownedBy(owner), id);
 }
 
 async function resolveProductId(slug: string): Promise<number | null> {
@@ -220,11 +241,11 @@ async function resolvePaperOptionId(productId: number, slug: string): Promise<nu
   return row?.id ?? null;
 }
 
-async function getOwnedDesignProductId(owner: Owner, id: string): Promise<number | null> {
+async function getDesignProductId(scope: SQL | undefined, id: string): Promise<number | null> {
   const [row] = await db
     .select({ productId: designs.productId })
     .from(designs)
-    .where(and(eq(designs.id, id), ownedBy(owner), isLiveDesign()))
+    .where(and(eq(designs.id, id), scope, isLiveDesign()))
     .limit(1);
   return row?.productId ?? null;
 }
@@ -270,18 +291,56 @@ export async function createDesign(
   return created;
 }
 
+export interface DesignPatch {
+  doc?: DesignDoc;
+  spec?: DesignSpec;
+  name?: string;
+  /** Slug — set when the editor applies a different template to the cover. */
+  templateId?: string;
+}
+
+/**
+ * Save changes to one of `owner`'s designs. A change to its content (see
+ * changesContent) bumps the revision; with `expectedRevision` it only lands on
+ * that revision and throws DesignConflictError otherwise, and without it (an
+ * editor tab opened before revisions existed) it is unconditional. A rename
+ * alone neither checks nor bumps the revision, so renaming on /account never
+ * makes an open editor's next save look like a clash.
+ */
 export async function updateDesign(
   owner: Owner,
   id: string,
-  patch: {
-    doc?: DesignDoc;
-    spec?: DesignSpec;
-    name?: string;
-    /** Slug — set when the editor applies a different template to the cover. */
-    templateId?: string;
-  },
+  patch: DesignPatch,
+  expectedRevision?: number,
 ): Promise<SavedDesign | null> {
-  const productId = await getOwnedDesignProductId(owner, id);
+  return writeDesign(ownedBy(owner), id, patch, expectedRevision);
+}
+
+/**
+ * Any customer's design, for an admin editing it on their behalf. Only
+ * adminDesigns.server.ts and the /api/admin/designs routes (behind isAdmin)
+ * call these — every customer path goes through the owner-scoped functions
+ * above.
+ */
+export function adminFindDesign(id: string): Promise<SavedDesign | null> {
+  return findDesign(undefined, id);
+}
+
+export function adminWriteDesign(
+  id: string,
+  patch: DesignPatch,
+  expectedRevision?: number,
+): Promise<SavedDesign | null> {
+  return writeDesign(undefined, id, patch, expectedRevision);
+}
+
+async function writeDesign(
+  scope: SQL | undefined,
+  id: string,
+  patch: DesignPatch,
+  expectedRevision: number | undefined,
+): Promise<SavedDesign | null> {
+  const productId = await getDesignProductId(scope, id);
   if (!productId) return null;
 
   let pageCountOptionId: number | undefined;
@@ -302,17 +361,39 @@ export async function updateDesign(
     templateId = resolved;
   }
 
-  await db
+  const content = changesContent(patch);
+  const guarded = content && expectedRevision !== undefined;
+  const [result] = await db
     .update(designs)
     .set({
       ...(patch.doc ? { doc: patch.doc } : {}),
       ...(patch.spec ? { pageCountOptionId, paperOptionId } : {}),
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(templateId !== undefined ? { templateId } : {}),
+      ...(content ? { revision: sql`${designs.revision} + 1` } : {}),
     })
-    .where(and(eq(designs.id, id), ownedBy(owner), isLiveDesign()));
+    .where(
+      and(
+        eq(designs.id, id),
+        scope,
+        isLiveDesign(),
+        guarded ? eq(designs.revision, expectedRevision) : undefined,
+      ),
+    );
 
-  return getDesign(owner, id);
+  if (result.affectedRows === 0) {
+    // Not there, not at that revision — or a rename to the name it already
+    // had, which matches the row but changes nothing. (A content change bumps
+    // the revision, so a matched row always changes.)
+    const current = await findDesign(scope, id);
+    if (current && guarded) throw new DesignConflictError();
+    return current;
+  }
+  const updated = await findDesign(scope, id);
+  // Re-read after the write, so another write may have landed in between:
+  // report the revision this one made, or the editor would take on the
+  // other's and its next save would pass the guard over that change.
+  return updated && guarded ? { ...updated, revision: expectedRevision + 1 } : updated;
 }
 
 /**

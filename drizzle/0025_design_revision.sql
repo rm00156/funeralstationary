@@ -1,0 +1,1 @@
+ALTER TABLE `designs` ADD `revision` int DEFAULT 0 NOT NULL;
