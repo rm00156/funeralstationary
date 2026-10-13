@@ -6,6 +6,13 @@
  * decimal(6,4) strings from the driver and become plain numbers here (exact
  * for 4dp values). Only active rows are returned, in sort order — the admin
  * area reads the tables through its own seam instead.
+ *
+ * `getPricingData` is what the customer path prices with: the list prices,
+ * less the signed-in trade customer's discount (trade.ts withTradeDiscount).
+ * Doing it here, once, is what keeps the buy box, the price table, "from
+ * £X", the basket and the Stripe charge in agreement — and a new page that
+ * shows a price can't forget it. `getListPricingData` is the undiscounted
+ * table, for the admin pages.
  */
 import { and, asc, eq } from "drizzle-orm";
 import { cache } from "react";
@@ -24,6 +31,8 @@ import type {
   QuantityOption,
   SelectOption,
 } from "@/lib/orderOfServicePricing";
+import { withTradeDiscount } from "@/lib/trade";
+import { getCurrentTradeMembership } from "@/lib/trade.server";
 
 async function resolveProductId(productSlug: string): Promise<number> {
   const [row] = await db
@@ -55,7 +64,7 @@ async function loadPaperOptions(productId: number): Promise<SelectOption[]> {
   }));
 }
 
-export const getPricingData = cache(
+export const getListPricingData = cache(
   async (productSlug: string): Promise<PricingData> => {
     const productId = await resolveProductId(productSlug);
 
@@ -135,6 +144,15 @@ export const getPricingData = cache(
     return { quantity, pages, paper, delivery };
   },
 );
+
+/** The prices the signed-in customer pays: list prices, less their trade discount if they have one. */
+export const getPricingData = cache(async (productSlug: string): Promise<PricingData> => {
+  const [data, membership] = await Promise.all([
+    getListPricingData(productSlug),
+    getCurrentTradeMembership(),
+  ]);
+  return membership ? withTradeDiscount(data, membership.discountPercent) : data;
+});
 
 /** Resolve one page-count option by slug — used to validate incoming specs. */
 export const getPageCountOption = cache(

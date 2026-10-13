@@ -13,7 +13,7 @@ import { VAT_TREATMENT_LABELS, VAT_TREATMENTS, type VatTreatment } from "@/lib/v
 export default function AdminProductsManager({ products }: { products: AdminProduct[] }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
+      <div className="table-stack table-stack-wide rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
         <table className="w-full min-w-[960px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
@@ -75,7 +75,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
 
   return (
     <tr className="border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0">
-      <td className="px-5 py-3">
+      <td data-label="Product" data-stack="full" className="px-5 py-3">
         <input
           aria-label={`Label for ${product.slug}`}
           value={label}
@@ -97,8 +97,8 @@ function ProductRow({ product }: { product: AdminProduct }) {
           </p>
         )}
       </td>
-      <td className="px-5 py-3 text-on-surface-variant">{product.slug}</td>
-      <td className="px-5 py-3">
+      <td data-stack="title" className="px-5 py-3 text-on-surface-variant">{product.slug}</td>
+      <td data-label="Shop group" className="px-5 py-3">
         <select
           aria-label={`Shop group for ${product.slug}`}
           value={occasion}
@@ -112,7 +112,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
           ))}
         </select>
       </td>
-      <td className="px-5 py-3">
+      <td data-label="VAT" className="px-5 py-3">
         <select
           aria-label={`VAT for ${product.slug}`}
           value={vatTreatment}
@@ -126,7 +126,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
           ))}
         </select>
       </td>
-      <td className="px-5 py-3">
+      <td data-label="Sort" className="px-5 py-3">
         <input
           aria-label={`Sort order for ${product.slug}`}
           type="number"
@@ -136,7 +136,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
           className="w-20 rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15"
         />
       </td>
-      <td className="px-5 py-3">
+      <td data-label="Active" className="px-5 py-3">
         <input
           aria-label={`${product.slug} active`}
           type="checkbox"
@@ -145,7 +145,7 @@ function ProductRow({ product }: { product: AdminProduct }) {
           className="h-4 w-4 accent-primary-container"
         />
       </td>
-      <td className="px-5 py-3">
+      <td data-stack="end" className="px-5 py-3">
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"

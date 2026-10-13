@@ -21,7 +21,6 @@ import {
   ArrowUp,
   Ban,
   Bold,
-  BookOpen,
   ChevronDown,
   ChevronUp,
   Circle,
@@ -35,7 +34,6 @@ import {
   ImagePlus,
   Italic,
   Layers,
-  LayoutGrid,
   LayoutTemplate,
   Lightbulb,
   Lock,
@@ -95,11 +93,10 @@ import {
   type ResizeHandle,
   type TextElement,
 } from "@/lib/designEditor";
-import BookletPreview from "@/components/BookletPreview";
+import DesignPreviewDialog, { type PreviewMode } from "@/components/DesignPreviewDialog";
 import {
   CLIPARTS,
   PageCanvas,
-  StaticPage,
   type CanvasGuides,
   type DragMode,
 } from "@/components/PageCanvas";
@@ -360,7 +357,8 @@ export default function DesignEditor({
   const [publishing, setPublishing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
-  const [previewMode, setPreviewMode] = useState<"pages" | "booklet">("pages");
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("pages");
+  const closePreview = useCallback(() => setPreview(false), []);
   const [tipsOpen, setTipsOpen] = useState(true);
   const [proofState, setProofState] = useState<"idle" | "generating">("idle");
   const [addingToCart, setAddingToCart] = useState(false);
@@ -2772,122 +2770,47 @@ export default function DesignEditor({
 
       {/* preview modal */}
       {preview && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Design preview"
-          className="fixed inset-0 z-50 flex flex-col bg-on-surface/70 p-6"
-          onClick={() => setPreview(false)}
+        <DesignPreviewDialog
+          pages={doc.pages}
+          trim={trim}
+          pageLabel={(index) => (authoring ? pageLabel(index) : `Page ${index + 1}`)}
+          // A booklet template is only ever cover / middle / back, so show it
+          // the way a customer would actually get it: expanded to a real
+          // booklet, middle page repeated.
+          bookletPages={authoring && format.templatePages === 3 ? withPageCount(doc, 8).pages : doc.pages}
+          bookletNote={
+            authoring && format.templatePages === 3 ? "Shown as an 8-page booklet, middle page repeated." : undefined
+          }
+          mode={previewMode}
+          onModeChange={setPreviewMode}
+          onClose={closePreview}
         >
-          <div
-            className={`mx-auto flex max-h-full w-full flex-col rounded-xl bg-paper p-6 ${
-              previewMode === "booklet" ? "h-full max-w-6xl" : "max-w-5xl"
-            }`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between gap-4">
-              <h2 className="font-display text-xl text-primary">Preview</h2>
-              <div
-                role="group"
-                aria-label="Preview as"
-                className="flex rounded-lg border border-outline-variant/60 bg-surface-container-lowest p-0.5"
-              >
-                {(
-                  [
-                    { mode: "pages", label: "Pages", Icon: LayoutGrid },
-                    { mode: "booklet", label: "Booklet", Icon: BookOpen },
-                  ] as const
-                ).map(({ mode, label, Icon }) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-pressed={previewMode === mode}
-                    onClick={() => setPreviewMode(mode)}
-                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-body text-sm transition-colors ${
-                      previewMode === mode
-                        ? "bg-primary-container text-white"
-                        : "text-on-surface-variant hover:bg-surface-container hover:text-primary"
-                    }`}
-                  >
-                    <Icon size={15} aria-hidden />
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                aria-label="Close preview"
-                onClick={() => setPreview(false)}
-                className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container hover:text-primary"
-              >
-                <X size={18} aria-hidden />
-              </button>
-            </div>
-            {previewMode === "booklet" ? (
-              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden pb-2">
-                {/* A booklet template is only ever cover / middle / back, so
-                    show it the way a customer would actually get it: expanded
-                    to a real booklet, middle page repeated. */}
-                {authoring && format.templatePages === 3 && (
-                  <p className="text-center font-body text-xs text-on-surface-variant">
-                    Shown as an 8-page booklet, middle page repeated.
-                  </p>
-                )}
-                <BookletPreview
-                  pages={
-                    authoring && format.templatePages === 3
-                      ? withPageCount(doc, 8).pages
-                      : doc.pages
-                  }
-                  pageW={metrics.pageW}
-                  pageH={metrics.pageH}
-                  renderPage={(page, scale) => (
-                    <StaticPage page={page} trim={trim} scale={scale} plain />
-                  )}
-                />
-              </div>
-            ) : (
-              <div className="flex flex-wrap justify-center gap-6 overflow-auto pb-2">
-                {doc.pages.map((previewPage, index) => (
-                  <div key={previewPage.id} className="flex flex-col items-center gap-2">
-                    {/* The same height whatever the format: 0.45 of an A5 page. */}
-                    <StaticPage page={previewPage} trim={trim} scale={283.5 / metrics.pageH} />
-                    <span className="font-body text-xs text-on-surface-variant">
-                      {authoring ? pageLabel(index) : `Page ${index + 1}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="mt-4 flex flex-wrap justify-end gap-3">
-              {/* Admin-only (authoring a template, or editing a customer's
-                  design for them) — the print-ready PDF is a press artefact,
-                  never something the customer downloads. */}
-              {!customerChrome && (
-                <button
-                  type="button"
-                  onClick={downloadProof}
-                  disabled={proofState === "generating"}
-                  className="flex items-center gap-2 rounded-lg border-2 border-primary-container px-5 py-3 font-body text-sm font-medium text-primary-container transition-colors hover:bg-surface-container disabled:opacity-60"
-                >
-                  <FileDown size={16} aria-hidden />
-                  {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
-                </button>
-              )}
-              {customerChrome && (
-                <button
-                  type="button"
-                  onClick={() => void addToCart()}
-                  disabled={addingToCart}
-                  className="flex items-center gap-2 rounded-lg bg-primary-container px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-primary disabled:opacity-60"
-                >
-                  <ShoppingCart size={16} aria-hidden />
-                  {addingToCart ? "Adding…" : "Add to basket"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+          {/* Admin-only (authoring a template, or editing a customer's
+              design for them) — the print-ready PDF is a press artefact,
+              never something the customer downloads. */}
+          {!customerChrome && (
+            <button
+              type="button"
+              onClick={downloadProof}
+              disabled={proofState === "generating"}
+              className="flex items-center gap-2 rounded-lg border-2 border-primary-container px-5 py-3 font-body text-sm font-medium text-primary-container transition-colors hover:bg-surface-container disabled:opacity-60"
+            >
+              <FileDown size={16} aria-hidden />
+              {proofState === "generating" ? "Generating proof…" : "Download proof PDF"}
+            </button>
+          )}
+          {customerChrome && (
+            <button
+              type="button"
+              onClick={() => void addToCart()}
+              disabled={addingToCart}
+              className="flex items-center gap-2 rounded-lg bg-primary-container px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-primary disabled:opacity-60"
+            >
+              <ShoppingCart size={16} aria-hidden />
+              {addingToCart ? "Adding…" : "Add to basket"}
+            </button>
+          )}
+        </DesignPreviewDialog>
       )}
     </div>
   );

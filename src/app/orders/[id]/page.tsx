@@ -5,11 +5,15 @@ import { CheckCircle2, ChevronRight } from "lucide-react";
 
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import OrderLinePreview from "@/components/OrderLinePreview";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
+import OrderThumb from "@/components/OrderThumb";
+import { shopDate } from "@/lib/adminDashboard";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { lineSpec, refundedPence } from "@/lib/orders";
 import { getOrder } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
+import { invoiceStatusText, tradeDiscountText } from "@/lib/trade";
 import { authConfigured } from "@/lib/userSession";
 import { vatIncludedText } from "@/lib/vat";
 
@@ -98,6 +102,7 @@ export default async function OrderPage({
                   <p className="mt-1 font-body text-on-surface-variant">
                     We have emailed a confirmation to {order.contact.email}. Your stationery is now
                     queued for printing.
+                    {order.account && " It’s on account: the invoice follows by email."}
                   </p>
                 </div>
               </div>
@@ -109,6 +114,8 @@ export default async function OrderPage({
                   {order.orderNumber}
                 </h1>
                 <p className="mt-2 font-body text-on-surface-variant">
+                  {order.trade?.familyName && `${order.trade.familyName} · `}
+                  {order.trade?.customerRef && `Your ref ${order.trade.customerRef} · `}
                   Placed {formatDate(order.placedAt)}
                 </p>
               </div>
@@ -133,27 +140,35 @@ export default async function OrderPage({
                     key={item.id}
                     className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h2 className="font-display text-xl font-medium text-on-surface">
-                          {item.designName}
-                        </h2>
-                        <p className="font-body text-sm text-on-surface-variant">
-                          {copiesText(item.quantityCopies)} · {lineSpec(item.format, item.quote)}
-                        </p>
-                        <p className="font-body text-sm text-on-surface-variant">
-                          {formatPence(item.unitPricePence)} each
-                        </p>
-                        <p className="font-body text-sm text-on-surface-variant">
-                          {item.delivery.label} ·{" "}
-                          {item.delivery.pricePence === 0
-                            ? "Free"
-                            : formatPence(item.delivery.pricePence)}
+                    <div className="flex items-start gap-4">
+                      {/* What was paid for: the line's snapshot, or a plain sheet for their own PDF. */}
+                      {item.doc ? (
+                        <OrderLinePreview doc={item.doc} name={item.designName} />
+                      ) : (
+                        <OrderThumb src={null} className="h-[112px] w-[79px]" />
+                      )}
+                      <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div>
+                          <h2 className="font-display text-xl font-medium text-on-surface">
+                            {item.designName}
+                          </h2>
+                          <p className="font-body text-sm text-on-surface-variant">
+                            {copiesText(item.quantityCopies)} · {lineSpec(item.format, item.quote)}
+                          </p>
+                          <p className="font-body text-sm text-on-surface-variant">
+                            {formatPence(item.unitPricePence)} each
+                          </p>
+                          <p className="font-body text-sm text-on-surface-variant">
+                            {item.delivery.label} ·{" "}
+                            {item.delivery.pricePence === 0
+                              ? "Free"
+                              : formatPence(item.delivery.pricePence)}
+                          </p>
+                        </div>
+                        <p className="font-display text-xl text-primary">
+                          {formatPence(item.lineTotalPence)}
                         </p>
                       </div>
-                      <p className="font-display text-xl text-primary">
-                        {formatPence(item.lineTotalPence)}
-                      </p>
                     </div>
                   </article>
                 ))}
@@ -177,7 +192,9 @@ export default async function OrderPage({
                     </div>
                   </dl>
                   <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-4">
-                    <span className="font-display text-xl text-on-surface">Paid</span>
+                    <span className="font-display text-xl text-on-surface">
+                      {order.paymentMethod === "account" ? "Total" : "Paid"}
+                    </span>
                     <span className="font-display text-3xl font-medium text-primary">
                       {formatPence(order.totals.totalPence)}
                     </span>
@@ -185,6 +202,32 @@ export default async function OrderPage({
                   <p className="mt-1 text-right font-body text-sm text-on-surface-variant">
                     {vatIncludedText(order.totals.vatPence)}
                   </p>
+                  {order.tradeDiscountPercent !== null && (
+                    <p className="mt-1 text-right font-body text-sm text-on-surface-variant">
+                      Trade prices: {tradeDiscountText(order.tradeDiscountPercent)} print
+                    </p>
+                  )}
+                  {order.paymentMethod === "account" && (
+                    <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-outline-variant/40 pt-4 font-body text-sm">
+                      <span className="text-on-surface">
+                        On account
+                        {order.account && `, due ${order.account.termsDays} days after the invoice`}
+                        <span className="block text-on-surface-variant">
+                          {invoiceStatusText(
+                            { ...order, totalPence: order.totals.totalPence },
+                            shopDate(new Date()),
+                          )}
+                          {order.invoice?.number && ` · invoice ${order.invoice.number}`}
+                        </span>
+                      </span>
+                      {order.invoice?.url && (
+                        <a href={order.invoice.url} target="_blank" rel="noopener noreferrer" className="link">
+                          {order.invoice.status === "paid" ? "View the receipt" : "View or pay the invoice"}
+                          <span className="sr-only"> (opens in a new tab)</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
                   {refunded > 0 && (
                     <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-outline-variant/40 pt-4">
                       <span className="font-body text-on-surface">Refunded to your card</span>

@@ -15,6 +15,7 @@ import {
   STANDARD_TURNAROUND,
   PHONE_DISPLAY,
   PHONE_HREF,
+  TRADE_HREF,
   UPLOAD_DESIGN_HREF,
 } from "@/lib/site";
 import {
@@ -71,15 +72,20 @@ const MENU_ITEM =
  * aren't catalogue products sit on the bar beside it (and in their own group
  * in the mobile menu). Signed in: "My account" opens a menu with
  * the account page and Sign out. Signed out: "Sign in" goes to /account,
- * which is the sign-in form above whatever this browser has saved.
+ * which is the sign-in form above whatever this browser has saved. The
+ * utility bar carries the link to trade accounts (/trade), for funeral
+ * directors, on every page.
  */
 export default function HeaderNav({
   products,
   user,
+  trade = false,
   shopClosed,
 }: {
   products: NavProduct[];
   user: { email: string } | null;
+  /** Signed in on a trade account: the utility bar's trade link goes to it, not to /trade. */
+  trade?: boolean;
   /** The site's subscription has lapsed: no designing, uploading or buying online. */
   shopClosed: boolean;
 }) {
@@ -120,13 +126,22 @@ export default function HeaderNav({
               on a working day
             </span>
           )}
-          <a
-            href={PHONE_HREF}
-            className="flex min-h-6 items-center gap-2 text-white no-underline hover:underline"
-          >
-            <Phone size={16} strokeWidth={1.8} aria-hidden />
-            {OPENING_HOURS} · {PHONE_DISPLAY}
-          </a>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+            <Link
+              href={trade ? "/account" : TRADE_HREF}
+              aria-current={!trade && pathname === TRADE_HREF ? "page" : undefined}
+              className="flex min-h-6 items-center font-semibold text-white underline underline-offset-4 hover:text-on-plum"
+            >
+              {trade ? "Your trade account" : "Trade accounts"}
+            </Link>
+            <a
+              href={PHONE_HREF}
+              className="flex min-h-6 items-center gap-2 text-white no-underline hover:underline"
+            >
+              <Phone size={16} strokeWidth={1.8} aria-hidden />
+              {OPENING_HOURS} · {PHONE_DISPLAY}
+            </a>
+          </div>
         </div>
       </div>
 

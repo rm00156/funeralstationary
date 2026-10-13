@@ -61,7 +61,7 @@ export default async function AdminCustomersPage({
         )}
       </p>
 
-      <div className="overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
+      <div className="table-stack rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
         <table className="w-full min-w-[760px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
@@ -84,21 +84,21 @@ export default async function AdminCustomersPage({
             {customers.map((customer) => (
               <tr
                 key={customer.email}
-                className="border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0"
+                className="row-linked border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0"
               >
-                <td className="px-5 py-3">
-                  <Link href={customerHref(customer.email)} className="block font-medium text-primary hover:underline">
+                <td data-stack="title" className="px-5 py-3">
+                  <Link href={customerHref(customer.email)} className="row-link block font-medium text-primary hover:underline">
                     {customer.name ?? customer.email}
                   </Link>
                   {customer.name && <span className="block text-xs text-on-surface-variant">{customer.email}</span>}
                 </td>
-                <td className="px-5 py-3 text-on-surface-variant">{customer.phone ?? "—"}</td>
-                <td className="px-5 py-3 text-on-surface-variant">{customer.orderCount}</td>
-                <td className="px-5 py-3 text-on-surface-variant">{formatDate(customer.lastOrderAt)}</td>
-                <td className="px-5 py-3 text-on-surface-variant">
+                <td data-label="Phone" className="px-5 py-3 text-on-surface-variant">{customer.phone ?? "—"}</td>
+                <td data-label="Orders" className="px-5 py-3 text-on-surface-variant">{customer.orderCount}</td>
+                <td data-label="Last order" className="px-5 py-3 text-on-surface-variant">{formatDate(customer.lastOrderAt)}</td>
+                <td data-label="Account" className="px-5 py-3 text-on-surface-variant">
                   {customer.account ? `Since ${formatDate(customer.account.createdAt)}` : "Guest"}
                 </td>
-                <td className="px-5 py-3 text-right">{formatPence(customer.spentPence)}</td>
+                <td data-label="Spent, less refunds" data-stack="end" className="px-5 py-3 text-right">{formatPence(customer.spentPence)}</td>
               </tr>
             ))}
           </tbody>

@@ -1,0 +1,1 @@
+ALTER TABLE `orders` MODIFY COLUMN `invoice_updated_at` timestamp(3);

@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { DesignForYouCard, UploadDesignCard } from "@/components/OtherWaysCards";
 import ProductDesigns from "@/components/ProductDesigns";
+import TradePriceNote from "@/components/TradePriceNote";
 import {
   getCategories,
   getSellableProduct,
@@ -152,6 +153,7 @@ export default async function ProductPage({
           <div className="site-container flex flex-col gap-10 py-20">
             <div className="flex max-w-[640px] flex-col gap-4">
               <h2 className="type-sub">Prices at a glance</h2>
+              <TradePriceNote />
               <p className="text-ink-2">
                 Every design costs the same. The price depends on how many copies
                 {table.columns.length > 1

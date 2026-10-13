@@ -38,6 +38,22 @@ export interface OrderEmailSummary {
   addressLines: string[];
   /** yyyy-mm-dd, the funeral date asked at checkout; optional, so often null. */
   serviceDate: string | null;
+  /** Placed on account by a trade firm: invoiced on these terms, not paid yet. */
+  onAccount?: { termsDays: number } | null;
+  /** A trade order's family and the firm's own reference. */
+  familyName?: string | null;
+  customerRef?: string | null;
+}
+
+/** The trade facts an order email adds to its box. */
+function tradeFacts(summary: OrderEmailSummary): Array<[string, string]> {
+  const facts: Array<[string, string]> = [];
+  if (summary.familyName) facts.push(["Family", summary.familyName]);
+  if (summary.customerRef) facts.push(["Your reference", summary.customerRef]);
+  if (summary.onAccount) {
+    facts.push(["Payment", `On account, due ${summary.onAccount.termsDays} days after the invoice`]);
+  }
+  return facts;
 }
 
 export interface EmailAttachment {
@@ -254,16 +270,25 @@ function totalsText(summary: OrderEmailSummary): string {
 }
 
 
-/** Sent to the customer once payment has completed. */
+/**
+ * Sent to the customer once payment has completed — or, for an order placed
+ * on account, once it is placed: then it says the invoice follows.
+ */
 export function orderConfirmationEmail(
   summary: OrderEmailSummary,
   orderUrl: string,
 ): EmailContent {
   const subject = `Your order ${summary.orderNumber} — The Funeral Stationery`;
+  const received = summary.onAccount
+    ? `we have received your order ${summary.orderNumber}, on account. We'll email the invoice separately; payment is due ${summary.onAccount.termsDays} days after it.`
+    : `we have received your order ${summary.orderNumber} and payment.`;
   const text = [
     `Dear ${summary.contactName},`,
     "",
-    `Thank you — we have received your order ${summary.orderNumber} and payment.`,
+    `Thank you — ${received}`,
+    ...tradeFacts(summary)
+      .filter(([label]) => label !== "Payment")
+      .map(([label, value]) => `${label}: ${value}`),
     "Your stationery is now queued for printing, exactly as you designed and confirmed it.",
     ...(summary.serviceDate ? ["", `Funeral: ${formatServiceDate(summary.serviceDate)}`] : []),
     "",
@@ -284,13 +309,19 @@ export function orderConfirmationEmail(
     "With our sincere condolences,",
     "The Funeral Stationery",
   ].join("\n");
-  const facts: Array<[string, string]> = [["Order number", summary.orderNumber]];
+  const facts: Array<[string, string]> = [["Order number", summary.orderNumber], ...tradeFacts(summary)];
   if (summary.serviceDate) facts.push(["Funeral", formatServiceDate(summary.serviceDate)]);
   const html = brandedEmailHtml({
-    preheader: `We've received your order ${summary.orderNumber} and payment. It's now queued for printing.`,
+    preheader: summary.onAccount
+      ? `We've received your order ${summary.orderNumber}, on account. It's now queued for printing.`
+      : `We've received your order ${summary.orderNumber} and payment. It's now queued for printing.`,
     heading: "Thank you for your order",
     body: `${paragraph(`Dear ${escapeHtml(summary.contactName)},`)}
-${paragraph("We have received your order and payment. Your stationery is now queued for printing, exactly as you designed and confirmed it.")}
+${paragraph(
+  summary.onAccount
+    ? `We have received your order, on account. Your stationery is now queued for printing, exactly as you designed and confirmed it. We&rsquo;ll email the invoice separately; payment is due ${summary.onAccount.termsDays} days after it.`
+    : "We have received your order and payment. Your stationery is now queued for printing, exactly as you designed and confirmed it.",
+)}
 ${factsBox(facts)}
 ${eyebrow("Your order")}
 ${orderTableHtml(summary)}
@@ -316,9 +347,11 @@ export function orderNotificationEmail(
   summary: OrderEmailSummary,
   adminUrl: string,
 ): EmailContent {
-  const subject = `New order ${summary.orderNumber} — ${formatPence(summary.totalPence)}`;
+  const subject = `New order ${summary.orderNumber} — ${formatPence(summary.totalPence)}${summary.onAccount ? " on account" : ""}`;
+  const kind = summary.onAccount ? `order on account (net ${summary.onAccount.termsDays} days)` : "paid order";
   const text = [
-    `New paid order ${summary.orderNumber} from ${summary.contactName} <${summary.contactEmail}>.`,
+    `New ${kind} ${summary.orderNumber} from ${summary.contactName} <${summary.contactEmail}>.`,
+    ...tradeFacts(summary).map(([label, value]) => `${label}: ${value}`),
     ...(summary.serviceDate ? ["", `Funeral: ${formatServiceDate(summary.serviceDate)}`] : []),
     "",
     itemsText(summary),
@@ -333,11 +366,12 @@ export function orderNotificationEmail(
   const facts: Array<[string, string]> = [
     ["Order", summary.orderNumber],
     ["Total", formatPence(summary.totalPence)],
+    ...tradeFacts(summary),
   ];
   if (summary.serviceDate) facts.push(["Funeral", formatServiceDate(summary.serviceDate)]);
   const html = brandedEmailHtml({
-    preheader: `${summary.contactName} paid ${formatPence(summary.totalPence)} for ${summary.items.length === 1 ? "1 item" : `${summary.items.length} items`}.`,
-    heading: "New paid order",
+    preheader: `${summary.contactName} ${summary.onAccount ? "ordered on account" : "paid"} ${formatPence(summary.totalPence)} for ${summary.items.length === 1 ? "1 item" : `${summary.items.length} items`}.`,
+    heading: summary.onAccount ? "New order on account" : "New paid order",
     body: `${paragraph(`From ${escapeHtml(summary.contactName)} &lt;<a href="mailto:${escapeHtml(summary.contactEmail)}" style="color:${PLUM}">${escapeHtml(summary.contactEmail)}</a>&gt;.`)}
 ${factsBox(facts)}
 ${eyebrow("Items")}
@@ -353,15 +387,19 @@ ${button("Open in admin", adminUrl)}`,
  * Sent to the customer when the shop cancels a paid order (from Thintent).
  * Says a refund *will* follow only as far as the shop has promised one: the
  * refund is a separate step a person makes in Stripe, so this tells them
- * where it goes and how to ask, not that it has happened.
+ * where it goes and how to ask, not that it has happened. An order on
+ * account was never paid by card: its invoice is cancelled or credited.
  */
 export function orderCancelledEmail(summary: OrderEmailSummary, orderUrl: string): EmailContent {
   const subject = `Your order ${summary.orderNumber} has been cancelled — ${SITE_NAME}`;
+  const money = summary.onAccount
+    ? "If it has been invoiced, the invoice will be cancelled or credited."
+    : "If a refund is due, it will go back to the card you paid with.";
   const text = [
     `Dear ${summary.contactName},`,
     "",
     `Your order ${summary.orderNumber} has been cancelled and will not be printed.`,
-    `If a refund is due, it will go back to the card you paid with. If you didn't expect this, or have any questions, please call us on ${PHONE_DISPLAY} or email ${EMAIL}.`,
+    `${money} If you didn't expect this, or have any questions, please call us on ${PHONE_DISPLAY} or email ${EMAIL}.`,
     "",
     itemsText(summary),
     "",
@@ -375,7 +413,7 @@ export function orderCancelledEmail(summary: OrderEmailSummary, orderUrl: string
     heading: "Your order has been cancelled",
     body: `${paragraph(`Dear ${escapeHtml(summary.contactName)},`)}
 ${paragraph(`Your order <strong>${escapeHtml(summary.orderNumber)}</strong> has been cancelled and will not be printed.`)}
-${paragraph(`If a refund is due, it will go back to the card you paid with. If you didn&rsquo;t expect this, or have any questions, please call us on ${escapeHtml(PHONE_DISPLAY)} or email <a href="mailto:${escapeHtml(EMAIL)}" style="color:${PLUM}">${escapeHtml(EMAIL)}</a>.`)}
+${paragraph(`${money} If you didn&rsquo;t expect this, or have any questions, please call us on ${escapeHtml(PHONE_DISPLAY)} or email <a href="mailto:${escapeHtml(EMAIL)}" style="color:${PLUM}">${escapeHtml(EMAIL)}</a>.`)}
 ${eyebrow("The order")}
 ${orderTableHtml(summary)}
 ${button("View your order", orderUrl)}
@@ -387,13 +425,16 @@ ${signOff("With our sincere condolences,")}`,
 /**
  * Sent to the business inbox when Thintent cancels a paid order. A cancel
  * never moves money, so it says what has gone back so far (a refund can be
- * made before the cancel) and what is left to decide.
+ * made before the cancel) and what is left to decide. An order on account
+ * has no card payment to refund: its invoice is voided or credited in
+ * Thintent instead.
  */
 export function orderCancelledNotificationEmail(
   summary: OrderEmailSummary,
   adminUrl: string,
   refundedPence = 0,
 ): EmailContent {
+  if (summary.onAccount) return accountOrderCancelledNotificationEmail(summary, adminUrl);
   const outstanding = summary.totalPence - refundedPence;
   const subject =
     outstanding <= 0
@@ -420,6 +461,27 @@ ${factsBox([
   ["Paid", formatPence(summary.totalPence)],
   ["Refunded so far", formatPence(refundedPence)],
 ])}
+${button("Open in admin", adminUrl)}`,
+  });
+  return { subject, text, html, replyTo: summary.contactEmail, attachments: brandedAttachments() };
+}
+
+function accountOrderCancelledNotificationEmail(summary: OrderEmailSummary, adminUrl: string): EmailContent {
+  const subject = `Cancelled: order ${summary.orderNumber} — on account`;
+  const invoiceText =
+    "It was placed on account, so there is no card payment to refund. If Thintent has invoiced it, void or credit the invoice there.";
+  const text = [
+    `Order ${summary.orderNumber} from ${summary.contactName} <${summary.contactEmail}> was cancelled in Thintent.`,
+    `It came to ${formatPence(summary.totalPence)}. ${invoiceText}`,
+    "",
+    `Order: ${adminUrl}`,
+  ].join("\n");
+  const html = brandedEmailHtml({
+    preheader: invoiceText,
+    heading: "Order cancelled in Thintent",
+    body: `${paragraph(`Order <strong>${escapeHtml(summary.orderNumber)}</strong> from ${escapeHtml(summary.contactName)} &lt;<a href="mailto:${escapeHtml(summary.contactEmail)}" style="color:${PLUM}">${escapeHtml(summary.contactEmail)}</a>&gt; was cancelled in Thintent.`)}
+${paragraph(escapeHtml(invoiceText))}
+${factsBox([["On account", formatPence(summary.totalPence)]])}
 ${button("Open in admin", adminUrl)}`,
   });
   return { subject, text, html, replyTo: summary.contactEmail, attachments: brandedAttachments() };
@@ -506,6 +568,45 @@ export function adminInviteEmail({
     ],
     buttonLabel: "Go to admin sign-in",
     buttonUrl: signInPageUrl,
+  });
+  return { subject, text, html, attachments: brandedAttachments() };
+}
+
+/**
+ * Sent when an admin approves a /trade application. Like an admin
+ * invitation it links to the sign-in page with the address filled in, never
+ * a sign-in link: it can sit unread for days.
+ */
+export function tradeAccountReadyEmail({
+  firmName,
+  signInPageUrl,
+}: {
+  firmName: string;
+  signInPageUrl: string;
+}): EmailContent {
+  const subject = "Your trade account is ready — The Funeral Stationery";
+  const text = [
+    "Hello,",
+    "",
+    `Thank you for applying. Your trade account for ${firmName} is ready.`,
+    "",
+    "Sign in at My account with this email address. We'll email you a link that signs you in — there is no password. Once you're in, you'll see your trade account: start an order for a family, and find every order by the family's name.",
+    signInPageUrl,
+    "",
+    `If you have any questions, call us on ${PHONE_DISPLAY}.`,
+    "",
+    "The Funeral Stationery",
+  ].join("\n");
+  const html = buttonEmailHtml({
+    preheader: `Your trade account for ${firmName} is ready.`,
+    heading: "Your trade account is ready",
+    paragraphs: [
+      `Thank you for applying. Your trade account for ${escapeHtml(firmName)} is ready.`,
+      "Sign in at My account with this email address. We&rsquo;ll email you a link that signs you in — there is no password. Once you&rsquo;re in, you&rsquo;ll see your trade account: start an order for a family, and find every order by the family&rsquo;s name.",
+    ],
+    buttonLabel: "Sign in to your account",
+    buttonUrl: signInPageUrl,
+    finePrint: `If you have any questions, call us on ${escapeHtml(PHONE_DISPLAY)}.`,
   });
   return { subject, text, html, attachments: brandedAttachments() };
 }

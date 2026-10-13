@@ -5,4 +5,5 @@ export * from "./designs";
 export * from "./artwork";
 export * from "./orders";
 export * from "./billing";
+export * from "./trade";
 export * from "./relations";

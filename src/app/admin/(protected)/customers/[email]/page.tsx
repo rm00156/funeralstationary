@@ -95,11 +95,11 @@ export default async function AdminCustomerPage({ params }: PageProps<"/admin/cu
                 No paid orders yet — any designs they have saved are listed below.
               </p>
             ) : (
-              // A phone gets a stacked card per order rather than a table to
-              // scroll sideways; md and up, a table.
-              <div className="md:overflow-x-auto">
-                <table className="block w-full text-left md:table md:min-w-[640px]">
-                  <thead className="hidden md:table-header-group">
+              // A narrow box gets a stacked card per order rather than a table to
+              // scroll sideways; a table once its own box (not the screen) is 48rem.
+              <div className="@container overflow-x-auto">
+                <table className="block w-full text-left @3xl:table @3xl:min-w-[640px]">
+                  <thead className="hidden @3xl:table-header-group">
                     <tr className="border-y border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
                       <th className="px-6 py-3">Order</th>
                       <th className="px-6 py-3">Placed</th>
@@ -109,32 +109,32 @@ export default async function AdminCustomerPage({ params }: PageProps<"/admin/cu
                       <th className="px-6 py-3 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="block border-t border-outline-variant/40 md:table-row-group md:border-t-0">
+                  <tbody className="block border-t border-outline-variant/40 @3xl:table-row-group @3xl:border-t-0">
                     {customer.orders.map((order) => (
                       <tr
                         key={order.id}
-                        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 border-b border-outline-variant/20 px-6 py-4 font-body text-sm text-on-surface last:border-b-0 md:table-row md:p-0"
+                        className="row-linked grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 border-b border-outline-variant/20 px-6 py-4 font-body text-sm text-on-surface last:border-b-0 @3xl:table-row @3xl:p-0"
                       >
-                        <td className="col-start-1 row-start-1 md:table-cell md:px-6 md:py-3">
-                          <Link href={`/admin/orders/${order.id}`} className="font-medium text-primary hover:underline">
+                        <td className="col-start-1 row-start-1 @3xl:table-cell @3xl:px-6 @3xl:py-3">
+                          <Link href={`/admin/orders/${order.id}`} className="row-link font-medium text-primary hover:underline">
                             {order.orderNumber}
                           </Link>
                         </td>
-                        <td className="col-start-1 text-on-surface-variant md:table-cell md:px-6 md:py-3">
-                          <span className="md:hidden">Placed </span>
+                        <td className="col-start-1 text-on-surface-variant @3xl:table-cell @3xl:px-6 @3xl:py-3">
+                          <span className="@3xl:hidden">Placed </span>
                           {formatDate(order.placedAt)}
                         </td>
-                        <td className="col-start-1 text-on-surface-variant md:table-cell md:px-6 md:py-3">
+                        <td className="col-start-1 text-on-surface-variant @3xl:table-cell @3xl:px-6 @3xl:py-3">
                           {order.products.join(", ") || "—"}
                         </td>
-                        <td className="col-start-1 text-on-surface-variant md:table-cell md:px-6 md:py-3">
-                          <span className="md:hidden">Service </span>
+                        <td className="col-start-1 text-on-surface-variant @3xl:table-cell @3xl:px-6 @3xl:py-3">
+                          <span className="@3xl:hidden">Service </span>
                           {order.serviceDate ? shortDay(order.serviceDate) : "—"}
                         </td>
-                        <td className="col-start-1 row-start-2 md:table-cell md:px-6 md:py-3">
+                        <td className="col-start-1 row-start-2 @3xl:table-cell @3xl:px-6 @3xl:py-3">
                           <OrderStatusBadge status={order.status} />
                         </td>
-                        <td className="col-start-2 row-start-1 text-right md:table-cell md:px-6 md:py-3">
+                        <td className="col-start-2 row-start-1 text-right @3xl:table-cell @3xl:px-6 @3xl:py-3">
                           {formatPence(order.totalPence)}
                           {order.refundedPence > 0 && (
                             <span className="block text-xs text-on-surface-variant">

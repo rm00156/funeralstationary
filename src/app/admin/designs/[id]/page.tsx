@@ -12,7 +12,7 @@ import {
   getTemplates,
 } from "@/lib/catalogue.server";
 import { customerHref } from "@/lib/adminCustomers";
-import { getPricingData } from "@/lib/pricing.server";
+import { getListPricingData } from "@/lib/pricing.server";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,7 @@ export default async function AdminDesignEditorPage({ params }: PageProps<"/admi
     getTemplates(),
     getProductFormats(),
     getProductLabels(),
-    getPricingData(design.productId),
+    getListPricingData(design.productId),
   ]);
   const format = formats.get(design.productId);
   if (!template || !format) notFound();

@@ -36,7 +36,9 @@ const order = (overrides: Partial<DashboardOrder> = {}): DashboardOrder => ({
   contactEmail: "s@example.com",
   contactPhone: null,
   customerEmail: "s@example.com",
+  placedAt: new Date("2026-10-08T06:00:00Z"),
   paidAt: new Date("2026-10-08T06:00:00Z"),
+  paymentMethod: "card",
   shippedAt: null,
   totalPence: 9000,
   refundedPence: 0,
@@ -155,8 +157,15 @@ describe("actionItems", () => {
   it("flags an order missing from Thintent only once fulfilment has had its chance", () => {
     const missing = order({ thintentJobRef: null });
     expect(actionItems([missing], ctx)[0].action).toBe("Send to Thintent");
-    expect(actionItems([{ ...missing, paidAt: new Date(THURSDAY.getTime() - 60_000) }], ctx)).toEqual([]);
+    expect(actionItems([{ ...missing, placedAt: new Date(THURSDAY.getTime() - 60_000) }], ctx)).toEqual([]);
     expect(actionItems([missing], { ...ctx, thintentConfigured: false })).toEqual([]);
+  });
+
+  it("waits on an account order from when it was placed, though it isn't paid", () => {
+    const onAccount = order({ thintentJobRef: null, paidAt: null });
+    expect(actionItems([onAccount], ctx)[0].action).toBe("Send to Thintent");
+    // And an unpaid account order that is cancelled needs no refund.
+    expect(actionItems([{ ...onAccount, status: "cancelled", thintentJobRef: "1" }], ctx)).toEqual([]);
   });
 
   it("names the warnings a customer printed through", () => {
@@ -171,6 +180,8 @@ describe("actionItems", () => {
   it("asks about a refund on a paid cancellation until it is refunded in full", () => {
     expect(actionItems([order({ status: "cancelled" })], ctx)[0].action).toBe("Refund needed?");
     expect(actionItems([order({ status: "cancelled", refundedPence: 9000 })], ctx)).toEqual([]);
+    // A paid invoice on account is voided or credited in Thintent, not refunded in Stripe.
+    expect(actionItems([order({ status: "cancelled", paymentMethod: "account" })], ctx)).toEqual([]);
   });
 
   it("puts urgent rows first, then by service date", () => {

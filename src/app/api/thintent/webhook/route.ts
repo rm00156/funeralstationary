@@ -2,15 +2,16 @@ import { after, type NextRequest } from "next/server";
 
 import { sendOrderCancelledEmails } from "@/lib/orderFulfilment.server";
 import { resolveRequestOrigin } from "@/lib/stripe.server";
-import { parseThintentJobEvent, verifyThintentSignature } from "@/lib/thintent";
-import { applyThintentJobEvent } from "@/lib/thintent.server";
+import { parseThintentInvoiceEvent, parseThintentJobEvent, verifyThintentSignature } from "@/lib/thintent";
+import { applyThintentInvoiceEvent, applyThintentJobEvent } from "@/lib/thintent.server";
 
 export const runtime = "nodejs";
 
 /**
  * POST /api/thintent/webhook — Thintent telling us a job moved (dispatched
- * with its tracking, completed, cancelled, ...). The body is read raw for
- * the signature.
+ * with its tracking, completed, cancelled, ...), or, for an order placed on
+ * account, that its invoice was issued, paid or voided (`invoice.updated`).
+ * The body is read raw for the signature.
  * Like the Stripe webhook, anything we can't act on — an event we don't
  * handle, an order number we don't know — is answered 200 so Thintent stops
  * retrying it; only a bad signature is refused. Applying an event is
@@ -31,6 +32,13 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ received: true });
   }
+  const invoiceEvent = parseThintentInvoiceEvent(body);
+  if (invoiceEvent) {
+    const result = await applyThintentInvoiceEvent(invoiceEvent);
+    if (result === "unknown-order") console.error(`Thintent invoice webhook names unknown order ${invoiceEvent.externalRef}`);
+    return Response.json({ received: true, result });
+  }
+
   const event = parseThintentJobEvent(body);
   if (!event) return Response.json({ received: true });
 

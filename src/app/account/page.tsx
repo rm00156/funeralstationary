@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, CircleUserRound } from "lucide-react";
 
+import Breadcrumb from "@/components/Breadcrumb";
+import CustomerAccount from "@/components/CustomerAccount";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import OrderList from "@/components/OrderList";
-import SavedDesignList from "@/components/SavedDesignList";
+import SavedDesignList, { type SavedDesignSummary } from "@/components/SavedDesignList";
 import SignInForm from "@/components/SignInForm";
-import SignOutButton from "@/components/SignOutButton";
+import TradeAccount from "@/components/TradeAccount";
 import { safeNextPath } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/auth.server";
+import { getSellableProducts } from "@/lib/catalogue.server";
 import { listDesigns } from "@/lib/designs.server";
-import { listOrders } from "@/lib/orders.server";
+import { listOrders, type OrderSummary } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
+import { getCurrentTradeMembership } from "@/lib/trade.server";
 import { authConfigured } from "@/lib/userSession";
 
 export const dynamic = "force-dynamic";
@@ -30,18 +32,17 @@ const LINK_ERRORS: Record<string, string> = {
   invalid: "That sign-in link isn't valid. Enter your email and we will send a fresh one.",
 };
 
-const breadcrumbClass = "mb-10 flex items-center gap-2 font-body text-sm text-on-surface-variant";
-const titleClass =
-  "mb-8 font-display text-4xl font-medium leading-tight text-primary md:text-5xl";
-const sectionTitleClass = "font-display text-3xl font-medium text-primary";
-
-type DesignSummaries = Parameters<typeof SavedDesignList>[0]["initialDesigns"];
+const SECTION_TITLE = "font-display text-[30px] font-normal leading-tight text-ink";
 
 /**
- * The account page, which is two different pages depending on who is
- * looking:
+ * The account page, which is three different pages depending on who is
+ * looking. Signing in is the same for all of them (an emailed link); what
+ * differs is only what the proven email is:
  *
- * - **Signed in** — "My Account": who you are, Sign out, My Designs, My Orders.
+ * - **A trade account** — the email is on an active firm (trade.server.ts):
+ *   the firm's view, TradeAccount.
+ * - **Signed in** — a family's: the order on its way, saved designs, other
+ *   orders, CustomerAccount.
  * - **A guest** — "Sign in": the email form. Only if this browser already
  *   holds designs or orders are they listed underneath, labelled as kept in
  *   this browser, so a guest's work never vanishes behind a login.
@@ -52,96 +53,62 @@ type DesignSummaries = Parameters<typeof SavedDesignList>[0]["initialDesigns"];
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; email?: string }>;
 }) {
-  const { next, error } = await searchParams;
+  const { next, error, email } = await searchParams;
   const user = authConfigured() ? await getCurrentUser() : null;
   if (user && next) redirect(safeNextPath(next, "/account"));
 
   const owner = await readOwner();
-  const [saved, orders] = owner
-    ? await Promise.all([listDesigns(owner), listOrders(owner)])
-    : [[], []];
-  const designs: DesignSummaries = saved.map((design) => ({
+  const [saved, orders, membership] = await Promise.all([
+    owner ? listDesigns(owner) : [],
+    owner ? listOrders(owner) : [],
+    user ? getCurrentTradeMembership() : null,
+  ]);
+  const designs: SavedDesignSummary[] = saved.map((design) => ({
     id: design.id,
     name: design.name,
     pageCount: design.pageCount,
     updatedAt: design.updatedAt.toISOString(),
     templateName: design.templateName,
+    templateImage: design.templateImage,
     productLabel: design.productLabel,
   }));
+
+  let content: React.ReactNode;
+  if (user && membership) {
+    const products = await getSellableProducts();
+    content = (
+      <TradeAccount
+        membership={membership}
+        email={user.email}
+        designCount={products.reduce((sum, product) => sum + product.templateCount, 0)}
+        designs={designs}
+        orders={orders}
+        now={new Date()}
+      />
+    );
+  } else if (user) {
+    content = <CustomerAccount email={user.email} designs={designs} orders={orders} />;
+  } else {
+    content = (
+      <Guest
+        next={safeNextPath(next, "/account")}
+        error={error}
+        initialEmail={typeof email === "string" ? email.slice(0, 255) : ""}
+        designs={designs}
+        orders={orders}
+      />
+    );
+  }
 
   return (
     <>
       <Header />
-      <main className="flex-1">
-        <section className="bg-paper px-margin-mobile pt-8 pb-section-gap md:px-gutter">
-          <div className="mx-auto max-w-[1200px]">
-            {user ? (
-              <SignedIn email={user.email} designs={designs} orders={orders} />
-            ) : (
-              <Guest
-                next={safeNextPath(next, "/account")}
-                error={error}
-                designs={designs}
-                orders={orders}
-              />
-            )}
-          </div>
-        </section>
+      <main className="type-body flex-1 bg-paper">
+        <div className="site-container pb-24 pt-10 md:pt-14">{content}</div>
       </main>
       <Footer />
-    </>
-  );
-}
-
-function Breadcrumb({ label }: { label: string }) {
-  return (
-    <nav aria-label="Breadcrumb" className={breadcrumbClass}>
-      <Link href="/" className="transition-colors hover:text-primary">
-        Home
-      </Link>
-      <ChevronRight size={14} aria-hidden />
-      <span className="text-on-surface">{label}</span>
-    </nav>
-  );
-}
-
-function SignedIn({
-  email,
-  designs,
-  orders,
-}: {
-  email: string;
-  designs: DesignSummaries;
-  orders: Awaited<ReturnType<typeof listOrders>>;
-}) {
-  return (
-    <>
-      <Breadcrumb label="My Account" />
-      <h1 className={titleClass}>My Account</h1>
-
-      <div className="mb-12 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-outline-variant/60 bg-surface-container-lowest px-5 py-4">
-        <p className="flex items-center gap-2 font-body text-sm text-on-surface-variant">
-          <CircleUserRound size={18} aria-hidden className="text-secondary" />
-          Signed in as <span className="font-medium text-on-surface">{email}</span>
-        </p>
-        <SignOutButton className="rounded-lg border border-outline-variant px-4 py-2 text-sm hover:border-primary-container" />
-      </div>
-
-      <section aria-labelledby="account-designs" className="mb-14">
-        <h2 id="account-designs" className={`mb-6 ${sectionTitleClass}`}>
-          My Designs
-        </h2>
-        <SavedDesignList initialDesigns={designs} />
-      </section>
-
-      <section aria-labelledby="account-orders">
-        <h2 id="account-orders" className={`mb-6 ${sectionTitleClass}`}>
-          My Orders
-        </h2>
-        <OrderList orders={orders} />
-      </section>
     </>
   );
 }
@@ -149,60 +116,63 @@ function SignedIn({
 function Guest({
   next,
   error,
+  initialEmail,
   designs,
   orders,
 }: {
   next: string;
   error?: string;
-  designs: DesignSummaries;
-  orders: Awaited<ReturnType<typeof listOrders>>;
+  /** From a "your trade account is ready" email (accountSignInPageUrl). */
+  initialEmail: string;
+  designs: SavedDesignSummary[];
+  orders: OrderSummary[];
 }) {
   const openingOrder = next.startsWith("/orders/");
   const hasSomething = designs.length > 0 || orders.length > 0;
 
   return (
-    <>
-      <Breadcrumb label="Sign in" />
-      <h1 className={titleClass}>{openingOrder ? "Sign in to see your order" : "Sign in"}</h1>
+    <div className="mx-auto flex max-w-[1150px] flex-col gap-12">
+      <div className="flex flex-col gap-5">
+        <Breadcrumb items={[{ label: "Home", href: "/" }, { label: "Sign in" }]} />
+        <h1 className="type-page">{openingOrder ? "Sign in to see your order" : "Sign in"}</h1>
+      </div>
 
-      <div className="mb-14 max-w-2xl rounded-2xl border border-line bg-surface-container-lowest p-8 ambient-shadow">
-        <p className="mb-6 font-body text-on-surface-variant">
+      <div className="max-w-2xl rounded-2xl border border-line bg-surface p-7 sm:p-10">
+        <p className="mb-6 text-ink-2">
           {openingOrder
             ? "Enter the email address the order was placed with and we will send you a link that opens it on this device."
-            : "Enter your email and we will send you a link to sign in. No password needed. Once you're signed in, your designs and orders are kept safe and you can open them on any device."}
+            : "Enter your email and we will send you a link to sign in. No password needed. Once you're signed in, your designs and orders are kept safe and you can open them on any device. Funeral directors with a trade account sign in here too."}
         </p>
         {error && LINK_ERRORS[error] && (
-          <p role="alert" className="mb-6 font-body text-sm text-primary">
+          <p role="alert" className="mb-6 text-base font-medium text-plum">
             {LINK_ERRORS[error]}
           </p>
         )}
         {authConfigured() ? (
-          <SignInForm next={next} />
+          <SignInForm next={next} initialEmail={initialEmail} />
         ) : (
-          <p className="font-body text-sm text-on-surface-variant">
-            Signing in isn&apos;t available right now. You can still design and order without
-            an account.
+          <p className="text-base text-ink-2">
+            Signing in isn&apos;t available right now. You can still design and order without an
+            account.
           </p>
         )}
       </div>
 
       {hasSomething && (
-        <section aria-labelledby="browser-saved">
-          <h2 id="browser-saved" className={sectionTitleClass}>
-            Saved in this browser
-          </h2>
-          <p className="mt-2 mb-6 max-w-3xl font-body text-on-surface-variant">
-            You aren&apos;t signed in, so these are only kept in this browser. Sign in above and
-            they move to your account.
-          </p>
-          {designs.length > 0 && (
-            <div className="mb-10">
-              <SavedDesignList initialDesigns={designs} />
-            </div>
-          )}
+        <section aria-labelledby="browser-saved" className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <h2 id="browser-saved" className={SECTION_TITLE}>
+              Saved in this browser
+            </h2>
+            <p className="max-w-3xl text-ink-2">
+              You aren&apos;t signed in, so these are only kept in this browser. Sign in above and
+              they move to your account.
+            </p>
+          </div>
+          {designs.length > 0 && <SavedDesignList initialDesigns={designs} />}
           {orders.length > 0 && <OrderList orders={orders} />}
         </section>
       )}
-    </>
+    </div>
   );
 }

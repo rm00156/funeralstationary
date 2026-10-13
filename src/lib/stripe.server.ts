@@ -88,6 +88,35 @@ export async function createCheckoutSessionForOrder(
   return { id: session.id, url: session.url };
 }
 
+/**
+ * Before an order is placed on account, close every Checkout Session still
+ * open for it — an earlier "Pay now by card" attempt (two, if Pay was
+ * double-clicked) could otherwise be paid afterwards, charging a card for an
+ * order the firm is also invoiced for. Sessions last 24 hours, so that is
+ * how far back it looks. "paid" means one was paid while we looked: the
+ * order is the card's, and the return route or webhook will place it.
+ */
+export async function closeOpenCheckoutSessions(orderId: string): Promise<"closed" | "paid"> {
+  if (!isStripeConfigured()) return "closed";
+  const stripe = getStripe();
+  const since = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+  for await (const session of stripe.checkout.sessions.list({
+    status: "open",
+    created: { gte: since },
+    limit: 100,
+  })) {
+    if (summariseSession(session).orderId !== orderId) continue;
+    try {
+      await stripe.checkout.sessions.expire(session.id);
+    } catch (error) {
+      // Only an open session can be expired: this one finished meanwhile.
+      if (summariseSession(await stripe.checkout.sessions.retrieve(session.id)).paid) return "paid";
+      if (!(error instanceof Stripe.errors.StripeInvalidRequestError)) throw error;
+    }
+  }
+  return "closed";
+}
+
 /** What finaliseOrder needs from a session, however it reached us. */
 export interface PaidSession {
   sessionId: string;

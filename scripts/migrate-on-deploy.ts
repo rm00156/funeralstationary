@@ -25,7 +25,22 @@
  * it anywhere that can see production.
  */
 
+import { TURNSTILE_PRODUCTION_SITE_KEY, turnstileSiteKeyProblem } from "../src/lib/turnstile";
+
 export type MigrateDecision = { run: true } | { run: false; reason: string };
+
+/**
+ * Anything that will fail `next build` for this deploy, checked before
+ * migrating: a build that fails after migrations leaves the live release
+ * running against a schema it doesn't match. Today that is next.config.ts's
+ * Turnstile site-key check.
+ */
+export function deployBlocker(
+  env: Record<string, string | undefined>,
+  turnstileKey: string | null = TURNSTILE_PRODUCTION_SITE_KEY,
+): string | null {
+  return turnstileSiteKeyProblem(env.VERCEL_ENV, turnstileKey);
+}
 
 /**
  * Whether this deploy may run migrations. Pure, so the rule can be tested
@@ -55,6 +70,9 @@ export function migrateDecision(env: Record<string, string | undefined>): Migrat
 }
 
 async function main() {
+  const blocker = deployBlocker(process.env);
+  if (blocker) throw new Error(`not migrating, this build would fail: ${blocker}`);
+
   const decision = migrateDecision(process.env);
 
   if (!decision.run) {

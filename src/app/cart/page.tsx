@@ -6,6 +6,7 @@ import CartView from "@/components/CartView";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import ShopClosedNotice from "@/components/ShopClosedNotice";
+import TradePriceNote from "@/components/TradePriceNote";
 import { getCart } from "@/lib/orders.server";
 import { getPricingData } from "@/lib/pricing.server";
 import { readOwner } from "@/lib/session";
@@ -57,6 +58,7 @@ export default async function CartPage() {
             </p>
 
             {!shopOpen && <ShopClosedNotice />}
+            <TradePriceNote className="mb-8 max-w-3xl" />
             {/* Closed, the basket stays readable and removable — only changing it and paying are refused. */}
             {(shopOpen || (cart && cart.items.length > 0)) && (
               <div className={shopOpen ? undefined : "mt-10"}>

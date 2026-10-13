@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Pencil, ShoppingBag, Trash2 } from "lucide-react";
@@ -10,6 +11,7 @@ import PreOrderCheckDialog, {
   parsePreOrderCheck,
   type PreOrderCheck,
 } from "@/components/PreOrderCheckDialog";
+import { changedWhen } from "@/lib/accountOrders";
 
 export interface SavedDesignSummary {
   id: string;
@@ -17,16 +19,10 @@ export interface SavedDesignSummary {
   pageCount: number;
   updatedAt: string;
   templateName: string;
+  /** The template's preview — the thumbnail. */
+  templateImage: string;
   productLabel: string;
 }
-
-const formatUpdated = (iso: string) =>
-  new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
 
 export default function SavedDesignList({
   initialDesigns,
@@ -141,15 +137,10 @@ export default function SavedDesignList({
 
   if (!designs.length) {
     return (
-      <div className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-10 text-center">
-        <FileText size={28} className="mx-auto mb-4 text-on-surface-variant" aria-hidden />
-        <p className="font-body text-base text-on-surface-variant mb-6">
-          You have not saved a design yet.
-        </p>
-        <Link
-          href="/shop"
-          className="inline-flex items-center rounded-lg bg-plum px-5 py-3 font-body text-sm font-medium text-white transition-colors hover:bg-plum-hover"
-        >
+      <div className="flex flex-col items-center gap-5 rounded-xl border border-line bg-surface p-10 text-center">
+        <FileText size={28} strokeWidth={1.6} className="text-ink-label" aria-hidden />
+        <p className="text-ink-2">You haven’t saved a design yet.</p>
+        <Link href="/shop" className="btn btn-primary min-h-12">
           Browse designs
         </Link>
       </div>
@@ -159,63 +150,71 @@ export default function SavedDesignList({
   return (
     <div>
       {error && (
-        <p role="alert" className="mb-4 font-body text-sm text-error">
+        <p role="alert" className="mb-4 text-base font-medium text-plum">
           {error}
         </p>
       )}
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {designs.map((design) => (
-          <li
-            key={design.id}
-            className="flex flex-col rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-5"
-          >
-            <h3 className="font-display text-xl font-medium text-on-surface mb-1">
-              {design.name}
-            </h3>
-            <p className="font-body text-sm text-on-surface-variant">
-              {design.templateName} · {design.productLabel}
-            </p>
-            <p className="font-body text-sm text-on-surface-variant mb-5">
-              {design.pageCount} pages · saved {formatUpdated(design.updatedAt)}
-            </p>
-
-            <div className="mt-auto flex items-center gap-2">
-              <Link
-                href={`/design?design=${design.id}`}
-                className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-center font-body text-sm font-medium text-on-secondary transition-colors hover:bg-on-secondary-container"
-              >
-                Open
-              </Link>
-              <button
-                type="button"
-                onClick={() => addToBasket(design)}
-                disabled={busyId === design.id}
-                aria-label={`Add ${design.name} to basket`}
-                className="rounded-lg p-2.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary disabled:opacity-50"
-              >
-                <ShoppingBag size={18} aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={() => rename(design)}
-                disabled={busyId === design.id}
-                aria-label={`Rename ${design.name}`}
-                className="rounded-lg p-2.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary disabled:opacity-50"
-              >
-                <Pencil size={18} aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={() => remove(design)}
-                disabled={busyId === design.id}
-                aria-label={`Remove ${design.name}`}
-                className="rounded-lg p-2.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-error disabled:opacity-50"
-              >
-                <Trash2 size={18} aria-hidden />
-              </button>
-            </div>
-          </li>
-        ))}
+      <ul className="flex flex-col gap-4">
+        {designs.map((design) => {
+          const busy = busyId === design.id;
+          return (
+            <li
+              key={design.id}
+              className="flex flex-wrap items-center gap-x-6 gap-y-4 rounded-xl border border-line bg-surface p-5 sm:px-7"
+            >
+              <div className="relative h-[88px] w-[64px] shrink-0 overflow-hidden rounded border border-line bg-sheet">
+                <Image
+                  src={design.templateImage}
+                  alt=""
+                  fill
+                  sizes="64px"
+                  className="object-cover"
+                />
+              </div>
+              <div className="flex min-w-[200px] flex-1 flex-col gap-0.5">
+                <h3 className="text-lg font-semibold text-ink">{design.name}</h3>
+                <p className="text-base text-ink-2">
+                  {design.productLabel} · {design.templateName}
+                </p>
+                <p className="text-[15px] text-ink-3">
+                  Last changed {changedWhen(new Date(design.updatedAt), new Date())}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+                <Link href={`/design?design=${design.id}`} className="btn btn-primary min-h-12 px-6">
+                  Continue
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => addToBasket(design)}
+                  disabled={busy}
+                  className="btn btn-ghost min-h-12 gap-2 px-3.5 text-base"
+                >
+                  <ShoppingBag size={18} aria-hidden />
+                  Add to basket
+                </button>
+                <button
+                  type="button"
+                  onClick={() => rename(design)}
+                  disabled={busy}
+                  aria-label={`Rename ${design.name}`}
+                  className="btn btn-ghost min-h-12 px-3 text-ink-2"
+                >
+                  <Pencil size={18} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => remove(design)}
+                  disabled={busy}
+                  aria-label={`Delete ${design.name}`}
+                  className="btn btn-ghost min-h-12 px-3 text-ink-2"
+                >
+                  <Trash2 size={18} aria-hidden />
+                </button>
+              </div>
+            </li>
+          );
+        })}
       </ul>
 
       {preOrderCheck && (

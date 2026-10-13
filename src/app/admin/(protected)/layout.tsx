@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/adminAuth.server";
 import { SITE_NAME } from "@/lib/site";
 import { billingNotice } from "@/lib/siteAccess";
 import { getSiteAccess, subscriptionRequired } from "@/lib/siteBilling.server";
+import { countPendingTradeApplications } from "@/lib/trade.server";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -32,9 +33,10 @@ export default async function AdminLayout({
 }) {
   const admin = await requireAdmin();
   // With the switch off nothing can close, so the billing table isn't read.
-  const [notice, counts] = await Promise.all([
+  const [notice, counts, tradeApplications] = await Promise.all([
     subscriptionRequired() ? getSiteAccess().then(billingNotice) : null,
     adminOrderCounts(),
+    countPendingTradeApplications(),
   ]);
 
   return (
@@ -49,7 +51,10 @@ export default async function AdminLayout({
           </Link>
         </div>
         <div className="px-2 pb-3 lg:flex-1 lg:px-3">
-          <AdminNav openOrders={counts.awaiting_print + counts.in_production} />
+          <AdminNav
+            openOrders={counts.awaiting_print + counts.in_production}
+            tradeApplications={tradeApplications}
+          />
         </div>
         <div className="hidden border-t border-white/10 px-3 py-4 lg:block">
           <p className="truncate px-3 pb-2 font-body text-xs text-on-plum-muted" title={admin.email}>

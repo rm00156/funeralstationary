@@ -64,3 +64,6 @@ export const GOOGLE_REVIEWS = {
  */
 export const DESIGN_FOR_YOU_HREF = "/contact?topic=design-for-me";
 export const UPLOAD_DESIGN_HREF = "/upload";
+
+/** Trade accounts for funeral directors: linked from the utility bar and the footer. */
+export const TRADE_HREF = "/trade";

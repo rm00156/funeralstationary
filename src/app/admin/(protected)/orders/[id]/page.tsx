@@ -6,7 +6,9 @@ import AdminOrderProofActions from "@/components/AdminOrderProofActions";
 import AdminPrintPdfButton from "@/components/AdminPrintPdfButton";
 import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
 import AdminThintentButton from "@/components/AdminThintentButton";
+import OrderLinePreview from "@/components/OrderLinePreview";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
+import OrderThumb from "@/components/OrderThumb";
 import { customerHref } from "@/lib/adminCustomers";
 import { adminDesignHref } from "@/lib/adminDesigns";
 import { adminOrderCustomerEmail } from "@/lib/adminCustomers.server";
@@ -18,6 +20,7 @@ import { ORDER_STATUS_LABELS, lineSpec, refundStatusEffect, refundedPence } from
 import { canSendToThintent } from "@/lib/thintent";
 import { isThintentConfigured } from "@/lib/thintent.server";
 import { vatRateLabel } from "@/lib/vat";
+import { tradeDiscountText } from "@/lib/trade";
 
 /** Stripe's dashboard page for a payment; test-mode payments live under /test. */
 function stripePaymentUrl(paymentIntentId: string): string {
@@ -85,7 +88,29 @@ export default async function AdminOrderPage({
         <div>
           <h1 className="font-display text-3xl font-medium text-primary">{order.orderNumber}</h1>
           <p className="mt-1 font-body text-sm text-on-surface-variant">
-            Placed {formatDateTime(order.placedAt)} · paid {formatDateTime(order.paidAt)}
+            Placed {formatDateTime(order.placedAt)} ·{" "}
+            {order.paymentMethod === "account" ? (
+              <>
+                on account
+                {order.account && `, net ${order.account.termsDays} days`}
+                {order.invoice?.number && ` · invoice ${order.invoice.number}`}
+                {order.invoice?.status && ` (${order.invoice.status.replace("_", " ")}`}
+                {order.invoice?.dueDate && `, due ${order.invoice.dueDate}`}
+                {order.invoice?.status && ")"}
+                {order.paidAt && ` · paid ${formatDateTime(order.paidAt)}`}
+                {order.invoice?.url && (
+                  <>
+                    {" · "}
+                    <a href={order.invoice.url} target="_blank" rel="noopener noreferrer" className="link">
+                      invoice in Thintent
+                    </a>
+                  </>
+                )}
+              </>
+            ) : (
+              <>paid {formatDateTime(order.paidAt)}</>
+            )}
+            {order.tradeDiscountPercent !== null && ` · trade price, ${tradeDiscountText(order.tradeDiscountPercent)}`}
           </p>
         </div>
         <OrderStatusBadge status={order.status} />
@@ -93,7 +118,16 @@ export default async function AdminOrderPage({
 
       {/* A cancel never moves money (it can come from a Thintent webhook):
           the refund is made in Stripe, and the order settles to Refunded by itself. */}
-      {order.status === "cancelled" && order.paidAt && refunded < order.totals.totalPence && (
+      {order.status === "cancelled" && order.paymentMethod === "account" && order.invoice?.status !== "voided" && (
+        <div className="mb-8 rounded-xl bg-warn-bg px-6 py-4 font-body text-sm text-warn-text">
+          <p className="font-medium">Invoice to cancel?</p>
+          <p className="mt-1">
+            This order was placed on account and has been cancelled. Its invoice is in Thintent: void it
+            there, or credit what’s been paid. Nothing is refunded through Stripe for an account order.
+          </p>
+        </div>
+      )}
+      {order.status === "cancelled" && order.paymentMethod === "card" && order.paidAt && refunded < order.totals.totalPence && (
         <div className="mb-8 rounded-xl bg-warn-bg px-6 py-4 font-body text-sm text-warn-text">
           <p className="font-medium">Refund needed?</p>
           <p className="mt-1">
@@ -118,34 +152,42 @@ export default async function AdminOrderPage({
             <ul className="divide-y divide-outline-variant/30">
               {order.items.map((item) => (
                 <li key={item.id} className="py-4 first:pt-0 last:pb-0">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="font-body font-medium text-on-surface">{item.designName}</p>
-                      <p className="font-body text-sm text-on-surface-variant">
-                        {copiesText(item.quantityCopies)} · {lineSpec(item.format, item.quote)}
-                        {item.format.sizedByOption &&
-                          ` — artwork drawn at ${trimText(item.artworkTrim)}; scale to the size ordered`}
-                      </p>
-                      {item.serviceDate && (
-                        <p className="font-body text-sm font-medium text-on-surface">
-                          Service on {formatServiceDate(item.serviceDate)}
+                  <div className="flex items-start gap-4">
+                    {/* The line as paid for (doc_snapshot), in the editor's own preview. */}
+                    {item.doc ? (
+                      <OrderLinePreview doc={item.doc} name={item.designName} />
+                    ) : (
+                      <OrderThumb src={null} className="h-[112px] w-[79px]" />
+                    )}
+                    <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="font-body font-medium text-on-surface">{item.designName}</p>
+                        <p className="font-body text-sm text-on-surface-variant">
+                          {copiesText(item.quantityCopies)} · {lineSpec(item.format, item.quote)}
+                          {item.format.sizedByOption &&
+                            ` — artwork drawn at ${trimText(item.artworkTrim)}; scale to the size ordered`}
                         </p>
-                      )}
-                      <p className="font-body text-xs text-on-surface-variant">
-                        {formatPence(item.unitPricePence)} each · {item.delivery.label} (
-                        {formatPence(item.delivery.pricePence)})
-                        {item.templateId ? ` · template ${item.templateId}` : " · customer’s own artwork"}
-                        {item.designId && (
-                          <>
-                            {" · "}
-                            <Link href={adminDesignHref(item.designId)} className="underline hover:text-primary">
-                              edit design
-                            </Link>
-                          </>
+                        {item.serviceDate && (
+                          <p className="font-body text-sm font-medium text-on-surface">
+                            Service on {formatServiceDate(item.serviceDate)}
+                          </p>
                         )}
-                      </p>
+                        <p className="font-body text-xs text-on-surface-variant">
+                          {formatPence(item.unitPricePence)} each · {item.delivery.label} (
+                          {formatPence(item.delivery.pricePence)})
+                          {item.templateId ? ` · template ${item.templateId}` : " · customer’s own artwork"}
+                          {item.designId && (
+                            <>
+                              {" · "}
+                              <Link href={adminDesignHref(item.designId)} className="underline hover:text-primary">
+                                edit design
+                              </Link>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <p className="font-display text-lg text-primary">{formatPence(item.lineTotalPence)}</p>
                     </div>
-                    <p className="font-display text-lg text-primary">{formatPence(item.lineTotalPence)}</p>
                   </div>
 
                   {item.artwork ? (
@@ -292,7 +334,7 @@ export default async function AdminOrderPage({
             />
           </Section>
 
-          {(order.thintent || (isThintentConfigured() && order.paidAt)) && (
+          {(order.thintent || (isThintentConfigured() && order.placedAt)) && (
             <Section title="Thintent">
               {order.thintent ? (
                 <>
@@ -337,6 +379,22 @@ export default async function AdminOrderPage({
                   second job for work already under way.
                 </p>
               )}
+            </Section>
+          )}
+
+          {order.trade && (
+            <Section title="Trade order">
+              {order.trade.firmId ? (
+                <Link href={`/admin/trade/${order.trade.firmId}`} className="link font-body text-sm font-medium">
+                  {order.trade.firmName ?? "Trade firm"}
+                </Link>
+              ) : (
+                <p className="font-body text-sm text-on-surface">Trade firm no longer exists</p>
+              )}
+              <p className="font-body text-sm text-on-surface">Family: {order.trade.familyName ?? "—"}</p>
+              <p className="font-body text-sm text-on-surface-variant">
+                Their reference: {order.trade.customerRef ?? "—"}
+              </p>
             </Section>
           )}
 

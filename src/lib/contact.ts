@@ -63,6 +63,10 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
+/** One plain address that is safe to use as a reply-to (see EMAIL_RE). */
+export const isReplyToAddress = (email: string): boolean =>
+  email.length <= 254 && EMAIL_RE.test(email);
+
 /** True for a real calendar date written yyyy-mm-dd (so not 2026-02-31). */
 function isCalendarDate(value: string): boolean {
   if (!DATE_RE.test(value)) return false;
@@ -88,7 +92,7 @@ export function validateContactMessage(
 
   const email = text(body.email);
   if (!email) errors.email = "Please give us an email address to reply to.";
-  else if (email.length > 254 || !EMAIL_RE.test(email)) {
+  else if (!isReplyToAddress(email)) {
     errors.email = "That email address doesn’t look right.";
   }
 
@@ -114,7 +118,7 @@ export function validateContactMessage(
   };
 }
 
-const escapeHtml = (value: string) =>
+export const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

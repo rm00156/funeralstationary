@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { migrateDecision } from "./migrate-on-deploy";
+import { deployBlocker, migrateDecision } from "./migrate-on-deploy";
 
 describe("migrateDecision", () => {
   it("runs on a production deploy", () => {
@@ -36,5 +36,17 @@ describe("migrateDecision", () => {
     expect(migrateDecision({ VERCEL_ENV: "preview", ALLOW_PREVIEW_MIGRATIONS: "true" }).run).toBe(
       false,
     );
+  });
+});
+
+describe("deployBlocker", () => {
+  it("stops a production deploy that next build would fail before it migrates", () => {
+    expect(deployBlocker({ VERCEL_ENV: "production" }, null)).toMatch(/TURNSTILE_PRODUCTION_SITE_KEY/);
+    expect(deployBlocker({ VERCEL_ENV: "production" }, "0x4AAAAAAAAAAAAAAAAAAAAA")).toBeNull();
+  });
+
+  it("leaves previews and local builds alone", () => {
+    expect(deployBlocker({ VERCEL_ENV: "preview" }, null)).toBeNull();
+    expect(deployBlocker({}, null)).toBeNull();
   });
 });

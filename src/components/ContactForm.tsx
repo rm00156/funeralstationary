@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
+import { Optional, Required, RequiredKey } from "@/components/FieldMarks";
+import FormSent from "@/components/FormSent";
+import TurnstileCheck from "@/components/TurnstileCheck";
+import { focusFirstError } from "@/lib/focusFirstError";
 import type { ContactField } from "@/lib/contact";
 import { PHONE_DISPLAY, PHONE_HREF } from "@/lib/site";
 
 const LABEL = "text-base font-semibold";
-const OPTIONAL = "font-normal text-ink-3";
 
 /**
  * The /contact form. Posts JSON to /api/contact, which validates and emails
@@ -23,13 +26,32 @@ export default function ContactForm({
   initialTopic: string;
 }) {
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
+  /** Who it was from, for the thank-you once it has sent. */
+  const [sentName, setSentName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Partial<Record<ContactField, string>>>({});
+  // Bumped on every refused send, so the effect below runs once the error
+  // markup is on the page — then the visitor is taken to the first problem.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [refusals, setRefusals] = useState(0);
+  // A layout effect, so the field is focused in the same commit that marks it.
+  useLayoutEffect(() => {
+    if (refusals > 0) focusFirstError(formRef.current);
+  }, [refusals]);
+  // Cloudflare Turnstile (TurnstileCheck): a token is spent by every send the
+  // server checks, so the check starts again after each attempt.
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileKey, setTurnstileKey] = useState(0);
+  const resetTurnstile = () => {
+    setTurnstileToken(null);
+    setTurnstileKey((key) => key + 1);
+  };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const data = Object.fromEntries(new FormData(form));
+    const data = { ...Object.fromEntries(new FormData(form)), turnstileToken };
+    const name = String(new FormData(form).get("name") ?? "").trim();
     setState("sending");
     setError(null);
     setErrors({});
@@ -39,8 +61,9 @@ export default function ContactForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      resetTurnstile();
       if (response.ok) {
-        form.reset();
+        setSentName(name);
         setState("sent");
         return;
       }
@@ -51,8 +74,10 @@ export default function ContactForm({
       setErrors(body?.errors ?? {});
       setError(body?.error ?? "We couldn't send your message just now. Please try again.");
     } catch {
+      resetTurnstile();
       setError("We couldn't send your message just now. Please check your connection and try again.");
     }
+    setRefusals((count) => count + 1);
     setState("idle");
   };
 
@@ -67,8 +92,20 @@ export default function ContactForm({
       </p>
     );
 
+  if (state === "sent") {
+    return (
+      <FormSent title="Message sent" againLabel="Send another message" onAgain={() => setState("idle")}>
+        <p>
+          Thank you{sentName ? `, ${sentName}` : ""}. Your message has been sent, and we’ll reply as
+          soon as we can during opening hours.
+        </p>
+      </FormSent>
+    );
+  }
+
   return (
     <form
+      ref={formRef}
       onSubmit={submit}
       noValidate
       className="flex flex-col gap-[22px] rounded-2xl border border-line bg-surface p-7 sm:p-11"
@@ -80,16 +117,9 @@ export default function ContactForm({
         <p className="text-base text-ink-2">
           We’ll reply as soon as we can during opening hours.
         </p>
+        <RequiredKey />
       </div>
 
-      {state === "sent" && (
-        <div
-          role="status"
-          className="rounded-lg border border-success-border bg-success-bg px-[18px] py-4 text-base text-success-text"
-        >
-          Thank you. Your message has been sent and we’ll be in touch soon.
-        </div>
-      )}
       {error && (
         <div
           role="alert"
@@ -107,6 +137,7 @@ export default function ContactForm({
         <div className="flex flex-col gap-1.5">
           <label htmlFor="c-name" className={LABEL}>
             Your name
+            <Required />
           </label>
           <input
             id="c-name"
@@ -121,7 +152,7 @@ export default function ContactForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="c-phone" className={LABEL}>
-            Phone <span className={OPTIONAL}>(optional)</span>
+            Phone <Optional />
           </label>
           <input
             id="c-phone"
@@ -138,6 +169,7 @@ export default function ContactForm({
       <div className="flex flex-col gap-1.5">
         <label htmlFor="c-email" className={LABEL}>
           Email
+          <Required />
         </label>
         <input
           id="c-email"
@@ -155,11 +187,13 @@ export default function ContactForm({
         <div className="flex flex-col gap-1.5">
           <label htmlFor="c-topic" className={LABEL}>
             What’s it about?
+            <Required />
           </label>
           <select
             id="c-topic"
             name="topic"
             defaultValue={initialTopic}
+            required
             className="field"
             {...describe("topic")}
           >
@@ -173,7 +207,7 @@ export default function ContactForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="c-date" className={LABEL}>
-            Date of the service <span className={OPTIONAL}>(if known)</span>
+            Date of the service <Optional>(optional, if known)</Optional>
           </label>
           <input
             id="c-date"
@@ -189,6 +223,7 @@ export default function ContactForm({
       <div className="flex flex-col gap-1.5">
         <label htmlFor="c-message" className={LABEL}>
           Your message
+          <Required />
         </label>
         <textarea
           id="c-message"
@@ -207,9 +242,11 @@ export default function ContactForm({
         <input id="c-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
       </div>
 
+      <TurnstileCheck resetKey={turnstileKey} onToken={setTurnstileToken} />
+
       <button
         type="submit"
-        disabled={state === "sending"}
+        disabled={state === "sending" || !turnstileToken}
         className="btn btn-primary min-h-14 self-start px-8 text-lg"
       >
         {state === "sending" ? "Sending…" : "Send message"}

@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 /** Change this whenever the wording below changes. */
-const LAST_UPDATED = "8 October 2026";
+const LAST_UPDATED = "13 October 2026";
 
 const ICO_COMPLAINT_URL = "https://ico.org.uk/make-a-complaint/";
 const STRIPE_PRIVACY_URL = "https://stripe.com/gb/privacy";
@@ -212,6 +212,12 @@ export default function PrivacyPage() {
                     message, so that we can reply.
                   </li>
                   <li>
+                    <strong className="font-semibold">When you apply for a trade account:</strong>{" "}
+                    your business name and postcode, your name, role, email address and phone
+                    number, roughly how many funerals you arrange and what you usually order, so
+                    that we can get in touch and set up your account.
+                  </li>
+                  <li>
                     <strong className="font-semibold">After your order:</strong> about two weeks
                     after the funeral (or three weeks after we finish your order, if you
                     didn&rsquo;t give a date) we email you once to ask about your experience, with a
@@ -224,6 +230,12 @@ export default function PrivacyPage() {
                     <strong className="font-semibold">When you visit:</strong> the company that
                     hosts our website records technical details such as your IP address, to keep the
                     site running and secure.
+                  </li>
+                  <li>
+                    <strong className="font-semibold">On our contact and trade forms:</strong>{" "}
+                    Cloudflare Turnstile checks that the form is being filled in by a person rather
+                    than a program sending spam. To do that, Cloudflare sees your IP address and
+                    details of your browser.
                   </li>
                 </ul>
                 <p>
@@ -249,8 +261,8 @@ export default function PrivacyPage() {
                   </li>
                   <li>
                     <strong className="font-semibold">Resend</strong> sends our emails: order
-                    confirmations, sign-in links, the email asking how we did and messages from our
-                    contact form.
+                    confirmations, sign-in links, the email asking how we did, messages from our
+                    contact form and trade account applications.
                   </li>
                   <li>
                     <strong className="font-semibold">Amazon Web Services</strong> stores your
@@ -258,6 +270,10 @@ export default function PrivacyPage() {
                   </li>
                   <li>
                     <strong className="font-semibold">Vercel</strong> hosts the website.
+                  </li>
+                  <li>
+                    <strong className="font-semibold">Cloudflare</strong> runs the check on our
+                    contact and trade forms that stops spam.
                   </li>
                   <li>
                     <strong className="font-semibold">TiDB Cloud</strong> (PingCAP) holds our
@@ -297,7 +313,8 @@ export default function PrivacyPage() {
                     completely.
                   </li>
                   <li>
-                    <strong className="font-semibold">Messages</strong> are kept for as long as we
+                    <strong className="font-semibold">Messages and trade account applications</strong>{" "}
+                    are kept for as long as we
                     need them to help you, and with your order if they&rsquo;re about one.
                   </li>
                   <li>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  printedPageLabels,
   A5_TRIM,
   NOTCH_RADIUS,
   RESIZE_HANDLES,
@@ -660,5 +661,16 @@ describe("product formats", () => {
     const a5 = resizeBox(origin, "se", 10, 0, { rotation: 30 });
     const tall = resizeBox(origin, "se", 10, 0, { rotation: 30, trim: bookmark.trim });
     expect(tall).not.toEqual(a5);
+  });
+});
+
+describe("printedPageLabels", () => {
+  it("names a one-page and a two-sided product by side", () => {
+    expect(printedPageLabels(1)).toEqual(["Front"]);
+    expect(printedPageLabels(2)).toEqual(["Front", "Back"]);
+  });
+
+  it("numbers a booklet's inside pages between its covers", () => {
+    expect(printedPageLabels(4)).toEqual(["Front cover", "Page 2", "Page 3", "Back cover"]);
   });
 });

@@ -1,5 +1,11 @@
 import type { NextConfig } from "next";
 import { chromiumTracingIncludes } from "./src/lib/chromiumRoutes";
+import { isTurnstileLive, turnstileSiteKeyProblem } from "./src/lib/turnstile";
+
+// A production build with no real Turnstile site key (or with the secret
+// pasted in its place) would ship forms that can't send — fail it here.
+const turnstileProblem = turnstileSiteKeyProblem(process.env.VERCEL_ENV);
+if (turnstileProblem) throw new Error(turnstileProblem);
 
 /**
  * next/image hard-errors on hosts it doesn't know, so the object-storage
@@ -22,6 +28,9 @@ function storageHost(): string | null {
 }
 
 const nextConfig: NextConfig = {
+  // Which Turnstile key pair the forms use (src/lib/turnstile.ts), fixed at
+  // build time so the browser and the server always agree.
+  env: { NEXT_PUBLIC_TURNSTILE_LIVE: isTurnstileLive(process.env.VERCEL_ENV) ? "1" : "" },
   // Lets the dev server (and its client JS/HMR) be requested through an
   // ngrok or cloudflared quick tunnel — Next otherwise blocks cross-origin dev
   // asset requests, which silently breaks hydration (buttons render but clicks

@@ -1,0 +1,1 @@
+ALTER TABLE `trade_firms` ADD `accounts_email` varchar(255);

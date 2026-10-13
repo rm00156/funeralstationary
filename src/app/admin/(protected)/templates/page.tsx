@@ -114,7 +114,7 @@ export default async function AdminTemplatesPage({
         ))}
       </nav>
 
-      <div className="mb-8 overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
+      <div className="table-stack mb-8 rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
         <table className="w-full min-w-[640px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
@@ -141,9 +141,9 @@ export default async function AdminTemplatesPage({
             {templates.map((template) => (
               <tr
                 key={template.slug}
-                className="border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0"
+                className="row-linked border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0"
               >
-                <td className="px-5 py-3">
+                <td data-stack="title" className="px-5 py-3">
                   <div className="flex items-center gap-3">
                     <span className="relative block h-14 w-11 shrink-0 overflow-hidden rounded-md bg-surface-container-low">
                       <Image
@@ -163,14 +163,14 @@ export default async function AdminTemplatesPage({
                   </div>
                 </td>
                 {!product && (
-                  <td className="px-5 py-3 text-on-surface-variant">
+                  <td data-label="Product" className="px-5 py-3 text-on-surface-variant">
                     {productLabels.get(template.productSlug) ?? template.productSlug}
                   </td>
                 )}
-                <td className="px-5 py-3 text-on-surface-variant">
+                <td data-label="Categories" className="px-5 py-3 text-on-surface-variant">
                   {template.categories.join(", ") || "—"}
                 </td>
-                <td className="px-5 py-3">
+                <td data-label="Status" className="px-5 py-3">
                   <span
                     className={`rounded-full px-3 py-1 font-body text-xs font-medium capitalize ${
                       STATUS_STYLES[template.status] ?? STATUS_STYLES.draft
@@ -184,11 +184,11 @@ export default async function AdminTemplatesPage({
                     </span>
                   )}
                 </td>
-                <td className="px-5 py-3 text-on-surface-variant">{template.sortOrder}</td>
-                <td className="px-5 py-3 text-right">
+                <td data-label="Sort" className="px-5 py-3 text-on-surface-variant">{template.sortOrder}</td>
+                <td data-stack="end" className="px-5 py-3 text-right">
                   <Link
                     href={`/admin/templates/${template.slug}`}
-                    className="inline-flex items-center gap-2 rounded-lg border-2 border-primary-container px-4 py-1.5 font-medium text-primary-container transition-colors duration-300 hover:bg-surface-container"
+                    className="row-link inline-flex items-center gap-2 rounded-lg border-2 border-primary-container px-4 py-1.5 font-medium text-primary-container transition-colors duration-300 hover:bg-surface-container"
                   >
                     <Pencil size={14} aria-hidden />
                     Edit

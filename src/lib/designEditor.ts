@@ -1261,6 +1261,15 @@ export function templatePageLabels(count: TemplatePageCount = TEMPLATE_PAGE_COUN
   return ["Cover", "Middle", "Back"];
 }
 
+/** Display names for a finished document's pages, in reading order. */
+export function printedPageLabels(count: number): string[] {
+  if (count === 1) return ["Front"];
+  if (count === 2) return ["Front", "Back"];
+  return Array.from({ length: count }, (_, index) =>
+    index === 0 ? "Front cover" : index === count - 1 ? "Back cover" : `Page ${index + 1}`,
+  );
+}
+
 export function templatePageLabel(
   index: number,
   count: TemplatePageCount = TEMPLATE_PAGE_COUNT,
