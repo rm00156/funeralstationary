@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { Optional, Required, RequiredKey } from "@/components/FieldMarks";
 import FormSent from "@/components/FormSent";
@@ -29,7 +29,8 @@ export default function TradeApplicationForm({ orderTypes }: { orderTypes: Trade
   // markup is on the page — then the visitor is taken to the first problem.
   const formRef = useRef<HTMLFormElement>(null);
   const [refusals, setRefusals] = useState(0);
-  useEffect(() => {
+  // A layout effect, so the field is focused in the same commit that marks it.
+  useLayoutEffect(() => {
     if (refusals > 0) focusFirstError(formRef.current);
   }, [refusals]);
   // Cloudflare Turnstile, as on the contact form: a fresh check after each attempt.

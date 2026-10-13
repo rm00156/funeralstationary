@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { CircleCheck, Phone } from "lucide-react";
 
 import { reveal } from "@/lib/focusFirstError";
@@ -25,7 +25,8 @@ export default function FormSent({
   onAgain: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // A layout effect: focused in the commit that shows it, never a frame later.
+  useLayoutEffect(() => {
     if (panelRef.current) reveal(panelRef.current, { focus: true });
   }, []);
 
