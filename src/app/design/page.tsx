@@ -133,6 +133,7 @@ export default async function DesignPage({
               doc: saved.doc,
               pagesOptionId: saved.pagesOptionId,
               paperId: saved.paperId,
+              revision: saved.revision,
             }
           : undefined
       }

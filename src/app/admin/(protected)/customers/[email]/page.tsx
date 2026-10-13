@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, Mail, Phone } from "lucide-react";
 
+import AdminDesignTable from "@/components/AdminDesignTable";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { adminGetCustomer } from "@/lib/adminCustomers.server";
+import { adminListDesigns } from "@/lib/adminDesigns.server";
 import { shortDay } from "@/lib/adminDashboard";
 import { formatPence } from "@/lib/orderOfServicePricing";
 
@@ -36,6 +38,9 @@ export default async function AdminCustomerPage({ params }: PageProps<"/admin/cu
   const customer = await adminGetCustomer(emailParam(email));
   if (!customer) notFound();
   const { summary } = customer;
+  const designs = await adminListDesigns({
+    customer: { userId: summary.account?.id ?? null, email: summary.email },
+  });
   const phoneHref = summary.phone ? `tel:${summary.phone.replace(/[^\d+]/g, "")}` : null;
 
   return (
@@ -82,59 +87,82 @@ export default async function AdminCustomerPage({ params }: PageProps<"/admin/cu
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
-          <h2 className="px-6 pb-4 pt-6 font-display text-xl text-primary">Orders</h2>
-          {customer.orders.length === 0 ? (
-            <p className="px-6 pb-6 font-body text-sm text-on-surface-variant">
-              No paid orders yet — they have an account and may have saved designs.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left">
-                <thead>
-                  <tr className="border-y border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
-                    <th className="px-6 py-3">Order</th>
-                    <th className="px-6 py-3">Placed</th>
-                    <th className="px-6 py-3">Products</th>
-                    <th className="px-6 py-3">Service</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customer.orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0"
-                    >
-                      <td className="px-6 py-3">
-                        <Link href={`/admin/orders/${order.id}`} className="font-medium text-primary hover:underline">
-                          {order.orderNumber}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-3 text-on-surface-variant">{formatDate(order.placedAt)}</td>
-                      <td className="px-6 py-3 text-on-surface-variant">{order.products.join(", ") || "—"}</td>
-                      <td className="px-6 py-3 text-on-surface-variant">
-                        {order.serviceDate ? shortDay(order.serviceDate) : "—"}
-                      </td>
-                      <td className="px-6 py-3">
-                        <OrderStatusBadge status={order.status} />
-                      </td>
-                      <td className="px-6 py-3 text-right">
-                        {formatPence(order.totalPence)}
-                        {order.refundedPence > 0 && (
-                          <span className="block text-xs text-on-surface-variant">
-                            {formatPence(order.refundedPence)} refunded
-                          </span>
-                        )}
-                      </td>
+        <div className="flex min-w-0 flex-col gap-8">
+          <section className="overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
+            <h2 className="px-6 pb-4 pt-6 font-display text-xl text-primary">Orders</h2>
+            {customer.orders.length === 0 ? (
+              <p className="px-6 pb-6 font-body text-sm text-on-surface-variant">
+                No paid orders yet — any designs they have saved are listed below.
+              </p>
+            ) : (
+              // A phone gets a stacked card per order rather than a table to
+              // scroll sideways; md and up, a table.
+              <div className="md:overflow-x-auto">
+                <table className="block w-full text-left md:table md:min-w-[640px]">
+                  <thead className="hidden md:table-header-group">
+                    <tr className="border-y border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
+                      <th className="px-6 py-3">Order</th>
+                      <th className="px-6 py-3">Placed</th>
+                      <th className="px-6 py-3">Products</th>
+                      <th className="px-6 py-3">Service</th>
+                      <th className="px-6 py-3">Status</th>
+                      <th className="px-6 py-3 text-right">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+                  <tbody className="block border-t border-outline-variant/40 md:table-row-group md:border-t-0">
+                    {customer.orders.map((order) => (
+                      <tr
+                        key={order.id}
+                        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 border-b border-outline-variant/20 px-6 py-4 font-body text-sm text-on-surface last:border-b-0 md:table-row md:p-0"
+                      >
+                        <td className="col-start-1 row-start-1 md:table-cell md:px-6 md:py-3">
+                          <Link href={`/admin/orders/${order.id}`} className="font-medium text-primary hover:underline">
+                            {order.orderNumber}
+                          </Link>
+                        </td>
+                        <td className="col-start-1 text-on-surface-variant md:table-cell md:px-6 md:py-3">
+                          <span className="md:hidden">Placed </span>
+                          {formatDate(order.placedAt)}
+                        </td>
+                        <td className="col-start-1 text-on-surface-variant md:table-cell md:px-6 md:py-3">
+                          {order.products.join(", ") || "—"}
+                        </td>
+                        <td className="col-start-1 text-on-surface-variant md:table-cell md:px-6 md:py-3">
+                          <span className="md:hidden">Service </span>
+                          {order.serviceDate ? shortDay(order.serviceDate) : "—"}
+                        </td>
+                        <td className="col-start-1 row-start-2 md:table-cell md:px-6 md:py-3">
+                          <OrderStatusBadge status={order.status} />
+                        </td>
+                        <td className="col-start-2 row-start-1 text-right md:table-cell md:px-6 md:py-3">
+                          {formatPence(order.totalPence)}
+                          {order.refundedPence > 0 && (
+                            <span className="block text-xs text-on-surface-variant">
+                              {formatPence(order.refundedPence)} refunded
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h2 className="mb-1 font-display text-xl text-plum-deep">Designs</h2>
+            <p className="mb-4 font-body text-sm text-ink-2">
+              Open one to make a change on their behalf — it saves to their own design.
+              {!summary.account && " As a guest, only the designs on their orders are listed."}
+            </p>
+            <AdminDesignTable
+              designs={designs}
+              showOwner={false}
+              empty="No saved designs."
+            />
+          </section>
+        </div>
 
         <aside className="flex flex-col gap-6">
           <section className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6 ambient-shadow">

@@ -42,6 +42,12 @@ export const designs = mysqlTable(
     /** The DesignDoc — pages of percentage-positioned elements. */
     doc: json("doc").$type<DesignDoc>().notNull(),
     /**
+     * Bumped on every save. An editor sends the revision it loaded, and a
+     * save from an out-of-date copy is refused — so the customer's open tab
+     * and an admin editing on their behalf can't silently overwrite each other.
+     */
+    revision: int("revision").notNull().default(0),
+    /**
      * Denormalised from doc.pages.length so listing designs never parses
      * the JSON blob. Invariant (enforced app-side, not by MySQL): this must
      * equal pageCountOptions.pageCount for the chosen pageCountOptionId —

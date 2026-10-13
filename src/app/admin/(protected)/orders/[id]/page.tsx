@@ -8,6 +8,7 @@ import AdminOrderStatusForm from "@/components/AdminOrderStatusForm";
 import AdminThintentButton from "@/components/AdminThintentButton";
 import OrderStatusBadge from "@/components/OrderStatusBadge";
 import { customerHref } from "@/lib/adminCustomers";
+import { adminDesignHref } from "@/lib/adminDesigns";
 import { adminOrderCustomerEmail } from "@/lib/adminCustomers.server";
 import { adminGetOrder } from "@/lib/adminOrders.server";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
@@ -137,8 +138,8 @@ export default async function AdminOrderPage({
                         {item.designId && (
                           <>
                             {" · "}
-                            <Link href={`/design?design=${item.designId}`} className="underline hover:text-primary">
-                              open design
+                            <Link href={adminDesignHref(item.designId)} className="underline hover:text-primary">
+                              edit design
                             </Link>
                           </>
                         )}

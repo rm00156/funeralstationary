@@ -1,13 +1,6 @@
 import type { NextRequest } from "next/server";
-import { getProductFormats, templateProductSlug } from "@/lib/catalogue.server";
-import { BOOKLET_FORMAT } from "@/lib/designEditor";
-import {
-  deleteDesign,
-  getDesign,
-  updateDesign,
-  validateDesignPayload,
-} from "@/lib/designs.server";
-import { getPageCountOption } from "@/lib/pricing.server";
+import { saveDesignPatch } from "@/lib/designPatch.server";
+import { deleteDesign, getDesign, updateDesign } from "@/lib/designs.server";
 import { getOrCreateOwner } from "@/lib/session";
 import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 
@@ -28,6 +21,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/api/designs
     doc: design.doc,
     pagesOptionId: design.pagesOptionId,
     paperId: design.paperId,
+    revision: design.revision,
     updatedAt: design.updatedAt.toISOString(),
   });
 }
@@ -43,67 +37,14 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/design
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { doc, pagesOptionId, paperId, name, templateId } = (body ?? {}) as Record<string, unknown>;
 
   const owner = await getOrCreateOwner();
   const existing = await getDesign(owner, id);
   if (!existing) return Response.json({ error: "Design not found" }, { status: 404 });
 
-  // The editor's template picker rewrites the cover, so the design's template
-  // can change after creation — otherwise the row would keep pointing at
-  // whichever template the editor happened to open with.
-  if (templateId !== undefined) {
-    // …but only to another of its own product's, which share its trim.
-    if (
-      typeof templateId !== "string" ||
-      (await templateProductSlug(templateId)) !== existing.productId
-    ) {
-      return Response.json({ error: "Unknown templateId" }, { status: 400 });
-    }
-  }
-
-  const spec = {
-    pagesOptionId: String(pagesOptionId ?? existing.pagesOptionId),
-    paperId: String(paperId ?? existing.paperId),
-  };
-  const pageOption = await getPageCountOption(existing.productId, spec.pagesOptionId);
-  if (!pageOption) {
-    return Response.json({ error: "Unknown page count option" }, { status: 400 });
-  }
-
-  // A doc is optional (a rename alone is valid), but if present it must be
-  // consistent with the spec it is being saved alongside.
-  let nextDoc = undefined;
-  if (doc !== undefined) {
-    const format = (await getProductFormats()).get(existing.productId) ?? BOOKLET_FORMAT;
-    const validated = validateDesignPayload(doc, pageOption.pageCount, format.trim);
-    if (!validated.ok) return Response.json({ error: validated.error }, { status: 400 });
-    nextDoc = validated.doc;
-  }
-
-  let updated;
-  try {
-    updated = await updateDesign(owner, id, {
-      doc: nextDoc,
-      spec,
-      name: typeof name === "string" ? name.trim().slice(0, 200) || "Untitled design" : undefined,
-      templateId: typeof templateId === "string" ? templateId : undefined,
-    });
-  } catch (error) {
-    // Resolver misses (e.g. an unknown paper slug for this product) are
-    // client errors.
-    if (error instanceof Error && error.message.startsWith("Unknown")) {
-      return Response.json({ error: error.message }, { status: 400 });
-    }
-    throw error;
-  }
-  if (!updated) return Response.json({ error: "Design not found" }, { status: 404 });
-
-  return Response.json({
-    id: updated.id,
-    name: updated.name,
-    updatedAt: updated.updatedAt.toISOString(),
-  });
+  return saveDesignPatch(body, existing, (patch, expectedRevision) =>
+    updateDesign(owner, id, patch, expectedRevision),
+  );
 }
 
 /** DELETE /api/designs/:id — soft delete. */

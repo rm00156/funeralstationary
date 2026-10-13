@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
     {
       id: created.id,
       name: created.name,
+      revision: created.revision,
       updatedAt: created.updatedAt.toISOString(),
     },
     { status: 201 },
