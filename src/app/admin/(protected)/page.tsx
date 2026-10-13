@@ -29,6 +29,7 @@ import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { ORDER_CUTOFF } from "@/lib/site";
 import { isStorageConfigured } from "@/lib/storage";
 import { isThintentConfigured } from "@/lib/thintent.server";
+import { countPendingTradeApplications } from "@/lib/trade.server";
 
 export const dynamic = "force-dynamic";
 
@@ -57,15 +58,11 @@ function placedText(date: Date | null, now: Date): string {
   return new Intl.DateTimeFormat("en-GB", { ...format, timeZone: SHOP_TIME_ZONE }).format(date);
 }
 
-function designFrom(lines: DashboardLine[]): string {
-  const sources = [
-    ...new Set(
-      lines.map((line) =>
-        line.source === "pdf" ? "PDF upload" : line.source === "canva" ? "Canva link" : `Template: ${line.templateName ?? "—"}`,
-      ),
-    ),
-  ];
-  return sources.join(", ");
+/** Where a line's artwork came from, shown beside its spec. */
+function designFrom(line: DashboardLine): string {
+  if (line.source === "pdf") return "PDF upload";
+  if (line.source === "canva") return "Canva link";
+  return line.templateName ? `${line.templateName} template` : "Template";
 }
 
 function ServiceChip({ label, urgency }: { label: string; urgency: Urgency }) {
@@ -78,12 +75,13 @@ function ServiceChip({ label, urgency }: { label: string; urgency: Urgency }) {
 
 export default async function AdminTodayPage() {
   const now = new Date();
-  const [counts, working, takings, sales, catalogue] = await Promise.all([
+  const [counts, working, takings, sales, catalogue, tradeApplications] = await Promise.all([
     adminOrderCounts(),
     loadWorkingOrders(now),
     loadTakings(now),
     loadProductSales(now),
     loadCatalogueCounts(),
+    countPendingTradeApplications(),
   ]);
 
   const today = shopDate(now);
@@ -102,7 +100,7 @@ export default async function AdminTodayPage() {
     .sort(
       (a, b) =>
         (a.serviceDate ?? "9999").localeCompare(b.serviceDate ?? "9999") ||
-        (a.paidAt?.getTime() ?? 0) - (b.paidAt?.getTime() ?? 0),
+        (a.placedAt?.getTime() ?? 0) - (b.placedAt?.getTime() ?? 0),
     );
   const cutoff = cutoffState(now, ORDER_CUTOFF);
   const monthChange = changeText(takings.month.netPence, takings.lastMonthToDate.netPence);
@@ -161,6 +159,21 @@ export default async function AdminTodayPage() {
           </form>
         </div>
       </header>
+
+      {tradeApplications > 0 && (
+        <Link
+          href="/admin/trade"
+          className={`${CARD} mb-8 flex min-h-12 flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm transition-colors hover:border-line-2`}
+        >
+          <span>
+            <strong className="font-semibold">
+              {tradeApplications} trade {tradeApplications === 1 ? "application" : "applications"} waiting
+            </strong>{" "}
+            — approve or decline {tradeApplications === 1 ? "it" : "them"} in Trade accounts.
+          </span>
+          <ArrowUpRight size={16} aria-hidden className="text-plum" />
+        </Link>
+      )}
 
       <h2 className="eyebrow mb-3">Production</h2>
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -226,7 +239,10 @@ export default async function AdminTodayPage() {
             )}
           </section>
 
-          <section className={`${CARD} overflow-hidden`}>
+          {/* Sized by its own width, not the viewport's: the sidebar and the
+              right-hand column decide how much room it has. Narrow, each order
+              is a stacked card; from @3xl, a table — never a sideways scroll. */}
+          <section className={`${CARD} @container overflow-hidden`}>
             <div className="flex items-baseline justify-between gap-4 px-6 py-5">
               <h2 className="font-display text-2xl">Open orders</h2>
               <Link href="/admin/orders" className="link text-sm">
@@ -236,31 +252,29 @@ export default async function AdminTodayPage() {
             {openOrders.length === 0 ? (
               <p className="border-t border-line px-6 py-6 text-ink-2">Everything paid for has been sent.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[860px] text-left text-sm">
-                  <thead className="bg-mist-2">
-                    <tr className="border-y border-line font-semibold text-ink-2">
-                      <th className="px-6 py-3">Order</th>
-                      <th className="px-4 py-3">Customer</th>
-                      <th className="px-4 py-3">Product</th>
-                      <th className="px-4 py-3">Design from</th>
-                      <th className="px-4 py-3">Service</th>
-                      <th className="px-4 py-3">Stage</th>
-                      <th className="px-6 py-3 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {openOrders.map((order) => {
-                      const chip = serviceUrgency(order.serviceDate, today);
-                      return (
-                        <tr key={order.id} className="align-top">
-                          <td className="px-6 py-3">
-                            <Link href={`/admin/orders/${order.id}`} className="link font-semibold">
-                              {order.orderNumber}
-                            </Link>
-                            <span className="block text-ink-2">{placedText(order.paidAt, now)}</span>
-                          </td>
-                          <td className="px-4 py-3">
+              <table className="block w-full border-t border-line text-left text-sm @3xl:table @3xl:border-t-0">
+                <thead className="hidden bg-mist-2 @3xl:table-header-group">
+                  <tr className="border-y border-line font-semibold text-ink-2">
+                    <th className="px-6 py-3">Order</th>
+                    <th className="px-4 py-3">Product</th>
+                    <th className="px-4 py-3">Service</th>
+                    <th className="px-4 py-3">Stage</th>
+                    <th className="px-6 py-3 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="block divide-y divide-line @3xl:table-row-group">
+                  {openOrders.map((order) => {
+                    const chip = serviceUrgency(order.serviceDate, today);
+                    return (
+                      <tr
+                        key={order.id}
+                        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 px-6 py-4 @3xl:table-row @3xl:p-0 @3xl:align-top"
+                      >
+                        <td className="col-start-1 @3xl:table-cell @3xl:px-6 @3xl:py-3">
+                          <Link href={`/admin/orders/${order.id}`} className="link whitespace-nowrap font-semibold">
+                            {order.orderNumber}
+                          </Link>
+                          <span className="block">
                             {order.customerEmail ? (
                               <Link href={customerHref(order.customerEmail)} className="hover:underline">
                                 {customerName(order)}
@@ -268,31 +282,40 @@ export default async function AdminTodayPage() {
                             ) : (
                               customerName(order)
                             )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {order.lines.map((line, index) => (
-                              <span key={index} className="block">
-                                {line.productLabel}
-                                <span className="block text-ink-2">
-                                  {copiesText(line.copies)} · {line.pagesLabel}
-                                </span>
+                          </span>
+                          <span className="block text-ink-2">{placedText(order.placedAt, now)}</span>
+                        </td>
+                        <td className="col-span-2 space-y-1.5 @3xl:table-cell @3xl:px-4 @3xl:py-3">
+                          {order.lines.map((line, index) => (
+                            <span key={index} className="block">
+                              {line.productLabel}
+                              <span className="block text-ink-2">
+                                {copiesText(line.copies)} · {line.pagesLabel} · {designFrom(line)}
                               </span>
-                            ))}
-                          </td>
-                          <td className="px-4 py-3">{designFrom(order.lines)}</td>
-                          <td className="px-4 py-3">
-                            {order.serviceDate ? <ServiceChip {...chip} /> : <span className="text-ink-2">Not given</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <OrderStatusBadge status={order.status} />
-                          </td>
-                          <td className="px-6 py-3 text-right">{formatPence(order.totalPence)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            </span>
+                          ))}
+                        </td>
+                        <td className="col-start-1 @3xl:table-cell @3xl:px-4 @3xl:py-3">
+                          {order.serviceDate ? (
+                            <ServiceChip {...chip} />
+                          ) : (
+                            <span className="text-ink-2">
+                              <span className="@3xl:hidden">No service date</span>
+                              <span className="hidden @3xl:inline">Not given</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="col-start-2 text-right @3xl:table-cell @3xl:px-4 @3xl:py-3 @3xl:text-left">
+                          <OrderStatusBadge status={order.status} />
+                        </td>
+                        <td className="col-start-2 row-start-1 text-right font-semibold @3xl:table-cell @3xl:px-6 @3xl:py-3 @3xl:font-normal">
+                          {formatPence(order.totalPence)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </section>
         </div>

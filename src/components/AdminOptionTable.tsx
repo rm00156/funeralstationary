@@ -83,7 +83,7 @@ export default function AdminOptionTable({
       <h2 className="border-b border-outline-variant/40 px-5 py-4 font-display text-lg text-primary">
         {title}
       </h2>
-      <div className="overflow-x-auto">
+      <div className="table-stack">
         <table className="w-full min-w-[720px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
@@ -179,8 +179,8 @@ function OptionRow({
 
   return (
     <tr className="border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0">
-      <td className="px-5 py-3 text-on-surface-variant">{option.slug}</td>
-      <td className="px-5 py-3">
+      <td data-stack="title" className="px-5 py-3 text-on-surface-variant">{option.slug}</td>
+      <td data-label="Label" data-stack="full" className="px-5 py-3">
         <input
           aria-label={`Label for ${option.slug}`}
           value={label}
@@ -194,7 +194,7 @@ function OptionRow({
         )}
       </td>
       {fields.map((field) => (
-        <td key={field.key} className="px-5 py-3">
+        <td data-label={field.label} key={field.key} className="px-5 py-3">
           <input
             aria-label={`${field.label} for ${option.slug}`}
             value={values[field.key]}
@@ -205,7 +205,7 @@ function OptionRow({
           />
         </td>
       ))}
-      <td className="px-5 py-3">
+      <td data-label="Note" data-stack="full" className="px-5 py-3">
         <input
           aria-label={`Note for ${option.slug}`}
           value={note}
@@ -213,7 +213,7 @@ function OptionRow({
           className={`${cellInput} w-full min-w-44`}
         />
       </td>
-      <td className="px-5 py-3">
+      <td data-label="Sort" className="px-5 py-3">
         <input
           aria-label={`Sort order for ${option.slug}`}
           type="number"
@@ -223,7 +223,7 @@ function OptionRow({
           className={`${cellInput} w-16`}
         />
       </td>
-      <td className="px-5 py-3">
+      <td data-label="Active" className="px-5 py-3">
         <input
           aria-label={`${option.slug} active`}
           type="checkbox"
@@ -232,7 +232,7 @@ function OptionRow({
           className="h-4 w-4 accent-primary-container"
         />
       </td>
-      <td className="px-5 py-3 text-right">
+      <td data-stack="end" className="px-5 py-3 text-right">
         <button
           type="button"
           onClick={save}

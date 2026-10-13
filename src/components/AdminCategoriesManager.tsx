@@ -17,7 +17,7 @@ export default function AdminCategoriesManager({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
+      <div className="table-stack rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
         <table className="w-full min-w-[560px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
@@ -66,7 +66,7 @@ function CategoryRow({ category }: { category: AdminCategory }) {
 
   return (
     <tr className="border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0">
-      <td className="px-5 py-3">
+      <td data-label="Category" data-stack="full" className="px-5 py-3">
         <input
           aria-label={`Label for ${category.slug}`}
           value={label}
@@ -79,8 +79,8 @@ function CategoryRow({ category }: { category: AdminCategory }) {
           </p>
         )}
       </td>
-      <td className="px-5 py-3 text-on-surface-variant">{category.slug}</td>
-      <td className="px-5 py-3">
+      <td data-stack="title" className="px-5 py-3 text-on-surface-variant">{category.slug}</td>
+      <td data-label="Accent" className="px-5 py-3">
         <input
           aria-label={`Accent colour for ${category.slug}`}
           type="color"
@@ -89,7 +89,7 @@ function CategoryRow({ category }: { category: AdminCategory }) {
           className="h-9 w-12 cursor-pointer rounded-lg border border-outline-variant/60 bg-surface-container-lowest"
         />
       </td>
-      <td className="px-5 py-3">
+      <td data-label="Sort" className="px-5 py-3">
         <input
           aria-label={`Sort order for ${category.slug}`}
           type="number"
@@ -99,7 +99,7 @@ function CategoryRow({ category }: { category: AdminCategory }) {
           className={`${cellInput} w-16`}
         />
       </td>
-      <td className="px-5 py-3">
+      <td data-label="Active" className="px-5 py-3">
         <input
           aria-label={`${category.slug} active`}
           type="checkbox"
@@ -108,7 +108,7 @@ function CategoryRow({ category }: { category: AdminCategory }) {
           className="h-4 w-4 accent-primary-container"
         />
       </td>
-      <td className="px-5 py-3 text-right">
+      <td data-stack="end" className="px-5 py-3 text-right">
         <button
           type="button"
           onClick={save}

@@ -35,13 +35,17 @@ function Field({
   );
 }
 
-type FormState = { [K in keyof CheckoutDetails | "serviceDate"]: string };
+type FormState = {
+  [K in keyof CheckoutDetails | "serviceDate" | "familyName" | "customerRef"]: string;
+};
 
 export default function CheckoutForm({
   cart,
   cancelled,
   paymentsConfigured,
   accountEmail = null,
+  tradeFirmName = null,
+  account = null,
 }: {
   cart: Cart;
   /** The customer backed out of Stripe Checkout. */
@@ -49,7 +53,13 @@ export default function CheckoutForm({
   paymentsConfigured: boolean;
   /** The signed-in customer's email, used only to prefill the contact field. */
   accountEmail?: string | null;
+  /** The signed-in account's firm (trade.ts): the form then asks for the family and a reference. */
+  tradeFirmName?: string | null;
+  /** Set when that firm may order on account: the form offers it, as the default. */
+  account?: { paymentTermsDays: number; invoicesTo: string | null } | null;
 }) {
+  const [payWith, setPayWith] = useState<"account" | "card">(account ? "account" : "card");
+  const onAccount = account !== null && payWith === "account";
   const [form, setForm] = useState<FormState>({
     contactName: cart.details?.contactName ?? "",
     contactEmail: cart.details?.contactEmail ?? accountEmail ?? "",
@@ -59,6 +69,8 @@ export default function CheckoutForm({
     city: cart.details?.city ?? "",
     postcode: cart.details?.postcode ?? "",
     serviceDate: cart.serviceDate ?? "",
+    familyName: cart.trade?.familyName ?? "",
+    customerRef: cart.trade?.customerRef ?? "",
   });
   // The review request (reviewRequest.ts). Ticked by default; unticking it is the
   // customer's way to say no, which is all the soft opt-in asks for.
@@ -74,7 +86,7 @@ export default function CheckoutForm({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/checkout", {
+      const response = await fetch(onAccount ? "/api/checkout/account" : "/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -87,6 +99,7 @@ export default function CheckoutForm({
       if (!response.ok || !payload.url) {
         throw new Error(payload.error || "Something went wrong — please try again");
       }
+      // Card: Stripe's page. On account: the order is placed, so its own page.
       window.location.assign(payload.url);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Something went wrong — please try again");
@@ -103,7 +116,7 @@ export default function CheckoutForm({
             whenever you are ready.
           </p>
         )}
-        {!paymentsConfigured && (
+        {!paymentsConfigured && !onAccount && (
           <p role="alert" className="rounded-xl bg-surface-container-low px-5 py-4 font-body text-sm text-primary">
             Online payments are not configured yet — please contact us to complete your order.
           </p>
@@ -128,6 +141,23 @@ export default function CheckoutForm({
             We will send your order confirmation to this email address.
           </p>
         </section>
+
+        {tradeFirmName && (
+          <section className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6 md:p-8">
+            <h2 className="mb-2 font-display text-2xl text-primary">The family</h2>
+            <p className="mb-6 font-body text-sm text-on-surface-variant">
+              Ordering for {tradeFirmName}. This is how you&rsquo;ll find the order in your account.
+            </p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field id="familyName" label="Family name">
+                <input id="familyName" required placeholder="e.g. Harper family" value={form.familyName} onChange={set("familyName")} className={fieldInput} />
+              </Field>
+              <Field id="customerRef" label="Your reference (optional)">
+                <input id="customerRef" maxLength={60} placeholder="e.g. your case or job number" value={form.customerRef} onChange={set("customerRef")} className={fieldInput} />
+              </Field>
+            </div>
+          </section>
+        )}
 
         <section className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6 md:p-8">
           <h2 className="mb-6 font-display text-2xl text-primary">The service</h2>
@@ -172,6 +202,41 @@ export default function CheckoutForm({
           </p>
         </section>
 
+        {account && (
+          <section className="rounded-2xl border border-outline-variant/60 bg-surface-container-lowest p-6 md:p-8">
+            <h2 className="mb-6 font-display text-2xl text-primary">How to pay</h2>
+            <fieldset className="flex flex-col gap-3">
+              <legend className="sr-only">How to pay</legend>
+              {[
+                {
+                  value: "account" as const,
+                  title: "On account",
+                  body: `No card now. We’ll invoice ${account.invoicesTo ?? "you"}, and payment is due ${account.paymentTermsDays} days after the invoice.`,
+                },
+                { value: "card" as const, title: "Pay now by card", body: "Pay securely with Stripe before the order goes to print." },
+              ].map((option) => (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer gap-3 rounded-xl border-[1.5px] border-line-2 p-4 has-checked:border-plum has-checked:bg-mist-2"
+                >
+                  <input
+                    type="radio"
+                    name="payWith"
+                    value={option.value}
+                    checked={payWith === option.value}
+                    onChange={() => setPayWith(option.value)}
+                    className="mt-1 size-4 shrink-0 accent-plum"
+                  />
+                  <span className="font-body">
+                    <span className="block font-medium text-on-surface">{option.title}</span>
+                    <span className="block text-sm text-on-surface-variant">{option.body}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          </section>
+        )}
+
         {error && (
           <p role="alert" className="font-body text-sm text-primary">
             {error}
@@ -190,14 +255,22 @@ export default function CheckoutForm({
 
         <button
           type="submit"
-          disabled={submitting || !cart.ready || !paymentsConfigured}
+          disabled={submitting || !cart.ready || (!onAccount && !paymentsConfigured)}
           className="flex items-center justify-center gap-2 rounded-lg bg-primary-container px-8 py-4 font-body text-base font-medium tracking-wide text-white shadow-lg shadow-primary-container/30 transition-colors duration-300 hover:bg-primary disabled:opacity-50 disabled:shadow-none"
         >
-          <Lock size={16} aria-hidden />
-          {submitting ? "Taking you to payment…" : `Pay ${formatPence(cart.totals.totalPence)} securely`}
+          {onAccount ? (
+            submitting ? "Placing your order…" : `Place order on account · ${formatPence(cart.totals.totalPence)}`
+          ) : (
+            <>
+              <Lock size={16} aria-hidden />
+              {submitting ? "Taking you to payment…" : `Pay ${formatPence(cart.totals.totalPence)} securely`}
+            </>
+          )}
         </button>
         <p className="-mt-4 text-center font-body text-xs text-on-surface-variant">
-          Card payments are handled by Stripe. We never see your card details.
+          {onAccount
+            ? "It goes to print straight away. The invoice comes from us by email."
+            : "Card payments are handled by Stripe. We never see your card details."}
         </p>
       </form>
 

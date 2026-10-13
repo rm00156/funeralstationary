@@ -24,6 +24,7 @@ import {
 } from "@/lib/orders";
 import type { OrderDetail, OrderDetailItem } from "@/lib/orders.server";
 import { trimText } from "@/lib/designEditor";
+import { tradeDiscountText } from "@/lib/trade";
 import { VAT_TREATMENT_LABELS, type VatTreatment } from "@/lib/vat";
 
 /* ------------------------------------------------------------------ */
@@ -35,7 +36,8 @@ export interface ThintentOrderPayload {
   externalRef: string;
   test: boolean;
   placedAt: string;
-  paidAt: string;
+  /** When it was paid — absent on an order placed on account, which isn't. */
+  paidAt?: string;
   currency: "GBP";
   customer: { name: string; email: string; phone: string | null };
   delivery: {
@@ -51,7 +53,8 @@ export interface ThintentOrderPayload {
   } | null;
   lines: ThintentOrderLine[];
   totals: { subtotalPence: number; deliveryPence: number; vatPence: number; totalPence: number };
-  payment: {
+  /** A card order's payment. Exactly one of `payment` and `account` is sent. */
+  payment?: {
     amountPence: number;
     reference: string;
     paidAt: string;
@@ -62,6 +65,12 @@ export interface ThintentOrderPayload {
      */
     feePence: number | null;
   };
+  /**
+   * An order placed on account by a trade firm: Thintent bills `company` on
+   * net `creditDays` terms and emails the invoice to `accountsEmail` (or the
+   * customer's email), unpaid.
+   */
+  account?: { creditDays: number; company: string; accountsEmail?: string };
   links: { order: string };
 }
 
@@ -263,12 +272,16 @@ export function buildThintentOrderPayload(
     feePence: number | null;
   },
 ): ThintentOrderPayload {
-  if (!order.paidAt || !order.placedAt) {
-    throw new Error(`Order ${order.orderNumber} has not been paid`);
+  if (!order.placedAt) throw new Error(`Order ${order.orderNumber} has not been placed`);
+  // A card order goes when paid; an account order is placed unpaid, on terms.
+  const account = order.paymentMethod === "account" ? order.account : null;
+  if (order.paymentMethod === "account" && !account) {
+    throw new Error(`Order ${order.orderNumber} is on account but has no terms`);
   }
+  if (!account && !order.paidAt) throw new Error(`Order ${order.orderNumber} has not been paid`);
   if (!order.contact.email) throw new Error(`Order ${order.orderNumber} has no contact email`);
   const adminOrderUrl = `${options.siteOrigin}/admin/orders/${order.id}`;
-  const paidAt = order.paidAt.toISOString();
+  const paidAt = order.paidAt?.toISOString();
 
   const lines = order.items.map((item): ThintentOrderLine => {
     const product = options.productLabels.get(item.productId) ?? item.productId;
@@ -288,6 +301,9 @@ export function buildThintentOrderPayload(
         { label: "Copies", value: copiesText(item.quantityCopies) },
         { label: "Artwork", value: artwork },
         { label: "Delivery", value: item.delivery.label },
+        ...(order.tradeDiscountPercent
+          ? [{ label: "Price", value: `Trade price, ${tradeDiscountText(order.tradeDiscountPercent)}` }]
+          : []),
         ...(item.serviceDate ? [{ label: "Service date", value: item.serviceDate }] : []),
       ].map((row) => ({ ...row, value: clip(row.value, LIMITS.specValue) })),
       product: lineProduct(item, product),
@@ -325,7 +341,7 @@ export function buildThintentOrderPayload(
     externalRef: order.orderNumber,
     test: options.test,
     placedAt: order.placedAt.toISOString(),
-    paidAt,
+    ...(paidAt && !account ? { paidAt } : {}),
     currency: "GBP",
     customer: {
       name: clip(order.contact.name ?? order.contact.email, LIMITS.name),
@@ -340,12 +356,22 @@ export function buildThintentOrderPayload(
       vatPence: order.totals.vatPence,
       totalPence: order.totals.totalPence,
     },
-    payment: {
-      amountPence: order.totals.totalPence,
-      reference: order.stripe.paymentIntentId ?? order.orderNumber,
-      paidAt,
-      feePence: options.feePence,
-    },
+    ...(account
+      ? {
+          account: {
+            creditDays: account.termsDays,
+            company: clip(order.trade?.firmName ?? order.contact.name ?? order.contact.email, LIMITS.name),
+            ...(account.invoiceEmail ? { accountsEmail: account.invoiceEmail } : {}),
+          },
+        }
+      : {
+          payment: {
+            amountPence: order.totals.totalPence,
+            reference: order.stripe.paymentIntentId ?? order.orderNumber,
+            paidAt: paidAt!,
+            feePence: options.feePence,
+          },
+        }),
     links: { order: adminOrderUrl },
   };
 }
@@ -407,6 +433,74 @@ export function parseThintentJobEvent(body: unknown): ThintentJobEvent | null {
     courier: optionalString(raw.courier),
     trackingRef: optionalString(raw.trackingRef),
   };
+}
+
+/** Thintent's invoice for an account order, as its import answer and `invoice.updated` carry it. */
+export interface ThintentInvoice {
+  number: string | null;
+  url: string | null;
+  status: "draft" | "issued" | "partially_paid" | "paid" | "voided";
+  dueDate: string | null;
+  totalPence: number;
+  paidPence: number;
+}
+
+const INVOICE_STATES = ["draft", "issued", "partially_paid", "paid", "voided"] as const;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const pence = (value: unknown): number | null =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+
+/** An invoice object from Thintent, or null when it isn't one we understand. */
+export function parseThintentInvoice(value: unknown): ThintentInvoice | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const status = INVOICE_STATES.find((state) => state === raw.status);
+  const totalPence = pence(raw.totalPence);
+  const paidPence = pence(raw.paidPence);
+  if (!status || totalPence === null || paidPence === null) return null;
+  const number = optionalString(raw.number ?? raw.invoiceNumber);
+  const url = optionalString(raw.url);
+  const dueDate = optionalString(raw.dueDate);
+  return {
+    number: number ? number.slice(0, 40) : null,
+    url: url && /^https?:\/\//.test(url) ? url.slice(0, 1024) : null,
+    status,
+    dueDate: dueDate && DATE_ONLY.test(dueDate) ? dueDate : null,
+    totalPence,
+    paidPence,
+  };
+}
+
+/** Thintent's `invoice.updated` webhook — the invoice's whole current state. */
+export interface ThintentInvoiceEvent {
+  externalRef: string;
+  invoice: ThintentInvoice;
+  occurredAt: Date;
+}
+
+/** Null for anything that isn't a well-formed invoice.updated event. */
+export function parseThintentInvoiceEvent(body: unknown): ThintentInvoiceEvent | null {
+  if (!body || typeof body !== "object") return null;
+  const raw = body as Record<string, unknown>;
+  if (raw.event !== "invoice.updated") return null;
+  const externalRef = optionalString(raw.externalRef);
+  const invoice = parseThintentInvoice(raw);
+  const occurredAt = typeof raw.occurredAt === "string" ? new Date(raw.occurredAt) : null;
+  if (!externalRef || !invoice || !occurredAt || Number.isNaN(occurredAt.getTime())) return null;
+  return { externalRef, invoice, occurredAt };
+}
+
+/**
+ * Whether an invoice event should be applied: only one newer than the last
+ * applied (events can arrive out of order), and never a draft — an account
+ * order's invoice is issued on import, so a draft is a step backwards.
+ */
+export function shouldApplyInvoiceEvent(
+  event: ThintentInvoiceEvent,
+  lastAppliedAt: Date | null,
+): boolean {
+  if (event.invoice.status === "draft") return false;
+  return lastAppliedAt === null || event.occurredAt.getTime() > lastAppliedAt.getTime();
 }
 
 /**

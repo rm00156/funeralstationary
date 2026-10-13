@@ -21,6 +21,7 @@ import type { Quote } from "@/lib/orderOfServicePricing";
 import { VAT_TREATMENTS } from "@/lib/vat";
 import { artworkUploads } from "./artwork";
 import { designs } from "./designs";
+import { tradeFirms } from "./trade";
 import { users } from "./users";
 
 /**
@@ -52,6 +53,10 @@ export const orderStatusValues = [
   "cancelled",
   "refunded",
 ] as const;
+
+export const ORDER_PAYMENT_METHODS = ["card", "account"] as const;
+/** Thintent's invoice statuses (its `invoice.updated` webhook). */
+export const INVOICE_STATUSES = ["draft", "issued", "partially_paid", "paid", "voided"] as const;
 
 export const orders = mysqlTable(
   "orders",
@@ -113,6 +118,46 @@ export const orders = mysqlTable(
     reviewRequestOptOut: boolean("review_request_opt_out"),
     /** When the one review request went out; claimed before sending, so it never goes twice. */
     reviewRequestedAt: timestamp("review_requested_at"),
+    /**
+     * A trade order (src/lib/trade.ts): the firm the signed-in account
+     * belonged to at checkout, and the family and the firm's own reference
+     * it typed there. All null on a family's own order. The firm is a FK
+     * because firms are retired, never deleted; the two texts are what the
+     * firm searches its orders by.
+     */
+    tradeFirmId: int("trade_firm_id").references(() => tradeFirms.id, { onDelete: "set null" }),
+    familyName: varchar("family_name", { length: 160 }),
+    customerRef: varchar("customer_ref", { length: 60 }),
+    /**
+     * The trade discount the prices were worked out with, frozen at the pay
+     * click like the totals. Null on a full-price order.
+     */
+    tradeDiscountPercent: decimal("trade_discount_percent", { precision: 5, scale: 2 }),
+    /**
+     * How it is paid: by card through Stripe at checkout, or on account —
+     * placed unpaid by a trade firm allowed to (trade_firms.on_account) and
+     * invoiced by Thintent on net terms. `paidAt` stays null on an account
+     * order until Thintent reports its invoice paid.
+     */
+    paymentMethod: mysqlEnum("payment_method", ORDER_PAYMENT_METHODS).notNull().default("card"),
+    /**
+     * An account order's terms and where its invoice goes, frozen when it is
+     * placed: a firm's terms edited later must not change what an order was
+     * invoiced on. Null on a card order.
+     */
+    accountTermsDays: smallint("account_terms_days"),
+    accountInvoiceEmail: varchar("account_invoice_email", { length: 255 }),
+    /**
+     * An account order's invoice, as Thintent last reported it (the import's
+     * answer, then `invoice.updated` webhooks). All null on a card order.
+     */
+    invoiceNumber: varchar("invoice_number", { length: 40 }),
+    invoiceUrl: varchar("invoice_url", { length: 1024 }),
+    invoiceStatus: mysqlEnum("invoice_status", INVOICE_STATUSES),
+    invoiceDueDate: date("invoice_due_date", { mode: "string" }),
+    invoicePaidPence: int("invoice_paid_pence"),
+    /** When Thintent wrote the event last applied — an older one is ignored. */
+    invoiceUpdatedAt: timestamp("invoice_updated_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },

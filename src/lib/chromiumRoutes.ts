@@ -14,6 +14,7 @@
 export const CHROMIUM_ROUTES = [
   "/api/proof",
   "/api/checkout/return",
+  "/api/checkout/account",
   "/api/stripe/webhook",
   "/api/thintent/webhook",
   "/api/thintent/press/[orderId]/[itemId]",

@@ -37,6 +37,8 @@ import {
   orderProofs,
   orderRefunds,
   orders,
+  templates,
+  tradeFirms,
 } from "@/db/schema";
 import {
   evaluateArtwork,
@@ -46,6 +48,7 @@ import {
   type ArtworkSnapshot,
 } from "@/lib/artwork";
 import type { CheckoutDetails } from "@/lib/checkoutValidation";
+import type { TradeOrderDetails } from "@/lib/trade";
 import {
   getProductFormats,
   getProductLabels,
@@ -91,6 +94,7 @@ import {
 // getPricingData is React-cached per request, so pricingByProduct's per-line
 // loads collapse to one query set per distinct product.
 import { getPageCountOption, getPricingData } from "@/lib/pricing.server";
+import { getCurrentTradeMembership } from "@/lib/trade.server";
 import type { Owner } from "@/lib/session";
 import type { VatTreatment } from "@/lib/vat";
 import { analyseUpload, getUpload, resolveArtworkTarget } from "@/lib/uploads.server";
@@ -186,6 +190,13 @@ export interface Cart {
   serviceDate: string | null;
   /** True when checkout's "Email me once after the funeral" box was unticked; null until checkout asks. */
   reviewOptOut: boolean | null;
+  /** A trade checkout's family name and reference (trade.ts), as last saved; null otherwise. */
+  trade: TradeOrderDetails | null;
+  /**
+   * The trade discount these prices already include (the signed-in firm's,
+   * applied in pricing.server.ts) — shown, never applied again. Null at list price.
+   */
+  tradeDiscountPercent: number | null;
   /** `deliveryPence` is Σ of the lines' delivery charges. */
   totals: OrderTotals;
   /** Everything prices and nothing is missing — checkout may proceed. */
@@ -221,6 +232,8 @@ export interface OrderDetailItem {
   templateId: string | null;
   /** The customer's own artwork and its checks; null on an editor-design line. */
   artwork: ArtworkSnapshot | null;
+  /** The design as paid for (doc_snapshot); null on an artwork line. */
+  doc: DesignDoc | null;
   serviceDate: string | null;
   pageCount: number;
   quote: Quote;
@@ -272,6 +285,43 @@ export interface OrderDetail {
   tracking: { courier: string | null; ref: string | null };
   /** Stripe refunds on the payment, oldest first — every status; see refundedPence. */
   refunds: (OrderRefund & { thintentCreditRef: string | null })[];
+  /** The trade discount the order was priced with, frozen at the pay click; null at list price. */
+  tradeDiscountPercent: number | null;
+  /** How it is paid; on account, `invoice` is Thintent's invoice for it. */
+  paymentMethod: "card" | "account";
+  /** An account order's terms and invoice address, frozen when it was placed. */
+  account: { termsDays: number; invoiceEmail: string | null } | null;
+  invoice: OrderInvoice | null;
+  /** A trade order's firm, family and reference (trade.ts); null on a family's own order. */
+  trade: { firmId: number | null; firmName: string | null; familyName: string | null; customerRef: string | null } | null;
+}
+
+/** An account order's invoice as Thintent last reported it. */
+export interface OrderInvoice {
+  number: string | null;
+  url: string | null;
+  status: "draft" | "issued" | "partially_paid" | "paid" | "voided" | null;
+  dueDate: string | null;
+  paidPence: number;
+}
+
+/** An order row's invoice, or null for a card order. */
+export function invoiceOf(order: {
+  paymentMethod: "card" | "account";
+  invoiceNumber: string | null;
+  invoiceUrl: string | null;
+  invoiceStatus: OrderInvoice["status"];
+  invoiceDueDate: string | null;
+  invoicePaidPence: number | null;
+}): OrderInvoice | null {
+  if (order.paymentMethod !== "account") return null;
+  return {
+    number: order.invoiceNumber,
+    url: order.invoiceUrl,
+    status: order.invoiceStatus,
+    dueDate: order.invoiceDueDate,
+    paidPence: order.invoicePaidPence ?? 0,
+  };
 }
 
 export interface OrderSummary {
@@ -281,6 +331,23 @@ export interface OrderSummary {
   placedAt: Date | null;
   totalPence: number;
   itemCount: number;
+  /** Each line's product and copies, in basket order — the account pages' "Bookmarks ×100". */
+  lines: OrderSummaryLine[];
+  /** The earliest funeral date on the order's lines. */
+  serviceDate: string | null;
+  /** Set on a trade order (trade.ts); null on a family's own. */
+  familyName: string | null;
+  customerRef: string | null;
+  paymentMethod: "card" | "account";
+  /** An account order's invoice from Thintent; null on a card order. */
+  invoice: OrderInvoice | null;
+}
+
+export interface OrderSummaryLine {
+  productLabel: string;
+  copies: number;
+  /** The template's preview, as a thumbnail; null on an uploaded-artwork line. */
+  previewImageUrl: string | null;
 }
 
 /** What Stripe is asked to charge — the output of prepareOrderForPayment. */
@@ -566,10 +633,18 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
     details: detailsFrom(order),
     serviceDate: earliestServiceDate(items.map((item) => item.serviceDate)),
     reviewOptOut: order.reviewRequestOptOut,
+    trade: order.familyName
+      ? { familyName: order.familyName, customerRef: order.customerRef }
+      : null,
+    tradeDiscountPercent: discountOf(await getCurrentTradeMembership()),
     totals,
     ready,
   };
 }
+
+/** A membership's discount, or null when there's none to mention. */
+const discountOf = (membership: { discountPercent: number } | null) =>
+  membership && membership.discountPercent > 0 ? membership.discountPercent : null;
 
 /** Number of lines in the basket — for the header badge; no cookie minting. */
 export async function getCartCount(owner: Owner): Promise<number> {
@@ -899,6 +974,12 @@ export async function setCheckoutDetails(
   details: CheckoutDetails,
   serviceDate?: string | null,
   reviewOptOut?: boolean,
+  /**
+   * A trade checkout: the firm the signed-in account belongs to, and the
+   * family and reference typed. Null clears them, so an account removed from
+   * its firm since an earlier attempt doesn't keep the firm on the order.
+   */
+  trade?: ({ firmId: number } & TradeOrderDetails) | null,
 ): Promise<Cart> {
   const order = await findDraftOrder(owner);
   if (!order) throw new CartError(404, "Your basket is empty");
@@ -919,6 +1000,13 @@ export async function setCheckoutDetails(
         postcode: details.postcode,
         country: "GB",
         ...(reviewOptOut === undefined ? {} : { reviewRequestOptOut: reviewOptOut }),
+        ...(trade === undefined
+          ? {}
+          : {
+              tradeFirmId: trade?.firmId ?? null,
+              familyName: trade?.familyName ?? null,
+              customerRef: trade?.customerRef ?? null,
+            }),
       })
       .where(eq(orders.id, order.id));
   });
@@ -950,12 +1038,15 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
   const details = detailsFrom(order);
   if (!details) return { ok: false, status: 400, error: "Please enter your delivery details" };
 
-  const [pricings, formats, labels, vatTreatments] = await Promise.all([
+  const [pricings, formats, labels, vatTreatments, membership] = await Promise.all([
     pricingByProduct(items),
     getProductFormats(),
     getProductLabels(),
     getProductVatTreatments(),
+    getCurrentTradeMembership(),
   ]);
+  // The prices above already include it (pricing.server.ts); this records it.
+  const tradeDiscount = discountOf(membership);
 
   const frozenLines: {
     item: OrderItemRow;
@@ -1102,6 +1193,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
         vatPence: totals.vatPence,
         vatRate: vatRateToDecimalString(totals.vatRate),
         totalPence: totals.totalPence,
+        tradeDiscountPercent: tradeDiscount === null ? null : tradeDiscount.toFixed(2),
       })
       .where(eq(orders.id, order.id));
   });
@@ -1193,6 +1285,48 @@ export async function finaliseOrder(
   return "finalised";
 }
 
+/**
+ * A trade firm allowed to order on account presses "Place order on
+ * account": the order goes to print now, unpaid, and Thintent invoices it on
+ * the firm's net terms (pushOrderToThintent sends it with `account`). The
+ * same single conditional UPDATE as finaliseOrder, so a double click places
+ * it once; `paidAt` stays null until Thintent reports the invoice paid.
+ * The caller has checked the firm may (trade.server.ts) and frozen the
+ * basket (prepareOrderForPayment).
+ */
+export async function placeOrderOnAccount(
+  orderId: string,
+  terms: { firmName: string; paymentTermsDays: number; accountsEmail: string | null },
+): Promise<FinaliseResult> {
+  const [result] = await db
+    .update(orders)
+    .set({
+      status: "awaiting_print",
+      placedAt: new Date(),
+      paymentMethod: "account",
+      accountTermsDays: terms.paymentTermsDays,
+      accountInvoiceEmail: terms.accountsEmail,
+    })
+    .where(and(eq(orders.id, orderId), eq(orders.status, "draft")));
+  if (result.affectedRows === 0) {
+    const [row] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId)).limit(1);
+    return row ? "already-finalised" : "not-found";
+  }
+  await insertEvent(orderId, {
+    type: "placed",
+    fromStatus: "draft",
+    toStatus: "awaiting_print",
+    actor: "customer",
+    note: `Placed on account for ${terms.firmName}: invoiced by Thintent, net ${terms.paymentTermsDays} days`,
+  });
+  const items = await listDraftItems(orderId);
+  const designIds = items.flatMap((item) => (item.designId ? [item.designId] : []));
+  if (designIds.length > 0) {
+    await db.update(designs).set({ status: "ordered" }).where(inArray(designs.id, designIds));
+  }
+  return "finalised";
+}
+
 /* ------------------------------------------------------------------ */
 /* Reads                                                               */
 /* ------------------------------------------------------------------ */
@@ -1205,21 +1339,61 @@ export async function listOrders(owner: Owner): Promise<OrderSummary[]> {
       status: orders.status,
       placedAt: orders.placedAt,
       totalPence: orders.totalPence,
+      familyName: orders.familyName,
+      customerRef: orders.customerRef,
+      paymentMethod: orders.paymentMethod,
+      invoiceNumber: orders.invoiceNumber,
+      invoiceUrl: orders.invoiceUrl,
+      invoiceStatus: orders.invoiceStatus,
+      invoiceDueDate: orders.invoiceDueDate,
+      invoicePaidPence: orders.invoicePaidPence,
     })
     .from(orders)
     .where(and(ownedBy(owner), ne(orders.status, "draft")))
     .orderBy(desc(orders.placedAt), desc(orders.createdAt));
   if (rows.length === 0) return [];
 
-  const counts = await db
-    .select({ orderId: orderItems.orderId, id: orderItems.id })
-    .from(orderItems)
-    .where(inArray(orderItems.orderId, rows.map((row) => row.id)));
-  const countByOrder = new Map<string, number>();
-  for (const row of counts) {
-    countByOrder.set(row.orderId, (countByOrder.get(row.orderId) ?? 0) + 1);
+  const [items, labels] = await Promise.all([
+    db
+      .select({
+        orderId: orderItems.orderId,
+        productId: orderItems.productId,
+        copies: orderItems.quantityCopies,
+        serviceDate: orderItems.serviceDate,
+        previewImageUrl: templates.previewImageUrl,
+      })
+      .from(orderItems)
+      // A slug snapshot, so a template since deleted just has no thumbnail.
+      .leftJoin(templates, eq(orderItems.templateId, templates.slug))
+      .where(inArray(orderItems.orderId, rows.map((row) => row.id)))
+      .orderBy(asc(orderItems.position), asc(orderItems.createdAt)),
+    getProductLabels(),
+  ]);
+  const itemsByOrder = new Map<string, typeof items>();
+  for (const item of items) {
+    itemsByOrder.set(item.orderId, [...(itemsByOrder.get(item.orderId) ?? []), item]);
   }
-  return rows.map((row) => ({ ...row, itemCount: countByOrder.get(row.id) ?? 0 }));
+  return rows.map((row) => {
+    const lines = itemsByOrder.get(row.id) ?? [];
+    return {
+      id: row.id,
+      orderNumber: row.orderNumber,
+      status: row.status,
+      placedAt: row.placedAt,
+      totalPence: row.totalPence,
+      familyName: row.familyName,
+      customerRef: row.customerRef,
+      paymentMethod: row.paymentMethod,
+      invoice: invoiceOf(row),
+      itemCount: lines.length,
+      lines: lines.map((line) => ({
+        productLabel: labels.get(line.productId) ?? line.productId,
+        copies: line.copies,
+        previewImageUrl: line.previewImageUrl,
+      })),
+      serviceDate: earliestServiceDate(lines.map((line) => line.serviceDate)),
+    };
+  });
 }
 
 /**
@@ -1305,7 +1479,31 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
     proofsByItem.set(proof.orderItemId, list);
   }
 
+  const [firm] = order.tradeFirmId
+    ? await db
+        .select({ name: tradeFirms.name })
+        .from(tradeFirms)
+        .where(eq(tradeFirms.id, order.tradeFirmId))
+        .limit(1)
+    : [];
+
   return {
+    tradeDiscountPercent: order.tradeDiscountPercent === null ? null : Number(order.tradeDiscountPercent),
+    paymentMethod: order.paymentMethod,
+    account:
+      order.paymentMethod === "account" && order.accountTermsDays !== null
+        ? { termsDays: order.accountTermsDays, invoiceEmail: order.accountInvoiceEmail }
+        : null,
+    invoice: invoiceOf(order),
+    trade:
+      order.tradeFirmId || order.familyName
+        ? {
+            firmId: order.tradeFirmId,
+            firmName: firm?.name ?? null,
+            familyName: order.familyName,
+            customerRef: order.customerRef,
+          }
+        : null,
     id: order.id,
     orderNumber: order.orderNumber,
     status: order.status,
@@ -1343,6 +1541,7 @@ export async function loadOrderDetail(id: string, owner?: Owner): Promise<OrderD
         artworkTrim: item.docSnapshot ? docTrim(item.docSnapshot) : artwork?.trim ?? format.trim,
         templateId: item.templateId,
         artwork,
+        doc: item.docSnapshot,
         serviceDate: item.serviceDate,
         pageCount: item.docSnapshot?.pages.length ?? artwork?.pageCount ?? item.quoteSnapshot.pages.pages,
         quote: item.quoteSnapshot,
@@ -1414,6 +1613,9 @@ export async function getOrderEmailSummary(orderId: string): Promise<OrderEmailS
     ].filter((line): line is string => !!line),
     // Checkout writes one funeral date onto every line; the earliest is safe if they differ.
     serviceDate: earliestServiceDate(order.items.map((item) => item.serviceDate)),
+    onAccount: order.account ? { termsDays: order.account.termsDays } : null,
+    familyName: order.trade?.familyName ?? null,
+    customerRef: order.trade?.customerRef ?? null,
   };
 }
 

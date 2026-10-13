@@ -6,11 +6,13 @@ import { ChevronRight } from "lucide-react";
 import CheckoutForm from "@/components/CheckoutForm";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import TradePriceNote from "@/components/TradePriceNote";
 import { getCurrentUser } from "@/lib/auth.server";
 import { getCart } from "@/lib/orders.server";
 import { readOwner } from "@/lib/session";
 import { isShopOpen } from "@/lib/siteBilling.server";
 import { isStripeConfigured } from "@/lib/stripe.server";
+import { getCurrentTradeMembership } from "@/lib/trade.server";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +31,9 @@ export default async function CheckoutPage({
   // Closed: the basket page explains why, and the Pay route refuses anyway.
   if (!cart || cart.items.length === 0 || !(await isShopOpen())) redirect("/cart");
   const { cancelled } = await searchParams;
-  const user = owner?.userId ? await getCurrentUser() : null;
+  const [user, membership] = owner?.userId
+    ? await Promise.all([getCurrentUser(), getCurrentTradeMembership()])
+    : [null, null];
 
   return (
     <>
@@ -59,10 +63,17 @@ export default async function CheckoutPage({
               Tell us where to send your stationery, then pay securely. Your
               order goes straight to print exactly as you designed it.
             </p>
+            <TradePriceNote className="mb-10 max-w-3xl" />
 
             <CheckoutForm
               cart={cart}
               accountEmail={user?.email ?? null}
+              tradeFirmName={membership?.firmName ?? null}
+              account={
+                membership?.onAccount && membership.paymentTermsDays !== null
+                  ? { paymentTermsDays: membership.paymentTermsDays, invoicesTo: membership.accountsEmail }
+                  : null
+              }
               cancelled={cancelled === "1"}
               paymentsConfigured={isStripeConfigured()}
             />

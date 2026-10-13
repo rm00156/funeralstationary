@@ -7,7 +7,7 @@ import {
   adminListCategories,
 } from "@/lib/adminCatalogue.server";
 import { requireAdmin } from "@/lib/adminAuth.server";
-import { getPricingData } from "@/lib/pricing.server";
+import { getListPricingData } from "@/lib/pricing.server";
 import type { Template } from "@/lib/templates";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export default async function AdminTemplateLayoutPage({
 
   const [product, pricing] = await Promise.all([
     adminGetProduct(template.productSlug),
-    getPricingData(template.productSlug),
+    getListPricingData(template.productSlug),
   ]);
   if (!product) notFound();
 

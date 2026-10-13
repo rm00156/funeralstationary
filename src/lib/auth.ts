@@ -56,6 +56,15 @@ export function adminLoginLinkUrl(origin: string, secret: string): string {
   return `${origin}/admin/verify?token=${encodeURIComponent(secret)}`;
 }
 
+/**
+ * The customer sign-in page (/account) with the address filled in — what a
+ * "your trade account is ready" email links to. A page, not a sign-in link,
+ * for the same reason as an admin invitation: it can sit unread for days.
+ */
+export function accountSignInPageUrl(origin: string, email: string): string {
+  return `${origin}/account?email=${encodeURIComponent(email)}`;
+}
+
 /** The admin sign-in page with the address filled in — what an invitation links to. */
 export function adminSignInPageUrl(origin: string, email: string): string {
   return `${origin}/admin/login?email=${encodeURIComponent(email)}`;

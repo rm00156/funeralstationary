@@ -4,6 +4,8 @@ import { getSellableProducts } from "@/lib/catalogue.server";
 import { contactEmail, contactTopics, validateContactMessage } from "@/lib/contact";
 import { isEmailConfigured, sendEmail } from "@/lib/email.server";
 import { clientKey, createRateLimiter } from "@/lib/rateLimit";
+import { turnstileFailure, turnstileTokenFrom } from "@/lib/turnstile";
+import { verifyTurnstileToken } from "@/lib/turnstile.server";
 
 export const runtime = "nodejs";
 
@@ -25,7 +27,8 @@ const tooMany = () =>
 
 /**
  * POST /api/contact — the /contact form. Validates the message
- * (validateContactMessage), then emails it to the business with the
+ * (validateContactMessage), checks its Turnstile token with Cloudflare
+ * (turnstile.ts), then emails it to the business with the
  * customer's address as reply-to.
  *
  * Unlike order emails this is not best-effort: if it can't be sent the
@@ -60,6 +63,13 @@ export async function POST(request: NextRequest) {
       { error: "Please check the highlighted fields.", errors: result.errors },
       { status: 400 },
     );
+  }
+
+  // Spent once per submission, so only after the cheap checks have passed.
+  const human = await verifyTurnstileToken(turnstileTokenFrom(body), ip);
+  if (!human.ok) {
+    const failure = turnstileFailure(human);
+    return Response.json(failure.body, { status: failure.status });
   }
 
   const to = recipient();

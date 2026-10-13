@@ -30,12 +30,12 @@ export default function AdminDesignTable({
   showOwner?: boolean;
 }) {
   const columns = showOwner ? 6 : 5;
-  // A phone gets a stacked card per design (name and Edit on top, the rest
-  // beneath) rather than a table to scroll sideways; md and up, a table.
+  // A narrow box gets a stacked card per design (name and Edit on top, the rest
+  // beneath) rather than a table to scroll sideways; a table once its own box (not the screen) is 48rem.
   return (
-    <div className="rounded-xl border border-line bg-surface ambient-shadow md:overflow-x-auto">
-      <table className="block w-full text-left md:table md:min-w-[720px]">
-        <thead className="hidden md:table-header-group">
+    <div className="rounded-xl border border-line bg-surface ambient-shadow @container overflow-x-auto">
+      <table className="block w-full text-left @3xl:table @3xl:min-w-[720px]">
+        <thead className="hidden @3xl:table-header-group">
           <tr className="border-b border-line font-body text-xs font-medium uppercase tracking-[0.18em] text-star">
             <th className="px-5 py-3">Design</th>
             <th className="px-5 py-3">Product</th>
@@ -47,10 +47,10 @@ export default function AdminDesignTable({
             </th>
           </tr>
         </thead>
-        <tbody className="block md:table-row-group">
+        <tbody className="block @3xl:table-row-group">
           {designs.length === 0 && (
-            <tr className="block md:table-row">
-              <td colSpan={columns} className="block px-5 py-8 text-center font-body text-sm text-ink-2 md:table-cell">
+            <tr className="block @3xl:table-row">
+              <td colSpan={columns} className="block px-5 py-8 text-center font-body text-sm text-ink-2 @3xl:table-cell">
                 {empty}
               </td>
             </tr>
@@ -58,15 +58,15 @@ export default function AdminDesignTable({
           {designs.map((design) => (
             <tr
               key={design.id}
-              className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 border-b border-line px-5 py-4 font-body text-sm text-ink last:border-b-0 md:table-row md:p-0"
+              className="row-linked grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1.5 border-b border-line px-5 py-4 font-body text-sm text-ink last:border-b-0 @3xl:table-row @3xl:p-0"
             >
-              <td className="col-start-1 md:table-cell md:px-5 md:py-3">
+              <td className="col-start-1 @3xl:table-cell @3xl:px-5 @3xl:py-3">
                 <span className="block font-medium">{design.name}</span>
                 <span className="block text-xs text-ink-2">{design.templateName}</span>
               </td>
-              <td className="col-start-1 text-ink-2 md:table-cell md:px-5 md:py-3">{design.productLabel}</td>
+              <td className="col-start-1 text-ink-2 @3xl:table-cell @3xl:px-5 @3xl:py-3">{design.productLabel}</td>
               {showOwner && (
-                <td className="col-start-1 md:table-cell md:px-5 md:py-3">
+                <td className="col-start-1 @3xl:table-cell @3xl:px-5 @3xl:py-3">
                   {design.owner ? (
                     <Link
                       href={customerHref(design.owner.email)}
@@ -79,11 +79,11 @@ export default function AdminDesignTable({
                   )}
                 </td>
               )}
-              <td className="col-start-1 text-ink-2 md:table-cell md:px-5 md:py-3">
-                <span className="md:hidden">Changed </span>
+              <td className="col-start-1 text-ink-2 @3xl:table-cell @3xl:px-5 @3xl:py-3">
+                <span className="@3xl:hidden">Changed </span>
                 {formatDate(design.updatedAt)}
               </td>
-              <td className="col-start-1 md:table-cell md:px-5 md:py-3">
+              <td className="col-start-1 @3xl:table-cell @3xl:px-5 @3xl:py-3">
                 <span className="flex flex-wrap gap-1.5">
                   {design.orderState.inBasket && (
                     <span className={`${PILL} bg-mist-3 text-ink`}>In basket</span>
@@ -99,14 +99,14 @@ export default function AdminDesignTable({
                   ))}
                   {!design.orderState.inBasket && design.orderState.orders.length === 0 && (
                     <span className="text-ink-2">
-                      <span className="md:hidden">Not ordered</span>
-                      <span className="hidden md:inline">—</span>
+                      <span className="@3xl:hidden">Not ordered</span>
+                      <span className="hidden @3xl:inline">—</span>
                     </span>
                   )}
                 </span>
               </td>
-              <td className="col-start-2 row-start-1 md:table-cell md:px-5 md:py-3 md:text-right">
-                <Link href={adminDesignHref(design.id)} className="btn btn-outline min-h-11 px-4 text-base">
+              <td className="col-start-2 row-start-1 @3xl:table-cell @3xl:px-5 @3xl:py-3 @3xl:text-right">
+                <Link href={adminDesignHref(design.id)} className="row-link btn btn-outline min-h-11 px-4 text-base">
                   <PencilLine size={16} aria-hidden />
                   Edit
                 </Link>

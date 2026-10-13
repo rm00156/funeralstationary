@@ -13,7 +13,10 @@ import {
   buildThintentRefundPayload,
   canSendToThintent,
   forwardStatusPath,
+  parseThintentInvoice,
+  parseThintentInvoiceEvent,
   parseThintentJobEvent,
+  shouldApplyInvoiceEvent,
   thintentStatusMoves,
   thintentTargetStatus,
   verifyThintentSignature,
@@ -39,6 +42,7 @@ function item(overrides: Partial<OrderDetailItem> = {}): OrderDetailItem {
     artworkTrim: BOOKLET_FORMAT.trim,
     templateId: "classic",
     artwork: null,
+    doc: null,
     serviceDate: null,
     pageCount: 8,
     quote,
@@ -69,6 +73,11 @@ function order(overrides: Partial<OrderDetail> = {}): OrderDetail {
     thintent: null,
     tracking: { courier: null, ref: null },
     refunds: [],
+    trade: null,
+    tradeDiscountPercent: null,
+    paymentMethod: "card",
+    account: null,
+    invoice: null,
     ...overrides,
   };
 }
@@ -80,6 +89,102 @@ const options = {
   pressKey: "press-key",
   feePence: 118,
 };
+
+describe("buildThintentOrderPayload on account", () => {
+  const onAccount = order({
+    paidAt: null,
+    paymentMethod: "account",
+    account: { termsDays: 30, invoiceEmail: "accounts@hollis.example" },
+    trade: { firmId: 1, firmName: "Hollis & Daughters", familyName: "Harper family", customerRef: "HAR-1" },
+    tradeDiscountPercent: 10,
+    stripe: { checkoutSessionId: null, paymentIntentId: null },
+  });
+
+  it("sends the terms and the firm in place of a payment, and no paidAt", () => {
+    const payload = buildThintentOrderPayload(onAccount, options);
+    expect(payload.payment).toBeUndefined();
+    expect(payload.paidAt).toBeUndefined();
+    expect(payload.account).toEqual({
+      creditDays: 30,
+      company: "Hollis & Daughters",
+      accountsEmail: "accounts@hollis.example",
+    });
+    // The totals still add up the way Thintent checks them.
+    expect(payload.lines.reduce((sum, line) => sum + line.lineTotalPence, 0)).toBe(payload.totals.subtotalPence);
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty("payment");
+  });
+
+  it("leaves the accounts email out when the firm has none, so the invoice goes to the customer", () => {
+    const payload = buildThintentOrderPayload(
+      { ...onAccount, account: { termsDays: 14, invoiceEmail: null } },
+      options,
+    );
+    expect(payload.account).toEqual({ creditDays: 14, company: "Hollis & Daughters" });
+  });
+
+  it("tells the print shop a line is at trade price", () => {
+    const spec = buildThintentOrderPayload(onAccount, options).lines[0].spec;
+    expect(spec).toContainEqual({ label: "Price", value: "Trade price, 10% off" });
+  });
+
+  it("refuses an account order without terms, and a card order that isn't paid", () => {
+    expect(() => buildThintentOrderPayload({ ...onAccount, account: null }, options)).toThrow(/no terms/);
+    expect(() => buildThintentOrderPayload(order({ paidAt: null }), options)).toThrow(/has not been paid/);
+  });
+});
+
+describe("Thintent invoices", () => {
+  const raw = {
+    event: "invoice.updated",
+    externalRef: "TFS-2026-123456",
+    invoiceNumber: "INV-0042",
+    status: "issued",
+    totalPence: 6499,
+    paidPence: 0,
+    dueDate: "2026-11-06",
+    url: "https://thintent.example/i/abc",
+    occurredAt: "2026-10-07T09:00:00.000Z",
+  };
+
+  it("reads an invoice.updated event", () => {
+    expect(parseThintentInvoiceEvent(raw)).toEqual({
+      externalRef: "TFS-2026-123456",
+      invoice: {
+        number: "INV-0042",
+        url: "https://thintent.example/i/abc",
+        status: "issued",
+        dueDate: "2026-11-06",
+        totalPence: 6499,
+        paidPence: 0,
+      },
+      occurredAt: new Date("2026-10-07T09:00:00.000Z"),
+    });
+  });
+
+  it("refuses anything malformed rather than store it", () => {
+    expect(parseThintentInvoiceEvent({ ...raw, event: "job.updated" })).toBeNull();
+    expect(parseThintentInvoiceEvent({ ...raw, status: "lost" })).toBeNull();
+    expect(parseThintentInvoiceEvent({ ...raw, paidPence: -1 })).toBeNull();
+    expect(parseThintentInvoiceEvent({ ...raw, occurredAt: "soon" })).toBeNull();
+    // A bad URL or date is dropped, not stored.
+    expect(parseThintentInvoice({ ...raw, url: "javascript:alert(1)", dueDate: "6/11/2026" })).toMatchObject({
+      url: null,
+      dueDate: null,
+    });
+  });
+
+  it("reads the import answer's invoice, which names its number `number`", () => {
+    expect(parseThintentInvoice({ number: "INV-1", status: "issued", totalPence: 1, paidPence: 0 })?.number).toBe("INV-1");
+  });
+
+  it("applies only an event newer than the last, and never a draft", () => {
+    const event = parseThintentInvoiceEvent(raw)!;
+    expect(shouldApplyInvoiceEvent(event, null)).toBe(true);
+    expect(shouldApplyInvoiceEvent(event, new Date("2026-10-07T08:00:00Z"))).toBe(true);
+    expect(shouldApplyInvoiceEvent(event, new Date("2026-10-07T10:00:00Z"))).toBe(false);
+    expect(shouldApplyInvoiceEvent({ ...event, invoice: { ...event.invoice, status: "draft" } }, null)).toBe(false);
+  });
+});
 
 describe("buildThintentOrderPayload", () => {
   it("describes the paid order, with money that adds up the way Thintent checks it", () => {
@@ -96,11 +201,11 @@ describe("buildThintentOrderPayload", () => {
     expect(lineSum).toBe(payload.totals.subtotalPence);
     expect(payload.delivery?.pricePence).toBe(payload.totals.deliveryPence);
     expect(payload.totals.subtotalPence + payload.totals.deliveryPence).toBe(payload.totals.totalPence);
-    expect(payload.payment.amountPence).toBe(payload.totals.totalPence);
+    expect(payload.payment?.amountPence).toBe(payload.totals.totalPence);
   });
 
   it("passes an unknown Stripe fee on as null", () => {
-    expect(buildThintentOrderPayload(order(), { ...options, feePence: null }).payment.feePence).toBeNull();
+    expect(buildThintentOrderPayload(order(), { ...options, feePence: null }).payment?.feePence).toBeNull();
   });
 
   it("names each line's product by the options that change what a copy costs, not the copies", () => {
@@ -165,7 +270,7 @@ describe("buildThintentOrderPayload", () => {
       lineSum === payload.totals.subtotalPence &&
       (payload.delivery?.pricePence ?? 0) === payload.totals.deliveryPence &&
       payload.totals.subtotalPence + payload.totals.deliveryPence === payload.totals.totalPence &&
-      payload.payment.amountPence === payload.totals.totalPence
+      payload.payment?.amountPence === payload.totals.totalPence
     );
   }
 

@@ -68,6 +68,7 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
       contactName: orders.contactName,
       contactEmail: orders.contactEmail,
       contactPhone: orders.contactPhone,
+      placedAt: orders.placedAt,
       paidAt: orders.paidAt,
       totalPence: orders.totalPence,
       thintentJobRef: orders.thintentJobRef,
@@ -82,7 +83,7 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
         and(eq(orders.status, "cancelled"), isNotNull(orders.paidAt), gte(orders.updatedAt, nagFrom)),
       ),
     )
-    .orderBy(desc(orders.paidAt));
+    .orderBy(desc(orders.placedAt));
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
 

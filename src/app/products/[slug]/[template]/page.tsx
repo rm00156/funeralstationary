@@ -9,6 +9,7 @@ import Header from "@/components/Header";
 import ProductCard from "@/components/ProductCard";
 import TemplateBuyBox from "@/components/TemplateBuyBox";
 import TemplateGallery from "@/components/TemplateGallery";
+import TradePriceNote from "@/components/TradePriceNote";
 import { placeholderPortraitUrl } from "@/lib/backgroundAssets.server";
 import {
   getCategories,
@@ -227,6 +228,7 @@ export default async function TemplatePage({
                   )}
                 </div>
 
+                <TradePriceNote />
                 <TemplateBuyBox
                   productId={product.id}
                   templateId={template.id}

@@ -26,8 +26,12 @@ import {
   buildThintentOrderPayload,
   buildThintentRefundPayload,
   canSendToThintent,
+  parseThintentInvoice,
+  shouldApplyInvoiceEvent,
   thintentStatusMoves,
   thintentTargetStatus,
+  type ThintentInvoice,
+  type ThintentInvoiceEvent,
   type ThintentJobEvent,
 } from "@/lib/thintent";
 
@@ -66,15 +70,28 @@ export async function pushOrderToThintent(
       pressKey: process.env.THINTENT_API_KEY!,
       feePence: await orderFeePence(order.stripe.paymentIntentId, order.orderNumber),
     });
-    const body = await postToThintent<{ jobNumber?: number | string; url?: string; duplicate?: boolean }>(
-      "/api/v1/orders",
-      payload,
-      (answer) => answer.jobNumber !== undefined,
-    );
+    const body = await postToThintent<{
+      jobNumber?: number | string;
+      url?: string;
+      duplicate?: boolean;
+      invoice?: unknown;
+    }>("/api/v1/orders", payload, (answer) => answer.jobNumber !== undefined);
 
     const jobRef = String(body.jobNumber);
     const jobUrl = body.url ?? null;
     await db.update(orders).set({ thintentJobRef: jobRef, thintentJobUrl: jobUrl }).where(eq(orders.id, orderId));
+    // An account order's invoice comes back with the job (a card order's is
+    // born paid there and isn't tracked here). Thintent sends the invoice —
+    // and its first invoice.updated — just after answering, so that event
+    // can land first and be newer than this answer: only fill in an invoice
+    // no event has set yet.
+    const invoice = order.paymentMethod === "account" ? parseThintentInvoice(body.invoice) : null;
+    if (invoice) {
+      await db
+        .update(orders)
+        .set(invoiceColumns(invoice))
+        .where(and(eq(orders.id, orderId), isNull(orders.invoiceUpdatedAt)));
+    }
     await addOrderEvent(orderId, {
       type: "thintent_pushed",
       actor,
@@ -276,11 +293,75 @@ export async function listOrdersAwaitingThintent(
       and(
         isNull(orders.thintentJobRef),
         eq(orders.status, "awaiting_print"),
-        gte(orders.paidAt, new Date(now.getTime() - days * 24 * 60 * 60 * 1000)),
-        lte(orders.paidAt, new Date(now.getTime() - minAgeMinutes * 60 * 1000)),
+        // Placed, not paid: an account order is placed unpaid and is sent the same way.
+        gte(orders.placedAt, new Date(now.getTime() - days * 24 * 60 * 60 * 1000)),
+        lte(orders.placedAt, new Date(now.getTime() - minAgeMinutes * 60 * 1000)),
       ),
     );
   return rows.map((row) => row.id);
+}
+
+/** An invoice as the orders table stores it. Its own clock isn't touched: only an event sets that. */
+function invoiceColumns(invoice: ThintentInvoice) {
+  return {
+    invoiceNumber: invoice.number,
+    invoiceUrl: invoice.url,
+    invoiceStatus: invoice.status,
+    invoiceDueDate: invoice.dueDate,
+    invoicePaidPence: invoice.paidPence,
+  };
+}
+
+/**
+ * Thintent's `invoice.updated`: an account order's invoice was issued, part
+ * paid, paid or voided. Stored whole (it's the invoice's full state), unless
+ * an event Thintent wrote later has already been applied. When it is first
+ * paid, `paidAt` is set to then — so takings count it on the day the money
+ * came in — and the history notes it once.
+ */
+export async function applyThintentInvoiceEvent(
+  event: ThintentInvoiceEvent,
+): Promise<"unknown-order" | "not-on-account" | "stale" | "applied"> {
+  const [order] = await db
+    .select({
+      id: orders.id,
+      paymentMethod: orders.paymentMethod,
+      paidAt: orders.paidAt,
+      invoiceUpdatedAt: orders.invoiceUpdatedAt,
+    })
+    .from(orders)
+    .where(eq(orders.orderNumber, event.externalRef))
+    .limit(1);
+  if (!order) return "unknown-order";
+  if (order.paymentMethod !== "account") return "not-on-account";
+  if (!shouldApplyInvoiceEvent(event, order.invoiceUpdatedAt)) return "stale";
+
+  const nowPaid = event.invoice.status === "paid";
+  // Conditional on the clock it read, so two deliveries can't both apply.
+  const [result] = await db
+    .update(orders)
+    .set({
+      ...invoiceColumns(event.invoice),
+      invoiceUpdatedAt: event.occurredAt,
+      ...(nowPaid && !order.paidAt ? { paidAt: event.occurredAt } : {}),
+    })
+    .where(
+      and(
+        eq(orders.id, order.id),
+        order.invoiceUpdatedAt === null
+          ? isNull(orders.invoiceUpdatedAt)
+          : eq(orders.invoiceUpdatedAt, order.invoiceUpdatedAt),
+      ),
+    );
+  if (result.affectedRows === 0) return "stale";
+
+  const label = event.invoice.number ? `Invoice ${event.invoice.number}` : "The invoice";
+  if (nowPaid && !order.paidAt) {
+    await addOrderEvent(order.id, { type: "invoice_paid", actor: "thintent", note: `${label} was paid in Thintent` });
+  } else if (event.invoice.status === "voided") {
+    await addOrderEventOnce(order.id, { type: "invoice_voided", actor: "thintent", note: `${label} was voided in Thintent` });
+  }
+  return "applied";
 }
 
 export type ThintentEventOutcome =
@@ -322,7 +403,7 @@ export async function applyThintentJobEvent(event: ThintentJobEvent): Promise<Th
     .select({
       id: orders.id,
       status: orders.status,
-      paidAt: orders.paidAt,
+      placedAt: orders.placedAt,
       courier: orders.shippedCourier,
       trackingRef: orders.trackingRef,
     })
@@ -345,7 +426,7 @@ export async function applyThintentJobEvent(event: ThintentJobEvent): Promise<Th
   }
 
   const reopenable =
-    order.status === "cancelled" && !!order.paidAt && (await cancelledByThintent(order.id));
+    order.status === "cancelled" && !!order.placedAt && (await cancelledByThintent(order.id));
   const steps = thintentStatusMoves(order.status, event.status, reopenable);
 
   // Staff notices are written once, not on every later save of the job.

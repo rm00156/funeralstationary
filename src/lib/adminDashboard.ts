@@ -165,6 +165,9 @@ export interface DashboardOrder {
   contactPhone: string | null;
   /** The email the customer page is keyed on — the account's when it has one. */
   customerEmail: string | null;
+  /** When it came in. An order placed on account is placed without being paid. */
+  placedAt: Date | null;
+  /** When it was paid; null on an account order until its invoice is. */
   paidAt: Date | null;
   /** When it moved to shipped, for "sent today". */
   shippedAt: Date | null;
@@ -230,7 +233,7 @@ export function actionItems(
 ): ActionItem[] {
   const today = shopDate(ctx.now);
   const settled = (order: DashboardOrder) =>
-    order.paidAt !== null && ctx.now.getTime() - order.paidAt.getTime() > SETTLE_MINUTES * 60_000;
+    order.placedAt !== null && ctx.now.getTime() - order.placedAt.getTime() > SETTLE_MINUTES * 60_000;
 
   const items: (ActionItem & { rank: number; sortDate: string })[] = [];
   for (const order of orders) {

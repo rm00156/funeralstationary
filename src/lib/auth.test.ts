@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   adminLoginLinkUrl,
+  accountSignInPageUrl,
   adminSignInPageUrl,
   generateLoginSecret,
   hashLoginSecret,
@@ -64,6 +65,12 @@ describe("admin link URLs", () => {
   it("sends an admin's link to the admin confirm page, never a route that spends it on a GET", () => {
     expect(adminLoginLinkUrl("https://tfs.example", "a+b/c")).toBe(
       "https://tfs.example/admin/verify?token=a%2Bb%2Fc",
+    );
+  });
+
+  it("links a ready trade account to My account with the address filled in", () => {
+    expect(accountSignInPageUrl("https://tfs.example", "jo+shop@example.com")).toBe(
+      "https://tfs.example/account?email=jo%2Bshop%40example.com",
     );
   });
 

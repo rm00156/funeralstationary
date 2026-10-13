@@ -1,69 +1,23 @@
 import type { NextRequest } from "next/server";
 
-import { parseServiceDate } from "@/lib/artwork";
-import { parseCheckoutDetails, parseReviewOptOut } from "@/lib/checkoutValidation";
-import {
-  attachCheckoutSession,
-  cartErrorResponse,
-  prepareOrderForPayment,
-  setCheckoutDetails,
-} from "@/lib/orders.server";
-import { getOrCreateOwner } from "@/lib/session";
-import {
-  createCheckoutSessionForOrder,
-  isStripeConfigured,
-  resolveRequestOrigin,
-} from "@/lib/stripe.server";
-import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
+import { freezeCheckout } from "@/lib/checkout.server";
+import { attachCheckoutSession } from "@/lib/orders.server";
+import { createCheckoutSessionForOrder, resolveRequestOrigin } from "@/lib/stripe.server";
 
 export const runtime = "nodejs";
 
 /**
- * POST /api/checkout — the Pay button. Saves the delivery details, freezes
- * the basket (server-side repricing + snapshots), creates a Stripe Checkout
- * Session and hands back its URL for the browser to navigate to.
+ * POST /api/checkout — the Pay button. Saves the delivery details (and, for
+ * a trade account, the family's name and the firm's reference), freezes
+ * the basket (server-side repricing + snapshots — checkout.server.ts),
+ * creates a Stripe Checkout Session and hands back its URL for the browser
+ * to navigate to. Placing an order on account is POST /api/checkout/account.
  */
 export async function POST(request: NextRequest) {
-  if (!(await isShopOpen())) return shopClosedResponse();
-  if (!isStripeConfigured()) {
-    return Response.json({ error: "Payments are not configured yet" }, { status: 503 });
-  }
+  const frozen = await freezeCheckout(request, "card");
+  if (!frozen.ok) return frozen.response;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  const details = parseCheckoutDetails(body);
-  if (!details.ok) return Response.json({ error: details.error }, { status: 400 });
-  // The funeral date is optional; a body without the field (an older form
-  // still open in a tab) leaves the dates the lines already carry.
-  const rawServiceDate = (body as Record<string, unknown> | null)?.serviceDate;
-  const serviceDate = rawServiceDate === undefined ? undefined : parseServiceDate(rawServiceDate);
-  if (serviceDate && !serviceDate.ok) return Response.json({ error: serviceDate.error }, { status: 400 });
-  const reviewOptOut = parseReviewOptOut((body as Record<string, unknown> | null)?.reviewOptOut);
-  if (!reviewOptOut.ok) return Response.json({ error: reviewOptOut.error }, { status: 400 });
-
-  const owner = await getOrCreateOwner();
-  try {
-    await setCheckoutDetails(owner, details.value, serviceDate?.date, reviewOptOut.value);
-  } catch (error) {
-    const response = cartErrorResponse(error);
-    if (response) return response;
-    throw error;
-  }
-
-  const prepared = await prepareOrderForPayment(owner);
-  if (!prepared.ok) {
-    return Response.json(
-      { error: prepared.error, itemId: prepared.itemId },
-      { status: prepared.status },
-    );
-  }
-
-  const origin = resolveRequestOrigin(request);
-  const session = await createCheckoutSessionForOrder(prepared.order, origin);
-  await attachCheckoutSession(prepared.order.id, session.id);
+  const session = await createCheckoutSessionForOrder(frozen.order, resolveRequestOrigin(request));
+  await attachCheckoutSession(frozen.order.id, session.id);
   return Response.json({ url: session.url });
 }

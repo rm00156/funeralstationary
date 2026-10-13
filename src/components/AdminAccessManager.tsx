@@ -125,7 +125,7 @@ export default function AdminAccessManager({
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
+      <div className="table-stack rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
         <table className="w-full min-w-[640px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
@@ -145,7 +145,7 @@ export default function AdminAccessManager({
                   key={admin.id}
                   className="border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0"
                 >
-                  <td className="px-5 py-3">
+                  <td data-stack="title" className="px-5 py-3">
                     <span className="font-medium">{admin.email}</span>
                     {admin.isOwner && (
                       <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-mist px-2.5 py-0.5 text-xs font-medium text-ink-2">
@@ -155,12 +155,12 @@ export default function AdminAccessManager({
                     )}
                     {isMe && <span className="ml-2 text-xs text-on-surface-variant">(you)</span>}
                   </td>
-                  <td className="px-5 py-3 text-on-surface-variant">
+                  <td data-label="Added" className="px-5 py-3 text-on-surface-variant">
                     {formatDate(admin.createdAt)}
                     {admin.addedBy && <span className="block text-xs">by {admin.addedBy}</span>}
                   </td>
-                  <td className="px-5 py-3 text-on-surface-variant">{formatDate(admin.lastSignInAt)}</td>
-                  <td className="px-5 py-3 text-right">
+                  <td data-label="Last signed in" className="px-5 py-3 text-on-surface-variant">{formatDate(admin.lastSignInAt)}</td>
+                  <td data-stack="end" className="px-5 py-3 text-right">
                     {!admin.isOwner && !isMe && (
                       <button
                         type="button"

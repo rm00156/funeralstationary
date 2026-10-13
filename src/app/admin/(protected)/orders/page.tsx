@@ -101,7 +101,7 @@ export default async function AdminOrdersPage({
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
+      <div className="table-stack rounded-xl border border-outline-variant/30 bg-surface-container-lowest ambient-shadow">
         <table className="w-full min-w-[720px] text-left">
           <thead>
             <tr className="border-b border-outline-variant/40 font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary">
@@ -124,17 +124,17 @@ export default async function AdminOrdersPage({
             {orders.map((order) => (
               <tr
                 key={order.id}
-                className="border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0"
+                className="row-linked border-b border-outline-variant/20 font-body text-sm text-on-surface last:border-b-0"
               >
-                <td className="px-5 py-3">
-                  <Link href={`/admin/orders/${order.id}`} className="font-medium text-primary hover:underline">
+                <td data-stack="title" className="px-5 py-3">
+                  <Link href={`/admin/orders/${order.id}`} className="row-link font-medium text-primary hover:underline">
                     {order.orderNumber}
                   </Link>
                 </td>
-                <td className="px-5 py-3 text-on-surface-variant">
+                <td data-label="Placed" className="px-5 py-3 text-on-surface-variant">
                   {formatDate(order.placedAt ?? (order.status === "draft" ? order.createdAt : null))}
                 </td>
-                <td className="px-5 py-3">
+                <td data-label="Customer" data-stack="full" className="px-5 py-3">
                   {order.customerEmail ? (
                     <Link href={customerHref(order.customerEmail)} className="block font-medium hover:text-primary hover:underline">
                       {order.contactName ?? order.customerEmail}
@@ -144,16 +144,16 @@ export default async function AdminOrdersPage({
                   )}
                   <span className="block text-xs text-on-surface-variant">{order.contactEmail ?? ""}</span>
                 </td>
-                <td className="px-5 py-3 text-on-surface-variant">
+                <td data-label="Products" data-stack="full" className="px-5 py-3 text-on-surface-variant">
                   {order.products.join(", ") || "—"}
                   {order.itemCount > order.products.length && (
                     <span className="block text-xs">{order.itemCount} items</span>
                   )}
                 </td>
-                <td className="px-5 py-3">
+                <td data-label="Status" className="px-5 py-3">
                   <OrderStatusBadge status={order.status} />
                 </td>
-                <td className="px-5 py-3 text-right">{formatPence(order.totalPence)}</td>
+                <td data-stack="end" className="px-5 py-3 text-right">{formatPence(order.totalPence)}</td>
               </tr>
             ))}
           </tbody>

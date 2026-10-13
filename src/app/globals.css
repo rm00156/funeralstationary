@@ -394,6 +394,29 @@ body {
     transform: translateY(-4px);
     box-shadow: var(--shadow-cover-hover);
   }
+
+  /* A table row (or stacked card) that opens its item from anywhere on it:
+     `row-linked` on the <tr>, `row-link` on the one link that opens the item,
+     which stretches over the row. Any other link or button in the row stays
+     clickable above it. One real link per row, so keyboards and screen
+     readers meet it once. */
+  .row-linked {
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+  .row-linked:hover {
+    background-color: var(--color-mist-2);
+  }
+  .row-linked :is(a, button):not(.row-link) {
+    position: relative;
+    z-index: 1;
+  }
+  .row-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
 }
 
 /* Keyboard focus, visible on every interactive element of the redesigned pages. */
@@ -408,5 +431,157 @@ body {
   .card-link:hover .cover {
     transition: none;
     transform: none;
+  }
+}
+
+/*
+ * A data table that becomes one card per row when its own box is too narrow
+ * to show it whole — a phone, or a column beside a sidebar — rather than a
+ * table to scroll sideways. Put `table-stack` (or `table-stack table-stack-wide`
+ * for a table that needs ~960px) on the table's wrapper. It's a container
+ * query, so it follows the wrapper, not the screen.
+ *
+ * A stacked row is a two-column grid of label-over-value pairs. On each cell:
+ * `data-label` is the label shown above it (none: no label);
+ * `data-stack="title"` heads the card, top left — the row's name or number;
+ * `data-stack="end"` sits opposite it, top right — a total or a button;
+ * `data-stack="full"` takes the whole width — anything long (a name with an
+ * email, a list, a wide input). The rest pair up in the gaps.
+ *
+ * Unlayered on purpose: the cells carry Tailwind padding utilities, and only
+ * an unlayered rule outranks the utilities layer.
+ */
+.table-stack {
+  container-type: inline-size;
+  overflow-x: auto;
+}
+@container (width < 48rem) {
+  .table-stack:not(.table-stack-wide) {
+    & :is(table, tbody) {
+      display: block;
+      width: 100%;
+      min-width: 0;
+    }
+    & thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    & tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-auto-flow: dense;
+      gap: 14px 24px;
+      padding: 18px 20px;
+    }
+    & td {
+      min-width: 0;
+      padding: 0;
+      text-align: start;
+      overflow-wrap: anywhere;
+    }
+    & td :is(input, select, textarea) {
+      min-width: 0;
+      max-width: 100%;
+    }
+    & td:empty {
+      display: none;
+    }
+    & td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      padding-bottom: 2px;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-ink-3);
+    }
+    & td:is([data-stack="full"], [colspan]) {
+      grid-column: 1 / -1;
+    }
+    & td[data-stack="title"] {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: center;
+      font-size: 16px;
+    }
+    & td[data-stack="end"] {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: center;
+      justify-self: end;
+      text-align: end;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+}
+@container (width < 60rem) {
+  .table-stack-wide {
+    & :is(table, tbody) {
+      display: block;
+      width: 100%;
+      min-width: 0;
+    }
+    & thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    & tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-auto-flow: dense;
+      gap: 14px 24px;
+      padding: 18px 20px;
+    }
+    & td {
+      min-width: 0;
+      padding: 0;
+      text-align: start;
+      overflow-wrap: anywhere;
+    }
+    & td :is(input, select, textarea) {
+      min-width: 0;
+      max-width: 100%;
+    }
+    & td:empty {
+      display: none;
+    }
+    & td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      padding-bottom: 2px;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-ink-3);
+    }
+    & td:is([data-stack="full"], [colspan]) {
+      grid-column: 1 / -1;
+    }
+    & td[data-stack="title"] {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: center;
+      font-size: 16px;
+    }
+    & td[data-stack="end"] {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: center;
+      justify-self: end;
+      text-align: end;
+      font-size: 16px;
+      font-weight: 600;
+    }
   }
 }

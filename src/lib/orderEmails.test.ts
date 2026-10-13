@@ -9,6 +9,7 @@ import {
   adminInviteEmail,
   adminSignInEmail,
   signInEmail,
+  tradeAccountReadyEmail,
   type OrderEmailSummary,
 } from "@/lib/orderEmails";
 
@@ -176,6 +177,7 @@ describe("branded emails", () => {
     signIn: signInEmail("https://tfs.example/api/auth/verify?token=abc"),
     adminSignIn: adminSignInEmail("https://tfs.example/admin/verify?token=abc"),
     adminInvite: adminInviteEmail({ signInPageUrl: "https://tfs.example/admin/login", invitedBy: "a@example.com" }),
+    tradeAccountReady: tradeAccountReadyEmail({ firmName: "Hollis", signInPageUrl: "https://tfs.example/account" }),
   };
 
   it.each(Object.entries(emails))("%s carries the logo it shows, inline", (_, { html, attachments }) => {
@@ -186,6 +188,45 @@ describe("branded emails", () => {
     // A real PNG, base64: the signature 89 50 4E 47.
     expect(Buffer.from(logo!.content, "base64").subarray(0, 4).toString("hex")).toBe("89504e47");
     expect(html).toContain('alt="The Funeral Stationery"');
+  });
+});
+
+describe("order emails for an order on account", () => {
+  const onAccount = { ...summary, onAccount: { termsDays: 30 }, familyName: "Harper family", customerRef: "HAR-1" };
+
+  it("tells the customer the invoice follows, never that they've paid", () => {
+    const { text, html } = orderConfirmationEmail(onAccount, "https://example.com/orders/abc");
+    expect(text).toContain("on account. We'll email the invoice separately; payment is due 30 days after it.");
+    expect(text).toContain("Family: Harper family");
+    expect(text).not.toContain("and payment");
+    expect(html).toContain("On account, due 30 days after the invoice");
+    expect(html).not.toContain("order and payment");
+  });
+
+  it("tells the shop it's an order on account, not a paid one", () => {
+    const { subject, text, html } = orderNotificationEmail(onAccount, "https://example.com/admin/orders/abc");
+    expect(subject).toMatch(/ on account$/);
+    expect(text).toMatch(/^New order on account \(net 30 days\) TFS-2026-004210/);
+    expect(html).toContain("New order on account");
+    expect(html).not.toContain("New paid order");
+  });
+
+  it("leaves a card order's wording as it was", () => {
+    expect(orderConfirmationEmail(summary, "https://example.com/orders/abc").text).toContain("and payment.");
+  });
+});
+
+describe("tradeAccountReadyEmail", () => {
+  it("names the firm and links to the sign-in page, never a sign-in link", () => {
+    const { subject, text, html } = tradeAccountReadyEmail({
+      firmName: "Hollis <& Daughters>",
+      signInPageUrl: "https://tfs.example/account?email=sam%40hollis.example",
+    });
+    expect(subject).toBe("Your trade account is ready — The Funeral Stationery");
+    expect(text).toContain("Your trade account for Hollis <& Daughters> is ready.");
+    expect(html).toContain("Hollis &lt;&amp; Daughters&gt;");
+    expect(html).toContain('href="https://tfs.example/account?email=sam%40hollis.example"');
+    expect(html).not.toContain("/api/auth/verify");
   });
 });
 
