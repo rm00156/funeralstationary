@@ -276,22 +276,32 @@ export const isTradeApplicationId = (segment: string) =>
 
 export type PayWith = "card" | "account";
 
+/** What an order placed on account is frozen with. */
+export interface AccountTerms {
+  firmName: string;
+  paymentTermsDays: number;
+  accountsEmail: string | null;
+}
+
+export type PayPlan = { payWith: "card" } | { payWith: "account"; terms: AccountTerms };
+
 /**
  * How a checkout is paid. Card unless the form asked for account — and only
- * a firm an admin let order on account may (TradeMembership.onAccount, which
- * also needs terms). Anyone else asking for it is refused, not quietly sent
- * to the card page.
+ * a firm an admin let order on account, with terms, may. Anyone else asking
+ * for it is refused, not quietly sent to the card page. The one place that
+ * rule lives: an account plan carries the terms the order is placed on.
  */
 export function resolvePayWith(
   value: unknown,
-  membership: Pick<TradeMembership, "onAccount"> | null,
-): Parsed<PayWith> {
-  if (value === undefined || value === null || value === "card") return { ok: true, value: "card" };
+  membership: Pick<TradeMembership, "onAccount" | "firmName" | "paymentTermsDays" | "accountsEmail"> | null,
+): Parsed<PayPlan> {
+  if (value === undefined || value === null || value === "card") return { ok: true, value: { payWith: "card" } };
   if (value !== "account") return { ok: false, error: "Choose how to pay" };
-  if (!membership?.onAccount) {
+  if (!membership?.onAccount || membership.paymentTermsDays === null) {
     return { ok: false, error: "This account can't order on account. Please pay by card." };
   }
-  return { ok: true, value: "account" };
+  const { firmName, paymentTermsDays, accountsEmail } = membership;
+  return { ok: true, value: { payWith: "account", terms: { firmName, paymentTermsDays, accountsEmail } } };
 }
 
 /** An order as the Invoices panel sees it: account orders only matter. */

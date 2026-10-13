@@ -218,6 +218,13 @@
       "when": 1791919068956,
       "tag": "0030_order_account_terms",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1791925957240,
+      "tag": "0031_invoice_updated_at_ms",
+      "breakpoints": true
     }
   ]
 }

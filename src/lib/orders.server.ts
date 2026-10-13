@@ -1254,10 +1254,11 @@ export async function finaliseOrder(
 
   if (result.affectedRows === 0) {
     const [row] = await db
-      .select({ id: orders.id })
+      .select({ id: orders.id, paymentMethod: orders.paymentMethod })
       .from(orders)
       .where(eq(orders.id, orderId))
       .limit(1);
+    if (row?.paymentMethod === "account") await recordCardPaymentOnAccountOrder(orderId, payment.sessionId);
     return row ? "already-finalised" : "not-found";
   }
 
@@ -1283,6 +1284,27 @@ export async function finaliseOrder(
     await db.update(designs).set({ status: "ordered" }).where(inArray(designs.id, designIds));
   }
   return "finalised";
+}
+
+/**
+ * A card payment for an order already placed on account — a Checkout left
+ * open that the account route couldn't close. Nothing here moves money, so
+ * staff are told once (the webhook and the return route both get here) to
+ * refund it in Stripe, since Thintent is invoicing the firm as well.
+ */
+async function recordCardPaymentOnAccountOrder(orderId: string, sessionId: string): Promise<void> {
+  const [seen] = await db
+    .select({ id: orderEvents.id })
+    .from(orderEvents)
+    .where(and(eq(orderEvents.orderId, orderId), eq(orderEvents.type, "card_paid_on_account")))
+    .limit(1);
+  if (seen) return;
+  console.error(`Order ${orderId} was placed on account but Checkout ${sessionId} was paid as well`);
+  await insertEvent(orderId, {
+    type: "card_paid_on_account",
+    actor: "stripe",
+    note: `Also paid by card (Checkout ${sessionId}) after being placed on account. Refund the card in Stripe, or have the invoice credited in Thintent.`,
+  });
 }
 
 /**

@@ -334,7 +334,7 @@ export default async function AdminOrderPage({
             />
           </Section>
 
-          {(order.thintent || (isThintentConfigured() && order.paidAt)) && (
+          {(order.thintent || (isThintentConfigured() && order.placedAt)) && (
             <Section title="Thintent">
               {order.thintent ? (
                 <>

@@ -387,15 +387,19 @@ ${button("Open in admin", adminUrl)}`,
  * Sent to the customer when the shop cancels a paid order (from Thintent).
  * Says a refund *will* follow only as far as the shop has promised one: the
  * refund is a separate step a person makes in Stripe, so this tells them
- * where it goes and how to ask, not that it has happened.
+ * where it goes and how to ask, not that it has happened. An order on
+ * account was never paid by card: its invoice is cancelled or credited.
  */
 export function orderCancelledEmail(summary: OrderEmailSummary, orderUrl: string): EmailContent {
   const subject = `Your order ${summary.orderNumber} has been cancelled — ${SITE_NAME}`;
+  const money = summary.onAccount
+    ? "If it has been invoiced, the invoice will be cancelled or credited."
+    : "If a refund is due, it will go back to the card you paid with.";
   const text = [
     `Dear ${summary.contactName},`,
     "",
     `Your order ${summary.orderNumber} has been cancelled and will not be printed.`,
-    `If a refund is due, it will go back to the card you paid with. If you didn't expect this, or have any questions, please call us on ${PHONE_DISPLAY} or email ${EMAIL}.`,
+    `${money} If you didn't expect this, or have any questions, please call us on ${PHONE_DISPLAY} or email ${EMAIL}.`,
     "",
     itemsText(summary),
     "",
@@ -409,7 +413,7 @@ export function orderCancelledEmail(summary: OrderEmailSummary, orderUrl: string
     heading: "Your order has been cancelled",
     body: `${paragraph(`Dear ${escapeHtml(summary.contactName)},`)}
 ${paragraph(`Your order <strong>${escapeHtml(summary.orderNumber)}</strong> has been cancelled and will not be printed.`)}
-${paragraph(`If a refund is due, it will go back to the card you paid with. If you didn&rsquo;t expect this, or have any questions, please call us on ${escapeHtml(PHONE_DISPLAY)} or email <a href="mailto:${escapeHtml(EMAIL)}" style="color:${PLUM}">${escapeHtml(EMAIL)}</a>.`)}
+${paragraph(`${money} If you didn&rsquo;t expect this, or have any questions, please call us on ${escapeHtml(PHONE_DISPLAY)} or email <a href="mailto:${escapeHtml(EMAIL)}" style="color:${PLUM}">${escapeHtml(EMAIL)}</a>.`)}
 ${eyebrow("The order")}
 ${orderTableHtml(summary)}
 ${button("View your order", orderUrl)}
@@ -421,13 +425,16 @@ ${signOff("With our sincere condolences,")}`,
 /**
  * Sent to the business inbox when Thintent cancels a paid order. A cancel
  * never moves money, so it says what has gone back so far (a refund can be
- * made before the cancel) and what is left to decide.
+ * made before the cancel) and what is left to decide. An order on account
+ * has no card payment to refund: its invoice is voided or credited in
+ * Thintent instead.
  */
 export function orderCancelledNotificationEmail(
   summary: OrderEmailSummary,
   adminUrl: string,
   refundedPence = 0,
 ): EmailContent {
+  if (summary.onAccount) return accountOrderCancelledNotificationEmail(summary, adminUrl);
   const outstanding = summary.totalPence - refundedPence;
   const subject =
     outstanding <= 0
@@ -454,6 +461,27 @@ ${factsBox([
   ["Paid", formatPence(summary.totalPence)],
   ["Refunded so far", formatPence(refundedPence)],
 ])}
+${button("Open in admin", adminUrl)}`,
+  });
+  return { subject, text, html, replyTo: summary.contactEmail, attachments: brandedAttachments() };
+}
+
+function accountOrderCancelledNotificationEmail(summary: OrderEmailSummary, adminUrl: string): EmailContent {
+  const subject = `Cancelled: order ${summary.orderNumber} — on account`;
+  const invoiceText =
+    "It was placed on account, so there is no card payment to refund. If Thintent has invoiced it, void or credit the invoice there.";
+  const text = [
+    `Order ${summary.orderNumber} from ${summary.contactName} <${summary.contactEmail}> was cancelled in Thintent.`,
+    `It came to ${formatPence(summary.totalPence)}. ${invoiceText}`,
+    "",
+    `Order: ${adminUrl}`,
+  ].join("\n");
+  const html = brandedEmailHtml({
+    preheader: invoiceText,
+    heading: "Order cancelled in Thintent",
+    body: `${paragraph(`Order <strong>${escapeHtml(summary.orderNumber)}</strong> from ${escapeHtml(summary.contactName)} &lt;<a href="mailto:${escapeHtml(summary.contactEmail)}" style="color:${PLUM}">${escapeHtml(summary.contactEmail)}</a>&gt; was cancelled in Thintent.`)}
+${paragraph(escapeHtml(invoiceText))}
+${factsBox([["On account", formatPence(summary.totalPence)]])}
 ${button("Open in admin", adminUrl)}`,
   });
   return { subject, text, html, replyTo: summary.contactEmail, attachments: brandedAttachments() };

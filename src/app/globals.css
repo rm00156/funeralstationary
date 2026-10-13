@@ -450,6 +450,11 @@ body {
  *
  * Unlayered on purpose: the cells carry Tailwind padding utilities, and only
  * an unlayered rule outranks the utilities layer.
+ *
+ * The two @container blocks below are the same rules at two widths — keep
+ * them in step. Plain CSS can't share one block between two size queries;
+ * a style query could, but Firefox and the older browsers many customers
+ * use don't support one.
  */
 .table-stack {
   container-type: inline-size;

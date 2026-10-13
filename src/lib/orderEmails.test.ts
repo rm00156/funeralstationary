@@ -117,6 +117,24 @@ describe("orderCancelledEmail", () => {
   });
 });
 
+describe("cancellation emails for an order on account", () => {
+  const onAccount = { ...summary, onAccount: { termsDays: 30 } };
+
+  it("tells the customer the invoice is cancelled, not that a card is refunded", () => {
+    const email = orderCancelledEmail(onAccount, "https://example.com/orders/abc");
+    expect(email.text).toContain("the invoice will be cancelled or credited");
+    expect(email.text).not.toMatch(/card/i);
+    expect(email.html).not.toMatch(/card you paid/i);
+  });
+
+  it("tells the shop to void the invoice in Thintent, not to refund in Stripe", () => {
+    const email = orderCancelledNotificationEmail(onAccount, "https://example.com/admin/orders/abc");
+    expect(email.subject).toBe("Cancelled: order TFS-2026-004210 — on account");
+    expect(email.text).toContain("void or credit the invoice");
+    expect(email.text).not.toMatch(/Stripe|paid/);
+  });
+});
+
 describe("orderCancelledNotificationEmail", () => {
   it("tells the shop what was paid and that the refund is still to do", () => {
     const email = orderCancelledNotificationEmail(summary, "https://example.com/admin/orders/abc");

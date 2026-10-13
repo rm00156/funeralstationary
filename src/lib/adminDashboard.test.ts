@@ -38,6 +38,7 @@ const order = (overrides: Partial<DashboardOrder> = {}): DashboardOrder => ({
   customerEmail: "s@example.com",
   placedAt: new Date("2026-10-08T06:00:00Z"),
   paidAt: new Date("2026-10-08T06:00:00Z"),
+  paymentMethod: "card",
   shippedAt: null,
   totalPence: 9000,
   refundedPence: 0,
@@ -179,6 +180,8 @@ describe("actionItems", () => {
   it("asks about a refund on a paid cancellation until it is refunded in full", () => {
     expect(actionItems([order({ status: "cancelled" })], ctx)[0].action).toBe("Refund needed?");
     expect(actionItems([order({ status: "cancelled", refundedPence: 9000 })], ctx)).toEqual([]);
+    // A paid invoice on account is voided or credited in Thintent, not refunded in Stripe.
+    expect(actionItems([order({ status: "cancelled", paymentMethod: "account" })], ctx)).toEqual([]);
   });
 
   it("puts urgent rows first, then by service date", () => {

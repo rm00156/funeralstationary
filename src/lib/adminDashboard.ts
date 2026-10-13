@@ -169,6 +169,8 @@ export interface DashboardOrder {
   placedAt: Date | null;
   /** When it was paid; null on an account order until its invoice is. */
   paidAt: Date | null;
+  /** An account order is settled by Thintent's invoice, never refunded in Stripe. */
+  paymentMethod: "card" | "account";
   /** When it moved to shipped, for "sent today". */
   shippedAt: Date | null;
   totalPence: number;
@@ -248,7 +250,12 @@ export function actionItems(
     const orderHref = `/admin/orders/${order.id}`;
     const open = OPEN_STATUSES.includes(order.status);
 
-    if (order.status === "cancelled" && order.paidAt && order.refundedPence < order.totalPence) {
+    if (
+      order.status === "cancelled" &&
+      order.paymentMethod === "card" &&
+      order.paidAt &&
+      order.refundedPence < order.totalPence
+    ) {
       items.push({
         ...base,
         rank: 1,

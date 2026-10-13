@@ -56,8 +56,15 @@ export function splitLeadOrder<T extends { status: OrderStatus }>(
   return { lead, rest: orders.filter((order) => order !== lead) };
 }
 
-/** The lead card's eyebrow, heading and sentence. */
-export function orderHeadline(status: OrderStatus): { label: string; title: string; body: string } {
+/**
+ * The lead card's eyebrow, heading and sentence. An order on account isn't
+ * paid for when it goes to print, and was never paid by card.
+ */
+export function orderHeadline(
+  status: OrderStatus,
+  paymentMethod: "card" | "account",
+): { label: string; title: string; body: string } {
+  const onAccount = paymentMethod === "account";
   switch (status) {
     case "in_production":
       return {
@@ -76,12 +83,18 @@ export function orderHeadline(status: OrderStatus): { label: string; title: stri
     case "cancelled":
       return { label: "Cancelled", title: "This order was cancelled", body: "It won’t be printed." };
     case "refunded":
-      return { label: "Refunded", title: "This order was refunded", body: "The money has gone back to your card." };
+      return {
+        label: "Refunded",
+        title: "This order was refunded",
+        body: onAccount ? "Its invoice has been credited." : "The money has gone back to your card.",
+      };
     default:
       return {
         label: "Ordered",
         title: "We’ve got your order",
-        body: "It’s paid for and waiting to go to print, exactly as you designed it.",
+        body: onAccount
+          ? "It’s on account and waiting to go to print, exactly as you designed it."
+          : "It’s paid for and waiting to go to print, exactly as you designed it.",
       };
   }
 }

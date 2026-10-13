@@ -156,8 +156,12 @@ export const orders = mysqlTable(
     invoiceStatus: mysqlEnum("invoice_status", INVOICE_STATUSES),
     invoiceDueDate: date("invoice_due_date", { mode: "string" }),
     invoicePaidPence: int("invoice_paid_pence"),
-    /** When Thintent wrote the event last applied — an older one is ignored. */
-    invoiceUpdatedAt: timestamp("invoice_updated_at"),
+    /**
+     * When Thintent wrote the event last applied — an older one is ignored.
+     * Milliseconds, as Thintent sends them: rounded to the second, a stored
+     * time could come back later than a newer event and refuse it.
+     */
+    invoiceUpdatedAt: timestamp("invoice_updated_at", { fsp: 3 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow().onUpdateNow(),
   },

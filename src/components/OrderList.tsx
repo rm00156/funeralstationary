@@ -17,7 +17,7 @@ export default function OrderList({ orders }: { orders: OrderSummary[] }) {
           <div className="flex min-w-[200px] flex-1 flex-col gap-0.5">
             <h3 className="text-lg font-semibold text-ink">{orderTitle(order.lines)}</h3>
             <p className="text-base text-ink-2">
-              Order {order.orderNumber} · {orderHeadline(order.status).label}
+              Order {order.orderNumber} · {orderHeadline(order.status, order.paymentMethod).label}
               {order.placedAt && ` · placed ${shortDate(order.placedAt)}`}
             </p>
           </div>

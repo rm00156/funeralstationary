@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
+import { getTableConfig } from "drizzle-orm/mysql-core";
 import { describe, expect, it } from "vitest";
 
+import { orders } from "@/db/schema";
 import { BOOKLET_FORMAT } from "@/lib/designEditor";
 import type { OrderDetail, OrderDetailItem } from "@/lib/orders.server";
 import { canTransition, computeOrderTotals, type OrderStatus } from "@/lib/orders";
@@ -183,6 +185,16 @@ describe("Thintent invoices", () => {
     expect(shouldApplyInvoiceEvent(event, new Date("2026-10-07T08:00:00Z"))).toBe(true);
     expect(shouldApplyInvoiceEvent(event, new Date("2026-10-07T10:00:00Z"))).toBe(false);
     expect(shouldApplyInvoiceEvent({ ...event, invoice: { ...event.invoice, status: "draft" } }, null)).toBe(false);
+  });
+
+  it("is stored to the millisecond, so a newer event in the same second isn't refused", () => {
+    // Rounded to whole seconds, 12:00:00.700 would read back as 12:00:01 and
+    // refuse a "paid" at 12:00:00.950 as stale.
+    const column = getTableConfig(orders).columns.find((c) => c.name === "invoice_updated_at");
+    expect(column?.getSQLType()).toBe("timestamp(3)");
+    const event = parseThintentInvoiceEvent(raw)!;
+    const stored = new Date("2026-10-07T12:00:00.700Z");
+    expect(shouldApplyInvoiceEvent({ ...event, occurredAt: new Date("2026-10-07T12:00:00.950Z") }, stored)).toBe(true);
   });
 });
 

@@ -70,6 +70,7 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
       contactPhone: orders.contactPhone,
       placedAt: orders.placedAt,
       paidAt: orders.paidAt,
+      paymentMethod: orders.paymentMethod,
       totalPence: orders.totalPence,
       thintentJobRef: orders.thintentJobRef,
       accountEmail: users.email,
@@ -80,7 +81,12 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
       or(
         inArray(orders.status, [...OPEN_STATUSES]),
         and(eq(orders.status, "shipped"), gte(orders.updatedAt, todayStart)),
-        and(eq(orders.status, "cancelled"), isNotNull(orders.paidAt), gte(orders.updatedAt, nagFrom)),
+        and(
+          eq(orders.status, "cancelled"),
+          eq(orders.paymentMethod, "card"),
+          isNotNull(orders.paidAt),
+          gte(orders.updatedAt, nagFrom),
+        ),
       ),
     )
     .orderBy(desc(orders.placedAt));

@@ -213,12 +213,21 @@ describe("withTradeDiscount", () => {
 
 describe("resolvePayWith", () => {
   it("pays by card unless account is asked for, and only a firm on account may", () => {
-    expect(resolvePayWith(undefined, null)).toEqual({ ok: true, value: "card" });
-    expect(resolvePayWith("card", { onAccount: true })).toEqual({ ok: true, value: "card" });
-    expect(resolvePayWith("account", { onAccount: true })).toEqual({ ok: true, value: "account" });
-    expect(resolvePayWith("account", { onAccount: false }).ok).toBe(false);
+    const firm = { firmName: "Hope & Sons", paymentTermsDays: 30, accountsEmail: "accounts@hope.example", onAccount: true };
+    const card = { ok: true, value: { payWith: "card" } };
+    expect(resolvePayWith(undefined, null)).toEqual(card);
+    expect(resolvePayWith("card", firm)).toEqual(card);
+    expect(resolvePayWith("account", firm)).toEqual({
+      ok: true,
+      value: {
+        payWith: "account",
+        terms: { firmName: "Hope & Sons", paymentTermsDays: 30, accountsEmail: "accounts@hope.example" },
+      },
+    });
+    expect(resolvePayWith("account", { ...firm, onAccount: false }).ok).toBe(false);
+    expect(resolvePayWith("account", { ...firm, paymentTermsDays: null }).ok).toBe(false);
     expect(resolvePayWith("account", null).ok).toBe(false);
-    expect(resolvePayWith("cheque", { onAccount: true }).ok).toBe(false);
+    expect(resolvePayWith("cheque", firm).ok).toBe(false);
   });
 });
 

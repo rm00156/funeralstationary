@@ -16,7 +16,7 @@ import type { OrderSummary } from "@/lib/orders.server";
  * along it is, and a way into it. Nothing to approve — see accountOrders.ts.
  */
 export default function AccountOrderCard({ order }: { order: OrderSummary }) {
-  const headline = orderHeadline(order.status);
+  const headline = orderHeadline(order.status, order.paymentMethod);
   const spec = [
     orderTitle(order.lines),
     order.serviceDate && `Service on ${serviceDateText(order.serviceDate)}`,

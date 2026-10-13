@@ -11,12 +11,18 @@ import {
 import { getOrCreateOwner, type Owner } from "@/lib/session";
 import { isShopOpen, shopClosedResponse } from "@/lib/siteBilling.server";
 import { isStripeConfigured } from "@/lib/stripe.server";
-import { parseTradeOrderDetails, resolvePayWith, type PayWith, type TradeMembership } from "@/lib/trade";
+import {
+  parseTradeOrderDetails,
+  resolvePayWith,
+  type PayPlan,
+  type PayWith,
+  type TradeMembership,
+} from "@/lib/trade";
 import { getCurrentTradeMembership } from "@/lib/trade.server";
 
 export type FrozenCheckout =
   | { ok: false; response: Response }
-  | { ok: true; owner: Owner; membership: TradeMembership | null; order: FrozenOrder };
+  | { ok: true; owner: Owner; membership: TradeMembership | null; plan: PayPlan; order: FrozenOrder };
 
 const fail = (error: string, status: number, extra: Record<string, unknown> = {}): FrozenCheckout => ({
   ok: false,
@@ -75,5 +81,5 @@ export async function freezeCheckout(request: NextRequest, payWith: PayWith): Pr
 
   const prepared = await prepareOrderForPayment(owner);
   if (!prepared.ok) return fail(prepared.error, prepared.status, { itemId: prepared.itemId });
-  return { ok: true, owner, membership, order: prepared.order };
+  return { ok: true, owner, membership, plan: allowed.value, order: prepared.order };
 }

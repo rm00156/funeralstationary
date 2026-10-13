@@ -47,9 +47,16 @@ describe("splitLeadOrder", () => {
 describe("orderHeadline", () => {
   it("has wording for every status a placed order can have", () => {
     for (const status of orderStatusValues) {
-      expect(orderHeadline(status).title).not.toBe("");
+      expect(orderHeadline(status, "card").title).not.toBe("");
     }
-    expect(orderHeadline("shipped").label).toBe("On its way");
+    expect(orderHeadline("shipped", "card").label).toBe("On its way");
+  });
+
+  it("never tells an order on account it was paid for by card", () => {
+    expect(orderHeadline("awaiting_print", "card").body).toContain("paid for");
+    expect(orderHeadline("awaiting_print", "account").body).not.toContain("paid");
+    expect(orderHeadline("awaiting_print", "account").body).toContain("on account");
+    expect(orderHeadline("refunded", "account").body).not.toContain("card");
   });
 });
 

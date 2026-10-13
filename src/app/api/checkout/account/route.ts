@@ -4,7 +4,7 @@ import { freezeCheckout } from "@/lib/checkout.server";
 import { renderOrigin } from "@/lib/headlessBrowser.server";
 import { runPostPaymentSideEffects } from "@/lib/orderFulfilment.server";
 import { placeOrderOnAccount } from "@/lib/orders.server";
-import { resolveRequestOrigin } from "@/lib/stripe.server";
+import { closeOpenCheckoutSessions, resolveRequestOrigin } from "@/lib/stripe.server";
 
 export const runtime = "nodejs";
 // The post-order side effects (Chromium proofs, email, Thintent) run in
@@ -21,16 +21,19 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const frozen = await freezeCheckout(request, "account");
   if (!frozen.ok) return frozen.response;
-  const { membership, order } = frozen;
-  if (!membership?.onAccount || membership.paymentTermsDays === null) {
-    return Response.json({ error: "This account can't order on account. Please pay by card." }, { status: 400 });
+  const { plan, order } = frozen;
+  // freezeCheckout refused anyone who may not order on account.
+  if (plan.payWith !== "account") throw new Error("freezeCheckout(account) returned a card plan");
+
+  // An earlier card attempt left open could be paid after this; close it.
+  if ((await closeOpenCheckoutSessions(order.id)) === "paid") {
+    return Response.json(
+      { error: "This order has just been paid by card, so it won't be invoiced. Check your order history." },
+      { status: 409 },
+    );
   }
 
-  const result = await placeOrderOnAccount(order.id, {
-    firmName: membership.firmName,
-    paymentTermsDays: membership.paymentTermsDays,
-    accountsEmail: membership.accountsEmail,
-  });
+  const result = await placeOrderOnAccount(order.id, plan.terms);
   if (result === "not-found") return Response.json({ error: "Your basket is empty" }, { status: 400 });
   if (result === "finalised") {
     const origins = { site: resolveRequestOrigin(request), render: renderOrigin(request) };

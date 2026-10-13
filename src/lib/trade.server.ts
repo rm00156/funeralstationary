@@ -104,7 +104,12 @@ export async function listTradeFirms(): Promise<TradeFirmSummary[]> {
   const [firms, members, orderCounts] = await Promise.all([
     db.select().from(tradeFirms).orderBy(asc(tradeFirms.name)),
     db.select({ firmId: tradeMembers.firmId, n: count() }).from(tradeMembers).groupBy(tradeMembers.firmId),
-    db.select({ firmId: orders.tradeFirmId, n: count() }).from(orders).groupBy(orders.tradeFirmId),
+    // Placed orders only: checkout stamps the firm on the basket before payment.
+    db
+      .select({ firmId: orders.tradeFirmId, n: count() })
+      .from(orders)
+      .where(ne(orders.status, "draft"))
+      .groupBy(orders.tradeFirmId),
   ]);
   const memberCount = new Map(members.map((row) => [row.firmId, row.n]));
   const orderCount = new Map(orderCounts.map((row) => [row.firmId, row.n]));
@@ -131,7 +136,7 @@ export async function getTradeFirm(id: number): Promise<TradeFirmDetail | null> 
       .from(tradeMembers)
       .where(eq(tradeMembers.firmId, id))
       .orderBy(asc(tradeMembers.email)),
-    db.select({ n: count() }).from(orders).where(eq(orders.tradeFirmId, id)),
+    db.select({ n: count() }).from(orders).where(and(eq(orders.tradeFirmId, id), ne(orders.status, "draft"))),
   ]);
   return {
     id: firm.id,
