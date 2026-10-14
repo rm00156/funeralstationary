@@ -332,11 +332,20 @@ export interface Timeliness {
 const COUNTED_FOR_TIMELINESS: readonly OrderStatus[] = ["awaiting_print", "in_production", "shipped", "delivered"];
 
 /**
+ * A refunded order reached `refunded` either from delivered (it went out —
+ * and a late one is the likeliest to be refunded) or from cancelled (it
+ * never did). Only a sent order tells the two apart.
+ */
+const cancelledBeforeSending = (order: Pick<AnalyticsOrder, "status" | "sentAt">) =>
+  order.status === "cancelled" || (order.status === "refunded" && order.sentAt === null);
+
+/**
  * Did it leave in time for the service? An order is in time when it was sent
  * on a day before the service — next-day delivery is what is sold, so sent
  * the day before is the latest that makes it. Only orders that gave a
  * service date can be judged, only services that have happened count (one
- * next week hasn't had its chance yet), and a cancelled order isn't late.
+ * next week hasn't had its chance yet), and an order cancelled before it was
+ * sent isn't late — one refunded after it went out still is.
  * Sent is the shop's own record; when the courier delivered isn't known
  * reliably, so it isn't what is judged.
  */
@@ -346,7 +355,9 @@ export function serviceTimeliness(orders: readonly AnalyticsOrder[], period: Per
   for (const order of orders) {
     const service = order.serviceDate;
     if (!service || service < period.from || service >= period.to || service > today) continue;
-    if (!COUNTED_FOR_TIMELINESS.includes(order.status)) continue;
+    const counted =
+      COUNTED_FOR_TIMELINESS.includes(order.status) || (order.status === "refunded" && order.sentAt !== null);
+    if (!counted) continue;
     result.total += 1;
     if (order.sentAt && shopDate(order.sentAt) < service) {
       result.inTime += 1;
@@ -523,8 +534,8 @@ export function isQuiet(daysSinceLast: number | null, usualGap: number | null): 
 
 /**
  * A firm's trend over the period: gone quiet (judged on its whole history),
- * new (its account opened during the period), else the second half of the
- * period's takings against the first.
+ * new (its account opened during the period), else the later half of the
+ * period's complete weeks (or months) against the earlier half.
  */
 export function tradeTrend(input: {
   quiet: boolean;
@@ -536,9 +547,13 @@ export function tradeTrend(input: {
   if (input.quiet) return "quiet";
   if (withinDays(input.createdAt, input.period.from, input.period.to)) return "new";
   if (input.orders === 0) return "none";
-  const half = Math.floor(input.buckets.length / 2);
-  const first = input.buckets.slice(0, half).reduce((sum, value) => sum + value, 0);
-  const second = input.buckets.slice(half).reduce((sum, value) => sum + value, 0);
+  // The last bucket is still running, so it would always make the recent
+  // half look quieter; leave it out, and the oldest too when that evens the halves.
+  const complete = input.buckets.slice(0, -1);
+  const even = complete.slice(complete.length % 2);
+  const half = even.length / 2;
+  const first = even.slice(0, half).reduce((sum, value) => sum + value, 0);
+  const second = even.slice(half).reduce((sum, value) => sum + value, 0);
   if (first <= 0) return second > 0 ? "growing" : "steady";
   if (second >= first * TREND_RATIO) return "growing";
   if (second * TREND_RATIO <= first) return "slowing";
@@ -916,10 +931,9 @@ export function niceCeiling(max: number): number {
   return ([1, 2, 5, 10].find((step) => step * power >= max) ?? 10) * power;
 }
 
-/** Orders placed in the period that were cancelled (refunded or not). */
+/** Orders placed in the period that were cancelled before they were sent (refunded or not). */
 export function cancelledCount(orders: readonly AnalyticsOrder[], period: Period): number {
-  return placedIn(orders, period).filter((order) => order.status === "cancelled" || order.status === "refunded")
-    .length;
+  return placedIn(orders, period).filter(cancelledBeforeSending).length;
 }
 
 /** The step most people stop at, as "from → to"; null with fewer than two steps or nobody started. */
@@ -933,4 +947,35 @@ export function biggestDrop(steps: readonly FunnelStep[]): { from: string; to: s
     }
   }
   return worst && worst.continued < 100 ? { from: worst.from, to: worst.to } : null;
+}
+
+/** The firms to call: active ones gone quiet, the most takings lost first. */
+export function quietAccounts(rows: readonly TradeAccountRow[]): TradeAccountRow[] {
+  return rows.filter((row) => row.trend === "quiet").sort((a, b) => b.takingsBeforePence - a.takingsBeforePence);
+}
+
+/** The accounts table: every active firm, and a retired one only while it has orders in the period. */
+export function listedAccounts(rows: readonly TradeAccountRow[], sort: TradeSort): TradeAccountRow[] {
+  return sortTradeRows(
+    rows.filter((row) => row.firm.isActive || row.orders > 0),
+    sort,
+  );
+}
+
+/** The step that takes longest, of those any order has reached. */
+export function longestStage(stages: readonly StageTime[]): StageTime | null {
+  return (
+    stages
+      .filter((stage) => stage.minutes !== null)
+      .sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0))[0] ?? null
+  );
+}
+
+/** "3 sent late · 1 ordered too close to the service", most common first. */
+export function reasonSummary(reasons: readonly string[]): string[] {
+  const counts = new Map<string, number>();
+  for (const reason of reasons) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  return [...counts]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([reason, count]) => `${count} ${reason.toLowerCase()}`);
 }

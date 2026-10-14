@@ -198,7 +198,8 @@ export default async function AdminAnalyticsProductsPage({
                           {row.key === SAME_DESIGN ? "More copies of the same design" : label(row.key)}
                         </td>
                         <td data-stack="end" className="px-4 py-3 text-right font-semibold tabular-nums">
-                          {row.share ?? 0}%
+                          {row.families}{" "}
+                          <span className="font-normal text-ink-2">({row.share ?? 0}%)</span>
                         </td>
                         <td data-label="Typically" className="px-6 py-3 text-right">{dayText(row.medianDays)}</td>
                       </tr>

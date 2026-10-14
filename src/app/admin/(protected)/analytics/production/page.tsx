@@ -15,11 +15,13 @@ import {
   afterCutoff,
   analyticsPeriod,
   lateReason,
+  longestStage as longestOf,
   orderHeatmap,
   orderToDispatch,
   parsePeriod,
   parseWorkingHours,
   percentText,
+  reasonSummary,
   serviceTimeliness,
   stageTimes,
 } from "@/lib/adminAnalytics";
@@ -49,10 +51,10 @@ export default async function AdminAnalyticsProductionPage({
   const timeliness = serviceTimeliness(facts.orders, period, now);
   const grid = orderHeatmap(facts.orders, period);
   const cutoffMinutes = parseCutoff(ORDER_CUTOFF);
-  const longestStage = stages.filter((stage) => stage.minutes !== null).sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0))[0];
+  const longestStage = longestOf(stages);
   const stageMax = Math.max(...stages.map((stage) => stage.minutes ?? 0), 1);
   const reasons = timeliness.late.map((order) => lateReason(order, ORDER_CUTOFF));
-  const reasonCounts = [...new Set(reasons)].map((reason) => `${reasons.filter((r) => r === reason).length} ${reason.toLowerCase()}`);
+  const reasonCounts = reasonSummary(reasons);
 
   return (
     <div className="font-body text-ink">

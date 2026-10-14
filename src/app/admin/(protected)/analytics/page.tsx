@@ -51,11 +51,12 @@ export default async function AdminAnalyticsOverviewPage({
 }) {
   const now = new Date();
   const period = analyticsPeriod(parsePeriod((await searchParams).period), now);
-  const [facts, products, funnel, templateCount] = await Promise.all([
+  const [facts, products, funnel, templateCount, templateMeta] = await Promise.all([
     loadAnalyticsFacts(period),
     loadProductInfo(),
     loadDesignFunnel(period),
     countPublishedTemplates(),
+    loadTemplateMeta(),
   ]);
 
   const headlines = overviewHeadlines(facts.orders, facts.refunds, period);
@@ -64,7 +65,6 @@ export default async function AdminAnalyticsOverviewPage({
   const productRows = ordersByProduct(facts.orders, period);
   const sources = designSources(facts.orders, period);
   const templates = topTemplates(facts.orders, period);
-  const templateMeta = await loadTemplateMeta(templates.map((row) => row.key));
   const steps = funnelSteps([
     { label: "Started a design or upload", count: funnel.started },
     { label: "Put in a basket", count: funnel.inBasket },

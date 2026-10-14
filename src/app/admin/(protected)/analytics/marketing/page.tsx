@@ -14,8 +14,15 @@ import {
   StatTiles,
 } from "@/components/AdminAnalyticsParts";
 import { analyticsPeriod, parsePeriod, percentText } from "@/lib/adminAnalytics";
-import { addDays } from "@/lib/adminDashboard";
-import { DEVICE_LABELS, pagePath, searchOpportunity } from "@/lib/searchConsole";
+import { shortDay } from "@/lib/adminDashboard";
+import {
+  DEVICE_LABELS,
+  pagePath,
+  QUERY_TABLE_ROWS,
+  SEARCH_LAG_DAYS,
+  searchOpportunity,
+  searchRanges,
+} from "@/lib/searchConsole";
 import { loadSearchReport } from "@/lib/searchConsole.server";
 
 export const dynamic = "force-dynamic";
@@ -35,12 +42,8 @@ export default async function AdminAnalyticsMarketingPage({
 }) {
   const now = new Date();
   const period = analyticsPeriod(parsePeriod((await searchParams).period), now);
-  const result = await loadSearchReport({
-    startDate: period.from,
-    endDate: addDays(period.to, -1),
-    previousStartDate: period.previousFrom,
-    previousEndDate: addDays(period.from, -1),
-  });
+  const ranges = searchRanges(period);
+  const result = await loadSearchReport(ranges);
 
   return (
     <div className="font-body text-ink">
@@ -91,8 +94,10 @@ export default async function AdminAnalyticsMarketingPage({
       )}
 
       <AnalyticsFootnote>
-        Search Console counts clicks and appearances on Google Search only (not Maps or ads), and its last two or
-        three days are still filling in. Position is the average place in the results, 1 being the top.
+        Search Console counts clicks and appearances on Google Search only (not Maps or ads). Its last{" "}
+        {SEARCH_LAG_DAYS} days are still filling in, so these figures run to {shortDay(ranges.endDate)} and are
+        compared with the same number of days before. Position is the average place in the results, 1 being the
+        top.
       </AnalyticsFootnote>
     </div>
   );
@@ -109,6 +114,7 @@ function SearchReportView({
   const impressions = report.total?.impressions ?? 0;
   const deviceClicks = report.devices.reduce((sum, row) => sum + row.clicks, 0);
   const mobile = report.devices.find((row) => row.key === "MOBILE")?.clicks ?? 0;
+  const queries = report.queries.slice(0, QUERY_TABLE_ROWS);
   const opportunity = searchOpportunity(report.queries);
 
   return (
@@ -142,7 +148,7 @@ function SearchReportView({
             <h2 className="font-display text-2xl">What people search on Google</h2>
             <p className="mt-0.5 text-sm text-ink-2">Searches that brought people to the site</p>
           </div>
-          {report.queries.length === 0 ? (
+          {queries.length === 0 ? (
             <p className="px-6 py-6 text-sm text-ink-2">No searches in this period yet.</p>
           ) : (
             <>
@@ -156,7 +162,7 @@ function SearchReportView({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
-                    {report.queries.map((row) => (
+                    {queries.map((row) => (
                       <tr key={row.key}>
                         <td data-stack="title" className="px-6 py-3">{row.key}</td>
                         <td data-stack="end" className="px-4 py-3 text-right tabular-nums">

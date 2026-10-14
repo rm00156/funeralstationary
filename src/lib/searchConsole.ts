@@ -10,6 +10,8 @@
  * Analytics sets cookies), so they are deliberately not here.
  */
 
+import { addDays } from "@/lib/adminDashboard";
+
 export interface SearchConsoleConfig {
   /** The property as Search Console names it: "sc-domain:example.co.uk" or "https://www.example.co.uk/". */
   siteUrl: string;
@@ -124,3 +126,28 @@ export function searchOpportunity(rows: readonly SearchRow[]): SearchRow | null 
       .sort((a, b) => b.impressions - a.impressions)[0] ?? null
   );
 }
+
+/** Search Console's figures for the last few days are still filling in. */
+export const SEARCH_LAG_DAYS = 3;
+
+/**
+ * The days to ask for (inclusive, as Search Console counts): the period up
+ * to the last day with final data, and the same number of days just before.
+ * Comparing a period with unfinished days against a complete one would
+ * always read as a fall.
+ */
+export function searchRanges(period: { from: string; to: string }) {
+  const endDate = addDays(period.to, -1 - SEARCH_LAG_DAYS);
+  const days =
+    Math.round((new Date(`${endDate}T00:00:00Z`).getTime() - new Date(`${period.from}T00:00:00Z`).getTime()) / 86_400_000) + 1;
+  return {
+    startDate: period.from,
+    endDate,
+    previousStartDate: addDays(period.from, -days),
+    previousEndDate: addDays(period.from, -1),
+  };
+}
+
+/** Queries shown in the table; more are fetched, so a much-seen, little-clicked one can be found. */
+export const QUERY_TABLE_ROWS = 10;
+export const QUERY_CANDIDATE_ROWS = 250;

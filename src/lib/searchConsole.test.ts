@@ -6,6 +6,7 @@ import {
   searchAnalyticsUrl,
   searchConsoleConfig,
   searchOpportunity,
+  searchRanges,
   unsignedServiceAccountJwt,
 } from "./searchConsole";
 
@@ -70,6 +71,18 @@ describe("the request", () => {
     expect(searchAnalyticsBody({ startDate: "a", endDate: "b", dimension: "query", rowLimit: 5 })).toMatchObject({
       dimensions: ["query"],
       rowLimit: 5,
+    });
+  });
+});
+
+describe("searchRanges", () => {
+  it("stops before the days still filling in and compares with as many days before", () => {
+    // Period 27 Jul – 14 Oct (to = 15 Oct): final data runs to 11 Oct, 77 days.
+    expect(searchRanges({ from: "2026-07-27", to: "2026-10-15" })).toEqual({
+      startDate: "2026-07-27",
+      endDate: "2026-10-11",
+      previousStartDate: "2026-05-11",
+      previousEndDate: "2026-07-26",
     });
   });
 });

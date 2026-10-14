@@ -4,6 +4,10 @@ import {
   afterCutoff,
   biggestDrop,
   cancelledCount,
+  listedAccounts,
+  longestStage,
+  quietAccounts,
+  reasonSummary,
   niceCeiling,
   analyticsPeriod,
   bookletStats,
@@ -42,6 +46,8 @@ import {
   type AnalyticsOrder,
   type HistoryOrder,
   type ProductInfo,
+  type TradeAccountRow,
+  type TradeTrend,
 } from "./adminAnalytics";
 
 // Wednesday 14 October 2026, 12:00 in London (BST, UTC+1).
@@ -202,16 +208,19 @@ describe("keeping the promise", () => {
         order({ serviceDate: "2026-10-12", status: "awaiting_print" }),
         // Service still to come: not judged yet.
         order({ serviceDate: "2026-10-20", status: "awaiting_print" }),
-        // Cancelled, or no service date: not judged.
+        // Refunded after it went out late: still late.
+        order({ serviceDate: "2026-10-09", status: "refunded", sentAt: new Date("2026-10-09T08:00:00Z") }),
+        // Cancelled (then refunded, or not) before it was sent, or no service date: not judged.
         order({ serviceDate: "2026-10-09", status: "cancelled" }),
+        order({ serviceDate: "2026-10-09", status: "refunded" }),
         order({ serviceDate: null }),
       ],
       PERIOD,
       NOW,
     );
-    expect(result.total).toBe(3);
+    expect(result.total).toBe(4);
     expect(result.inTime).toBe(1);
-    expect(result.late.map((late) => late.serviceDate)).toEqual(["2026-10-12", "2026-10-09"]);
+    expect(result.late.map((late) => late.serviceDate)).toEqual(["2026-10-12", "2026-10-09", "2026-10-09"]);
   });
 
   it("says when an order came in too late to make it", () => {
@@ -297,6 +306,9 @@ describe("trade accounts", () => {
     expect(tradeTrend({ ...base, buckets: [2, 2, 2, 2] })).toBe("steady");
     expect(tradeTrend({ ...base, buckets: [0, 0, 2, 2] })).toBe("growing");
     expect(tradeTrend({ ...base, buckets: [0, 0, 0, 0], orders: 0 })).toBe("none");
+    // The running week is left out, so a firm ordering every week isn't "slowing" on a Monday.
+    expect(tradeTrend({ ...base, buckets: [2, 2, 2, 2, 2, 0] })).toBe("steady");
+    expect(tradeTrend({ ...base, buckets: [2, 2, 2, 0] })).toBe("steady");
     expect(tradeTrend({ ...base, buckets: [3, 3, 1, 1], quiet: true })).toBe("quiet");
     expect(tradeTrend({ ...base, buckets: [3, 3, 1, 1], createdAt: new Date("2026-09-01") })).toBe("new");
   });
@@ -505,10 +517,53 @@ describe("for the pages", () => {
     expect(niceCeiling(7)).toBe(10);
   });
 
-  it("counts cancelled orders, refunded or not", () => {
+  it("counts orders cancelled before they were sent, refunded or not", () => {
     expect(
-      cancelledCount([order({ status: "cancelled" }), order({ status: "refunded" }), order()], PERIOD),
+      cancelledCount(
+        [
+          order({ status: "cancelled" }),
+          order({ status: "refunded" }),
+          // Delivered, then refunded as a goodwill gesture: not a cancellation.
+          order({ status: "refunded", sentAt: new Date("2026-10-06T09:00:00Z") }),
+          order(),
+        ],
+        PERIOD,
+      ),
     ).toBe(2);
+  });
+
+  it("lists the firms to call, the most takings lost first", () => {
+    const row = (name: string, trend: TradeTrend, takingsBeforePence: number, isActive = true, orders = 0) =>
+      ({
+        firm: { id: 1, name, createdAt: NOW, isActive, phone: null },
+        trend,
+        takingsBeforePence,
+        takingsPence: 0,
+        orders,
+        lastOrderAt: null,
+      }) as unknown as TradeAccountRow;
+    const rows = [row("A", "quiet", 100), row("B", "steady", 900), row("C", "quiet", 500), row("D", "none", 0, false)];
+    expect(quietAccounts(rows).map((r) => r.firm.name)).toEqual(["C", "A"]);
+    // A retired firm is listed only while it has orders in the period.
+    expect(listedAccounts(rows, "name").map((r) => r.firm.name)).toEqual(["A", "B", "C"]);
+    expect(listedAccounts([...rows, row("E", "steady", 0, false, 2)], "name").map((r) => r.firm.name)).toEqual([
+      "A", "B", "C", "E",
+    ]);
+  });
+
+  it("names the longest step and sums up why orders were late", () => {
+    expect(
+      longestStage([
+        { label: "a", minutes: 60, orders: 2 },
+        { label: "b", minutes: 240, orders: 1 },
+        { label: "c", minutes: null, orders: 0 },
+      ])?.label,
+    ).toBe("b");
+    expect(longestStage([{ label: "c", minutes: null, orders: 0 }])).toBeNull();
+    expect(reasonSummary(["Sent late", "Ordered too close to the service", "Sent late"])).toEqual([
+      "2 sent late",
+      "1 ordered too close to the service",
+    ]);
   });
 
   it("finds the step most people stop at", () => {

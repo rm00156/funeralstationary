@@ -12,12 +12,13 @@ import {
 import {
   analyticsPeriod,
   lastOrderText,
+  listedAccounts,
   parsePeriod,
   parseTradeSort,
   percentText,
   QUIET_GAP_MULTIPLE,
   QUIET_MIN_DAYS,
-  sortTradeRows,
+  quietAccounts,
   takingsBetween,
   totalOf,
   tradeAccountRows,
@@ -96,11 +97,8 @@ export default async function AdminAnalyticsTradePage({
   const current = takingsBetween(facts.orders, facts.refunds, period.from, period.to);
   const previous = takingsBetween(facts.orders, facts.refunds, period.previousFrom, period.from);
   const rows = tradeAccountRows({ firms, orders: facts.orders, refunds: facts.refunds, history: facts.history, period, now });
-  const listed = sortTradeRows(
-    rows.filter((row) => row.firm.isActive || row.orders > 0),
-    sort,
-  );
-  const quiet = rows.filter((row) => row.trend === "quiet").sort((a, b) => b.takingsBeforePence - a.takingsBeforePence);
+  const listed = listedAccounts(rows, sort);
+  const quiet = quietAccounts(rows);
   const active = firms.filter((firm) => firm.isActive).length;
   const ordered = rows.filter((row) => row.firm.isActive && row.orders > 0).length;
   const share = (split: typeof current) => percentText(split.tradePence, totalOf(split));
@@ -275,7 +273,7 @@ export default async function AdminAnalyticsTradePage({
         Takings are net of refunds and counted when paid — an order on account counts once its invoice is paid.
         “Orders every” is the firm’s usual gap between orders, once it has three. “Gone quiet” means at least{" "}
         {QUIET_GAP_MULTIPLE}× that gap, and {QUIET_MIN_DAYS} days or more, since its last order. Growing and slowing
-        compare the second half of the period with the first.
+        compare the later half of the period’s complete {period.key === "12m" ? "months" : "weeks"} with the earlier half.
       </AnalyticsFootnote>
     </div>
   );

@@ -108,7 +108,8 @@ export async function loadAnalyticsFacts(period: Period): Promise<AnalyticsFacts
       })
       .from(orderRefunds)
       .innerJoin(orders, eq(orderRefunds.orderId, orders.id))
-      .where(and(eq(orderRefunds.status, "succeeded"), gte(orderRefunds.refundedAt, previousFrom))),
+      // As far back as the orders: a quiet firm's takings before its last order can predate the period.
+      .where(and(eq(orderRefunds.status, "succeeded"), gte(orderRefunds.refundedAt, historyFrom))),
   ]);
 
   const itemsByOrder = new Map<string, typeof itemRows>();
@@ -233,14 +234,13 @@ export interface TemplateMeta {
   category: string | null;
 }
 
-export async function loadTemplateMeta(slugs: readonly string[]): Promise<Map<string, TemplateMeta>> {
-  if (slugs.length === 0) return new Map();
+/** Every template's name and first category — a small table, so read whole alongside the orders. */
+export async function loadTemplateMeta(): Promise<Map<string, TemplateMeta>> {
   const rows = await db
     .select({ slug: templates.slug, name: templates.name, category: templateCategories.label })
     .from(templates)
     .leftJoin(templateCategoryLinks, eq(templateCategoryLinks.templateId, templates.id))
     .leftJoin(templateCategories, eq(templateCategories.id, templateCategoryLinks.categoryId))
-    .where(inArray(templates.slug, [...slugs]))
     .orderBy(asc(templateCategoryLinks.position));
   const meta = new Map<string, TemplateMeta>();
   for (const row of rows) if (!meta.has(row.slug)) meta.set(row.slug, { name: row.name, category: row.category });

@@ -9,6 +9,7 @@ import { createSign } from "node:crypto";
 import {
   GOOGLE_TOKEN_URL,
   parseSearchRows,
+  QUERY_CANDIDATE_ROWS,
   searchAnalyticsBody,
   searchAnalyticsUrl,
   searchConsoleConfig,
@@ -81,7 +82,9 @@ export async function loadSearchReport(input: {
     const [total, previousTotal, queries, pages, devices] = await Promise.all([
       ask(searchAnalyticsBody(range)),
       ask(searchAnalyticsBody({ startDate: input.previousStartDate, endDate: input.previousEndDate })),
-      ask(searchAnalyticsBody({ ...range, dimension: "query", rowLimit: 10 })),
+      // Search Console returns the most-clicked first; the page shows the top
+      // few and looks through the rest for a search that is seen but not clicked.
+      ask(searchAnalyticsBody({ ...range, dimension: "query", rowLimit: QUERY_CANDIDATE_ROWS })),
       ask(searchAnalyticsBody({ ...range, dimension: "page", rowLimit: 8 })),
       ask(searchAnalyticsBody({ ...range, dimension: "device" })),
     ]);
