@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Briefcase,
+  ChartColumn,
   ChevronDown,
   CreditCard,
   FileText,
@@ -21,6 +22,7 @@ import {
 const SECTIONS: { href: string; label: string; icon: LucideIcon; badge?: "orders" | "trade" }[] = [
   { href: "/admin", label: "Today", icon: LayoutDashboard },
   { href: "/admin/orders", label: "Orders", icon: FileText, badge: "orders" },
+  { href: "/admin/analytics", label: "Analytics", icon: ChartColumn },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { href: "/admin/trade", label: "Trade accounts", icon: Briefcase, badge: "trade" },
   { href: "/admin/designs", label: "Designs", icon: PencilRuler },

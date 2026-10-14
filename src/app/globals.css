@@ -37,6 +37,8 @@
 
   /* Status */
   --color-star: #1f6b45;
+  /* The second chart series (trade beside families' plum) — under 3:1 on white, so a chart using it carries a table view. */
+  --color-chart-gold: #c2913a;
   --color-success-bg: #eef5f0;
   --color-success-border: #bfd9c8;
   --color-success-text: #1f4d33;
@@ -120,6 +122,7 @@
   --color-field-border: var(--color-field-border);
   --color-focus-ring: var(--color-focus-ring);
   --color-star: var(--color-star);
+  --color-chart-gold: var(--color-chart-gold);
   --color-success-bg: var(--color-success-bg);
   --color-success-border: var(--color-success-border);
   --color-success-text: var(--color-success-text);
