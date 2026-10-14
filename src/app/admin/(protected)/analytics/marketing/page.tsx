@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Info } from "lucide-react";
 
 import {
@@ -31,9 +30,9 @@ const positionText = (position: number) => (position > 0 ? position.toFixed(1) :
 
 /**
  * /admin/analytics/marketing — how people find the shop on Google, from
- * Search Console. That is all the traffic this page shows: visitor counts,
- * sources and devices for the whole site would need an analytics script that
- * sets cookies, and the site deliberately sets none that need consent.
+ * Search Console. Visits, where visitors came from and their devices are
+ * counted by Vercel Web Analytics (SiteAnalytics.tsx), but Vercel offers no
+ * API to read them back, so the page points to its dashboard instead.
  */
 export default async function AdminAnalyticsMarketingPage({
   searchParams,
@@ -52,13 +51,14 @@ export default async function AdminAnalyticsMarketingPage({
       <div className={`${CARD} mb-6 flex items-start gap-3 px-5 py-4 text-sm text-ink-2`}>
         <Info size={18} aria-hidden className="mt-0.5 shrink-0 text-plum" />
         <p>
-          Searches come from Google Search Console, which reads Google’s side — nothing is added to the site. Visitor
-          numbers, where visitors came from and phone vs computer for the whole site aren’t here: they need an
-          analytics script that sets cookies, which would mean asking every visitor’s consent first (see the{" "}
-          <Link href="/privacy" className="link">
-            privacy notice
-          </Link>
-          ).
+          Searches come from Google Search Console, which reads Google’s side — nothing is added to the site.
+          Visits, where visitors came from and phone vs computer are counted by Vercel Web Analytics (no cookies),
+          and can only be seen in{" "}
+          <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="link">
+            Vercel’s dashboard
+          </a>{" "}
+          under the project’s Analytics tab — Vercel doesn’t let other pages read them. Which visits became orders
+          isn’t recorded.
         </p>
       </div>
 

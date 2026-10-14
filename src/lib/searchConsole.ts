@@ -4,10 +4,10 @@
  * Pure and tested; searchConsole.server.ts signs in and asks.
  *
  * Search Console is read from Google's side — nothing is added to the site,
- * no script and no cookie — which is why it is the one traffic source the
- * site can show without a consent banner. Visitor counts, where visitors
- * came from and phone vs computer would need an analytics script (Google
- * Analytics sets cookies), so they are deliberately not here.
+ * no script and no cookie. Visits, referrers and devices are counted by
+ * Vercel Web Analytics, which has no API to read them back, so they stay in
+ * Vercel's dashboard; Google Analytics, which could, sets cookies and would
+ * need a consent banner.
  */
 
 import { addDays } from "@/lib/adminDashboard";

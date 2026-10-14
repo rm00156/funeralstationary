@@ -191,8 +191,8 @@ export default async function AdminAnalyticsOverviewPage({
                     ? `The biggest drop is between “${drop.from.toLowerCase()}” and “${drop.to.toLowerCase()}”. `
                     : ""}
                   A design taken out of the basket again isn’t remembered, so “put in a basket” only counts those
-                  still in one or ordered. Product page visits aren’t recorded — the site keeps no visitor
-                  analytics.
+                  still in one or ordered. Product page visits are counted by Vercel Web Analytics, which can only be
+                  seen in Vercel’s dashboard.
                 </Insight>
               </>
             )}
