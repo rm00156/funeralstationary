@@ -67,16 +67,41 @@ export const SUBJECT_PORTRAIT_IDS = [
   "portrait-26", // cat
 ] as const;
 
+/**
+ * The studio set's twelve people again, older — the same faces in the same
+ * order and clothes, aged to the years most of these booklets are for. Same
+ * plain grey ground and the same alternating woman/man order, so a template
+ * pinned to one studio portrait can move to its older twin without its
+ * sample name changing. Pinned per template like the studio set (and offered
+ * in the admin picker), never dealt out automatically.
+ */
+export const ELDER_PORTRAIT_IDS = [
+  "portrait-27",
+  "portrait-28",
+  "portrait-29",
+  "portrait-30",
+  "portrait-31",
+  "portrait-32",
+  "portrait-33",
+  "portrait-34",
+  "portrait-35",
+  "portrait-36",
+  "portrait-37",
+  "portrait-38",
+] as const;
+
 export const PLACEHOLDER_PORTRAIT_IDS = [
   ...MONO_PORTRAIT_IDS,
   ...COLOUR_PORTRAIT_IDS,
   ...STUDIO_PORTRAIT_IDS,
   ...SUBJECT_PORTRAIT_IDS,
+  ...ELDER_PORTRAIT_IDS,
 ] as const;
 
 export type PlaceholderPortraitId = (typeof PLACEHOLDER_PORTRAIT_IDS)[number];
 export type StudioPortraitId = (typeof STUDIO_PORTRAIT_IDS)[number];
 export type SubjectPortraitId = (typeof SUBJECT_PORTRAIT_IDS)[number];
+export type ElderPortraitId = (typeof ELDER_PORTRAIT_IDS)[number];
 
 /**
  * Who each studio portrait shows, so a template previewed with one carries a
@@ -98,12 +123,29 @@ export const STUDIO_PORTRAIT_GENDER: Record<StudioPortraitId, "woman" | "man"> =
   "portrait-21": "man",
 };
 
+/** Who each older studio portrait shows; the same as its younger twin's. */
+export const ELDER_PORTRAIT_GENDER: Record<ElderPortraitId, "woman" | "man"> = {
+  "portrait-27": "woman",
+  "portrait-28": "man",
+  "portrait-29": "woman",
+  "portrait-30": "man",
+  "portrait-31": "woman",
+  "portrait-32": "man",
+  "portrait-33": "woman",
+  "portrait-34": "man",
+  "portrait-35": "woman",
+  "portrait-36": "man",
+  "portrait-37": "woman",
+  "portrait-38": "man",
+};
+
 /** The sets a pick can belong to; a rotation stays inside its pick's set. */
 const PORTRAIT_SETS: ReadonlyArray<readonly PlaceholderPortraitId[]> = [
   MONO_PORTRAIT_IDS,
   COLOUR_PORTRAIT_IDS,
   STUDIO_PORTRAIT_IDS,
   SUBJECT_PORTRAIT_IDS,
+  ELDER_PORTRAIT_IDS,
 ];
 
 export function isPlaceholderPortraitId(value: unknown): value is PlaceholderPortraitId {

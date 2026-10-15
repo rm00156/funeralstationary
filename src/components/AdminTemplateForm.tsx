@@ -7,7 +7,7 @@ import { ArrowDown, ArrowUp, ImagePlus, X } from "lucide-react";
 
 import type { AdminCategory, AdminProduct, AdminTemplate } from "@/lib/adminCatalogue.server";
 import { adminMutate } from "@/lib/adminClient";
-import { COLOUR_PORTRAIT_IDS, MONO_PORTRAIT_IDS } from "@/lib/placeholderPortraits";
+import { COLOUR_PORTRAIT_IDS, ELDER_PORTRAIT_IDS, MONO_PORTRAIT_IDS } from "@/lib/placeholderPortraits";
 
 const fieldInput =
   "rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 font-body text-sm focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15";
@@ -355,7 +355,7 @@ export default function AdminTemplateForm({
             >
               Automatic
             </button>
-            {[...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS].map((id) => (
+            {[...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS, ...ELDER_PORTRAIT_IDS].map((id) => (
               <button
                 key={id}
                 type="button"

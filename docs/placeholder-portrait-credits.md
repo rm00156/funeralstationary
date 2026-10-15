@@ -3,7 +3,7 @@
 Stand-in photographs used only in template preview thumbnails (see
 `src/lib/placeholderPortraits.ts`); never printed, never stored in a layout.
 
-`portrait-1` to `portrait-21` are AI-generated. The subject portraits are CC0
+`portrait-1` to `portrait-21`, and `portrait-27` to `portrait-38` (the studio set's people, older), are AI-generated. The subject portraits are CC0
 photographs from Wikimedia Commons, cropped to 3:4:
 
 | Id | Subject | Source | Licence |
