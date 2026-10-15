@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
 import TrustpilotBadge from "@/components/TrustpilotBadge";
-import { coverWidthFactor, trimAspect } from "@/lib/designEditor";
+import { coverWidthFactor, sizeText, trimAspect } from "@/lib/designEditor";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { ORDER_CUTOFF, UPLOAD_DESIGN_HREF } from "@/lib/site";
 import type { ProductShowcase, Template } from "@/lib/templates";
@@ -46,9 +46,11 @@ export default function Hero({
           </h1>
           {/* On a phone the covers beside the text would land a screen below
               the button, just above the design grid. A small row here puts
-              the product on the first screen instead. */}
+              the product on the first screen instead. Neither set of covers
+              is preloaded or eager: only the one on show should download,
+              and a lazy image that's display:none never does. */}
           {lead && covers.length > 0 && (
-            <div className="flex w-full max-w-[360px] items-start gap-2.5 lg:hidden">
+            <div className="flex w-full max-w-[360px] items-start justify-center gap-2.5 lg:hidden">
               {covers.map((cover) => (
                 <div
                   key={cover.id}
@@ -61,7 +63,6 @@ export default function Hero({
                     src={cover.image}
                     alt={`${cover.name} design, front cover`}
                     fill
-                    loading="eager"
                     sizes="90px"
                     className="object-cover"
                   />
@@ -121,7 +122,6 @@ export default function Hero({
                           src={cover.image}
                           alt={`${cover.name} design, front cover`}
                           fill
-                          priority
                           sizes="190px"
                           className="object-cover"
                         />
@@ -131,7 +131,8 @@ export default function Hero({
               ))}
             </div>
             <p className="text-[15px] text-ink-2">
-              {lead.templateCount} designs · {lead.format.sizeLabel} heavyweight paper
+              {lead.templateCount} {lead.templateCount === 1 ? "design" : "designs"} ·{" "}
+              {sizeText(lead.format)} · heavyweight paper
             </p>
           </div>
         )}

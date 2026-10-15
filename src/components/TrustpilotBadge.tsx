@@ -16,6 +16,15 @@ declare global {
 }
 
 /**
+ * `start` lines the badge's text up with what's above it; `centre-below-lg`
+ * centres it until lg, for a layout that is centred on phones (the home hero).
+ */
+const ALIGN = {
+  start: "-ml-[18px] max-w-[calc(100%+18px)]",
+  "centre-below-lg": "mx-auto max-w-full lg:mx-0 lg:-ml-[18px] lg:max-w-[calc(100%+18px)]",
+} as const;
+
+/**
  * Trustpilot's own badge, drawn and kept current by Trustpilot — the one
  * figure on the page we can't have typed. It needs Trustpilot's bootstrap
  * script: the badge's frame pings its parent page and, with no answer, shows
@@ -25,15 +34,6 @@ declare global {
  * split test it joins when the element carries `data-group`, so never add
  * one — that would need consent (see /privacy and siteCookies.ts).
  */
-/**
- * `start` lines the badge's text up with what's above it; `centre-below-lg`
- * centres it until lg, for a layout that is centred on phones (the home hero).
- */
-const ALIGN = {
-  start: "-ml-[18px] max-w-[calc(100%+18px)]",
-  "centre-below-lg": "mx-auto max-w-full lg:mx-0 lg:-ml-[18px] lg:max-w-[calc(100%+18px)]",
-} as const;
-
 export default function TrustpilotBadge({ align = "start" }: { align?: keyof typeof ALIGN }) {
   const ref = useRef<HTMLDivElement>(null);
 
