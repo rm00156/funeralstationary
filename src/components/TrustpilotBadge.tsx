@@ -25,7 +25,16 @@ declare global {
  * split test it joins when the element carries `data-group`, so never add
  * one — that would need consent (see /privacy and siteCookies.ts).
  */
-export default function TrustpilotBadge() {
+/**
+ * `start` lines the badge's text up with what's above it; `centre-below-lg`
+ * centres it until lg, for a layout that is centred on phones (the home hero).
+ */
+const ALIGN = {
+  start: "-ml-[18px] max-w-[calc(100%+18px)]",
+  "centre-below-lg": "mx-auto max-w-full lg:mx-0 lg:-ml-[18px] lg:max-w-[calc(100%+18px)]",
+} as const;
+
+export default function TrustpilotBadge({ align = "start" }: { align?: keyof typeof ALIGN }) {
   const ref = useRef<HTMLDivElement>(null);
 
   // The script initialises the badges on the page when it first loads. On a
@@ -42,8 +51,8 @@ export default function TrustpilotBadge() {
         // (alignment is a custom style, a paid feature), so the frame is sized to
         // the ~243px text plus ~12px the badge keeps for itself, with headroom
         // for wider system fonts, and pulled left past the badge's own padding so
-        // the text lines up with the stars above it.
-        className="trustpilot-widget -ml-[18px] h-6 w-[272px] max-w-[calc(100%+18px)]"
+        // the text lines up with the stars above it — or, centred, not pulled.
+        className={`trustpilot-widget h-6 w-[272px] ${ALIGN[align]}`}
         data-locale="en-GB"
         data-template-id={MICRO_REVIEW_COUNT}
         data-businessunit-id={TRUSTPILOT.businessUnitId}

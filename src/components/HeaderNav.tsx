@@ -113,7 +113,9 @@ export default function HeaderNav({
   return (
     <div className="site-chrome font-body">
       <div className="bg-plum-deep text-[15px] text-on-plum">
-        <div className="site-container flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-2.5">
+        {/* On a phone the bar is one centred line — the delivery promise; the
+            trade link and the phone number are in the menu there. */}
+        <div className="site-container flex flex-wrap items-center justify-center gap-x-6 gap-y-1 py-2 text-center text-sm sm:justify-between sm:py-2.5 sm:text-left sm:text-[15px]">
           {shopClosed ? (
             <span>
               <strong className="font-semibold text-white">We’re not taking orders online just now.</strong>{" "}
@@ -122,11 +124,11 @@ export default function HeaderNav({
           ) : (
             <span>
               <strong className="font-semibold text-white">{STANDARD_TURNAROUND}</strong> delivery
-              if ordered before <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong>{" "}
-              on a working day
+              if ordered before <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong>
+              <span className="hidden sm:inline"> on a working day</span>
             </span>
           )}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+          <div className="hidden flex-wrap items-center gap-x-6 gap-y-1 sm:flex">
             <Link
               href={trade ? "/account" : TRADE_HREF}
               aria-current={!trade && pathname === TRADE_HREF ? "page" : undefined}
@@ -337,6 +339,21 @@ export default function HeaderNav({
               <Link href="/account" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
                 {user ? "My account" : "Sign in"}
               </Link>
+            </div>
+            {/* On a phone the utility bar leaves these out to stay one line. */}
+            <div className="border-t border-line py-2 sm:hidden">
+              <Link
+                href={trade ? "/account" : TRADE_HREF}
+                onClick={() => setMenuOpen(false)}
+                aria-current={!trade && pathname === TRADE_HREF ? "page" : undefined}
+                className={MENU_ITEM}
+              >
+                {trade ? "Your trade account" : "Trade accounts"}
+              </Link>
+              <a href={PHONE_HREF} className={`${MENU_ITEM.replace("block", "flex items-center")} gap-2`}>
+                <Phone size={18} strokeWidth={1.8} aria-hidden className="text-plum" />
+                {OPENING_HOURS} · {PHONE_DISPLAY}
+              </a>
             </div>
             {user && (
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-3 pt-4">

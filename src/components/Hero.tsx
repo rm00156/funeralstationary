@@ -33,7 +33,8 @@ export default function Hero({
       {/* One column below lg: the covers move from beside the text to a
           small row inside it (see below), so the switch is one breakpoint. */}
       <div className="site-container grid items-center gap-16 pb-20 pt-10 md:pb-24 md:pt-14 lg:grid-cols-2">
-        <div className="flex flex-col gap-7">
+        {/* Centred until lg, where the covers come in beside it. */}
+        <div className="flex flex-col items-center gap-7 text-center lg:items-start lg:text-left">
           {lead && (
             <p className="text-[15px] font-semibold uppercase tracking-[0.14em] text-plum">
               {lead.label}
@@ -73,7 +74,7 @@ export default function Hero({
               ? `Choose one of ${lead.templateCount} designs, add their photographs and words online, and we’ll print and deliver anywhere in the UK.`
               : "Choose a design, add their photographs and words online, and we’ll print on heavyweight paper and deliver anywhere in the UK."}
           </p>
-          <ul className="flex flex-col gap-3 text-[17px]">
+          <ul className="flex flex-col gap-3 text-left text-[17px]">
             {[
               `Order by ${ORDER_CUTOFF} for next-working-day delivery`,
               lead && `From ${formatPence(lead.fromPence)} for ${copiesText(lead.fromCopies)}`,
@@ -87,7 +88,7 @@ export default function Hero({
                 </li>
               ))}
           </ul>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 pt-1">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4 pt-1 lg:justify-start">
             <a href="#designs" className="btn btn-primary min-h-14 px-[30px] text-lg">
               Browse designs
               <ArrowRight size={18} aria-hidden />
@@ -96,8 +97,8 @@ export default function Hero({
               Upload your own design
             </Link>
           </div>
-          <div className="mt-1 border-t border-line pt-6 text-[15px]">
-            <TrustpilotBadge />
+          <div className="mt-1 w-full border-t border-line pt-6 text-[15px]">
+            <TrustpilotBadge align="centre-below-lg" />
           </div>
         </div>
 
