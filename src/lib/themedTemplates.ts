@@ -44,7 +44,10 @@ import {
 } from "@/lib/classicTemplates";
 import { FULL_BLEED_BOX, uid, type CanvasElement, type DesignPage } from "@/lib/designEditor";
 import {
+  ELDER_PORTRAIT_IDS,
   STUDIO_PORTRAIT_GENDER,
+  STUDIO_PORTRAIT_IDS,
+  type ElderPortraitId,
   type StudioPortraitId,
   type SubjectPortraitId,
 } from "@/lib/placeholderPortraits";
@@ -1030,8 +1033,19 @@ export const SUBJECT_PEOPLE: Record<SubjectPortraitId, Person> = {
   "portrait-26": { name: "Misty", nickname: "Misty" },
 };
 
+/**
+ * The older studio portraits are the same twelve people aged, in the same
+ * order, so each is shown as its younger twin — same name, same wording.
+ */
+export const ELDER_PEOPLE = Object.fromEntries(
+  ELDER_PORTRAIT_IDS.map((id, index) => [id, STUDIO_PEOPLE[STUDIO_PORTRAIT_IDS[index]]]),
+) as Record<ElderPortraitId, Person>;
+
+/** A stand-in a themed template can be pinned to. */
+export type ThemedPortraitId = StudioPortraitId | ElderPortraitId | SubjectPortraitId;
+
 /** Who each pinnable stand-in shows. */
-const PEOPLE: Record<StudioPortraitId | SubjectPortraitId, Person> = { ...STUDIO_PEOPLE, ...SUBJECT_PEOPLE };
+const PEOPLE: Record<ThemedPortraitId, Person> = { ...STUDIO_PEOPLE, ...ELDER_PEOPLE, ...SUBJECT_PEOPLE };
 
 /**
  * The designs' sample wording that names or genders the person, and what it
@@ -1069,8 +1083,12 @@ export interface ThemedTemplateSpec {
   name: string;
   design: ThemedDesignId;
   categories: string[];
-  /** The stand-in portrait its preview is drawn with, pinned on create. */
-  portrait: StudioPortraitId | SubjectPortraitId;
+  /**
+   * The stand-in portrait its preview is drawn with, pinned on create: the
+   * older studio face where the theme reads as a long life (faith, heritage,
+   * the quieter pastimes), the younger one where it reads young (most sport).
+   */
+  portrait: ThemedPortraitId;
   /** Who the template is shown as — named and worded to match the portrait. */
   person: Person;
   /**
@@ -1085,43 +1103,43 @@ const CURATED_THEMED: Array<
     name: string,
     design: ThemedDesignId,
     categories: string[],
-    portrait: StudioPortraitId | SubjectPortraitId,
+    portrait: ThemedPortraitId,
     backgrounds?: Array<[id: string, palette: PaletteId]>,
   ]
 > = [
-  ["Celtic Cross", "celtic-cross", ["religious", "classic"], "portrait-21"],
-  ["Grey Cross", "grey-cross", ["religious", "simple"], "portrait-15"],
-  ["New Cross", "new-cross", ["religious", "classic"], "portrait-17"],
-  ["Cross Doves", "cross-doves", ["religious", "birds", "colourful"], "portrait-18"],
-  ["Religious Cross 1", "religious-cross-1", ["religious", "simple"], "portrait-16"],
-  ["Religious Cross 2", "religious-cross-2", ["religious", "simple"], "portrait-10"],
-  ["Brown Heart", "brown-heart", ["classic", "cultural"], "portrait-21"],
-  ["French", "french", ["cultural", "colourful"], "portrait-19"],
-  ["Italian", "italian", ["cultural", "colourful"], "portrait-13"],
-  ["Jamaican Butterfly", "jamaican-butterfly", ["cultural", "colourful"], "portrait-15"],
+  ["Celtic Cross", "celtic-cross", ["religious", "classic"], "portrait-38"],
+  ["Grey Cross", "grey-cross", ["religious", "simple"], "portrait-32"],
+  ["New Cross", "new-cross", ["religious", "classic"], "portrait-34"],
+  ["Cross Doves", "cross-doves", ["religious", "birds", "colourful"], "portrait-35"],
+  ["Religious Cross 1", "religious-cross-1", ["religious", "simple"], "portrait-33"],
+  ["Religious Cross 2", "religious-cross-2", ["religious", "simple"], "portrait-27"],
+  ["Brown Heart", "brown-heart", ["classic", "cultural"], "portrait-38"],
+  ["French", "french", ["cultural", "colourful"], "portrait-36"],
+  ["Italian", "italian", ["cultural", "colourful"], "portrait-30"],
+  ["Jamaican Butterfly", "jamaican-butterfly", ["cultural", "colourful"], "portrait-32"],
   ["LGBT", "lgbt", ["cultural", "colourful"], "portrait-17"],
-  ["Guyana Thanksgiving", "guyana-thanksgiving", ["cultural", "colourful"], "portrait-14"],
-  ["Golden Shine", "golden-shine", ["classic", "religious"], "portrait-16"],
+  ["Guyana Thanksgiving", "guyana-thanksgiving", ["cultural", "colourful"], "portrait-31"],
+  ["Golden Shine", "golden-shine", ["classic", "religious"], "portrait-33"],
   ["Bob Marley", "bob-marley", ["music", "cultural", "colourful"], "portrait-11"],
-  ["Blue Candles", "blue-candles", ["religious", "calm"], "portrait-11", []],
-  ["Candlelight", "candlelight", ["religious", "classic"], "portrait-13", []],
-  ["Golden Shine Candles", "golden-shine-candles", ["religious", "classic"], "portrait-10", []],
-  ["Dove in the Clouds", "dove-in-the-clouds", ["religious", "birds", "calm"], "portrait-12", [["sky-rays", "ink"]]],
-  ["Religious Cross Sunlight", "religious-cross-sunlight", ["religious", "calm"], "portrait-19", [["cross-sky", "ink"]]],
-  ["Golden Sunset", "golden-sunset", ["nature", "calm"], "portrait-11", [["lake-sunset-ember", "ember"]]],
-  ["Grand Piano", "grand-piano", ["music", "classic"], "portrait-21", [["piano-keys", "noir"]]],
+  ["Blue Candles", "blue-candles", ["religious", "calm"], "portrait-28", []],
+  ["Candlelight", "candlelight", ["religious", "classic"], "portrait-30", []],
+  ["Golden Shine Candles", "golden-shine-candles", ["religious", "classic"], "portrait-27", []],
+  ["Dove in the Clouds", "dove-in-the-clouds", ["religious", "birds", "calm"], "portrait-29", [["sky-rays", "ink"]]],
+  ["Religious Cross Sunlight", "religious-cross-sunlight", ["religious", "calm"], "portrait-36", [["cross-sky", "ink"]]],
+  ["Golden Sunset", "golden-sunset", ["nature", "calm"], "portrait-28", [["lake-sunset-ember", "ember"]]],
+  ["Grand Piano", "grand-piano", ["music", "classic"], "portrait-38", [["piano-keys", "noir"]]],
   ["Guitar", "guitar", ["music", "simple"], "portrait-12", []],
   ["Melody", "melody", ["music", "calm"], "portrait-17", [["sheet-music", "ink"]]],
-  ["Bookworm", "bookworm", ["sport", "simple"], "portrait-11", []],
+  ["Bookworm", "bookworm", ["sport", "simple"], "portrait-28", []],
   ["Karate Grey", "karate-grey", ["sport", "modern"], "portrait-12", []],
   ["Kickboxer Yellow", "kickboxer-yellow", ["sport", "modern"], "portrait-15", []],
   ["Fields", "fields", ["nature", "calm"], "portrait-20", [["meadow-wash", "ink"]]],
-  ["Mountain Waterfall", "mountain-waterfall", ["nature", "calm"], "portrait-21", [["waterfall-band", "periwinkle"]]],
+  ["Mountain Waterfall", "mountain-waterfall", ["nature", "calm"], "portrait-38", [["waterfall-band", "periwinkle"]]],
   ["Red Sunset", "red-sunset", ["nature", "modern"], "portrait-14", [["red-sunset-band", "wine"]]],
   ["Basketball", "basketball", ["sport"], "portrait-15", []],
-  ["Cricket", "cricket", ["sport"], "portrait-13", [["grass-band", "ink"]]],
+  ["Cricket", "cricket", ["sport"], "portrait-30", [["grass-band", "ink"]]],
   ["Football", "football", ["sport"], "portrait-17", [["grass-band", "ink"]]],
-  ["Golf", "golf", ["sport", "calm"], "portrait-19", [["sky-clouds", "ink"]]],
+  ["Golf", "golf", ["sport", "calm"], "portrait-36", [["sky-clouds", "ink"]]],
   ["Rugby", "rugby", ["sport"], "portrait-20", [["sky-clouds", "ink"]]],
   ["Rainbow Sky", "rainbow-sky", ["child", "colourful"], "portrait-22"],
   ["Rabbit Blue", "rabbit-blue", ["pets"], "portrait-23"],

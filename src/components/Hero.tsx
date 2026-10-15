@@ -10,7 +10,7 @@ import type { ProductShowcase, Template } from "@/lib/templates";
 
 /**
  * The home page hero. It leads with the shop's first product (sort order is
- * the admin's call) — its name, design count, "from" price and two of its real
+ * the admin's call) — its name, design count, "from" price and four of its real
  * covers — so nothing here is a hardcoded claim about the catalogue.
  */
 export default function Hero({
@@ -18,18 +18,23 @@ export default function Hero({
   covers,
 }: {
   lead: ProductShowcase | null;
-  /** Up to two of the lead product's designs, shown as overlapping covers. */
+  /**
+   * Up to four of the lead product's designs: flat covers in two columns
+   * beside the text, or a small row under the headline below lg.
+   */
   covers: Template[];
 }) {
-  const [front, back] = covers;
   const trim = lead?.format.trim;
   const aspectRatio = trim ? trimAspect(trim) : undefined;
   const narrow = trim ? coverWidthFactor(trim) : 1;
 
   return (
     <section className="bg-paper">
-      <div className="site-container grid grid-cols-[repeat(auto-fit,minmax(min(460px,100%),1fr))] items-center gap-16 pb-20 pt-14 md:pb-24 md:pt-[88px]">
-        <div className="flex flex-col gap-7">
+      {/* One column below lg: the covers move from beside the text to a
+          small row inside it (see below), so the switch is one breakpoint. */}
+      <div className="site-container grid items-center gap-16 pb-20 pt-10 md:pb-24 md:pt-14 lg:grid-cols-2">
+        {/* Centred until lg, where the covers come in beside it. */}
+        <div className="flex flex-col items-center gap-7 text-center lg:items-start lg:text-left">
           {lead && (
             <p className="text-[15px] font-semibold uppercase tracking-[0.14em] text-plum">
               {lead.label}
@@ -39,12 +44,38 @@ export default function Hero({
             A beautiful order of service,{" "}
             <em className="text-plum">ready in time for the day.</em>
           </h1>
+          {/* On a phone the covers beside the text would land a screen below
+              the button, just above the design grid. A small row here puts
+              the product on the first screen instead. Neither set of covers
+              is preloaded or eager: only the one on show should download,
+              and a lazy image that's display:none never does. */}
+          {lead && covers.length > 0 && (
+            <div className="flex w-full max-w-[360px] items-start justify-center gap-2.5 lg:hidden">
+              {covers.map((cover) => (
+                <div
+                  key={cover.id}
+                  className="relative shrink-0 overflow-hidden rounded-[2px] bg-sheet shadow-cover"
+                  // A quarter of the row less its three 10px gaps; a narrow
+                  // format (a bookmark) narrower, at the same height.
+                  style={{ aspectRatio, width: `calc((100% - 30px) / 4 * ${narrow})` }}
+                >
+                  <Image
+                    src={cover.image}
+                    alt={`${cover.name} design, front cover`}
+                    fill
+                    sizes="90px"
+                    className="object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
           <p className="max-w-[34em] text-xl leading-[1.6] text-ink-2">
             {lead
               ? `Choose one of ${lead.templateCount} designs, add their photographs and words online, and we’ll print and deliver anywhere in the UK.`
               : "Choose a design, add their photographs and words online, and we’ll print on heavyweight paper and deliver anywhere in the UK."}
           </p>
-          <ul className="flex flex-col gap-3 text-[17px]">
+          <ul className="flex flex-col gap-3 text-left text-[17px]">
             {[
               `Order by ${ORDER_CUTOFF} for next-working-day delivery`,
               lead && `From ${formatPence(lead.fromPence)} for ${copiesText(lead.fromCopies)}`,
@@ -58,7 +89,7 @@ export default function Hero({
                 </li>
               ))}
           </ul>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 pt-1">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4 pt-1 lg:justify-start">
             <a href="#designs" className="btn btn-primary min-h-14 px-[30px] text-lg">
               Browse designs
               <ArrowRight size={18} aria-hidden />
@@ -67,47 +98,41 @@ export default function Hero({
               Upload your own design
             </Link>
           </div>
-          <div className="mt-1 border-t border-line pt-6 text-[15px]">
-            <TrustpilotBadge />
+          <div className="mt-1 w-full border-t border-line pt-6 text-[15px]">
+            <TrustpilotBadge align="centre-below-lg" />
           </div>
         </div>
 
-        {front && (
-          <div className="relative flex items-end justify-center pb-10 pt-6">
-            <div
-              aria-hidden
-              className="absolute inset-x-[6%] bottom-0 top-[8%] rounded-b-3xl rounded-t-[280px] bg-mist-3"
-            />
-            <div
-              className="relative z-[1] rotate-[-4deg] overflow-hidden rounded-[3px] bg-sheet shadow-cover-lg"
-              style={{ aspectRatio, width: `calc(min(270px, 52%) * ${narrow})` }}
-            >
-              <Image
-                src={front.image}
-                alt={`${front.name} design, front cover`}
-                fill
-                priority
-                sizes="270px"
-                className="object-cover"
-              />
+        {lead && covers.length > 0 && (
+          <div className="hidden flex-col items-center gap-6 lg:flex">
+            {/* Two columns, the second dropped a little — flat covers laid
+                out like a shop's product shots, not a fan of tilted prints. */}
+            <div className="grid grid-cols-2 items-start gap-x-[clamp(20px,4vw,44px)]">
+              {[0, 1].map((column) => (
+                <div key={column} className={`flex flex-col gap-6 ${column === 1 ? "mt-10" : ""}`}>
+                  {covers
+                    .filter((_, index) => index % 2 === column)
+                    .map((cover) => (
+                      <div
+                        key={cover.id}
+                        className="relative overflow-hidden rounded-[3px] bg-sheet shadow-cover"
+                        style={{ aspectRatio, width: `calc(190px * ${narrow})` }}
+                      >
+                        <Image
+                          src={cover.image}
+                          alt={`${cover.name} design, front cover`}
+                          fill
+                          sizes="190px"
+                          className="object-cover"
+                        />
+                      </div>
+                    ))}
+                </div>
+              ))}
             </div>
-            {back && (
-              <div
-                className="relative z-[2] -mb-5 -ml-[70px] rotate-[5deg] overflow-hidden rounded-[3px] bg-sheet shadow-cover-lg"
-                style={{ aspectRatio, width: `calc(min(240px, 46%) * ${narrow})` }}
-              >
-                <Image
-                  src={back.image}
-                  alt={`${back.name} design, front cover`}
-                  fill
-                  priority
-                  sizes="240px"
-                  className="object-cover"
-                />
-              </div>
-            )}
-            <p className="absolute bottom-0 right-[4%] z-[3] rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink-2 shadow-cover">
-              {lead && `${sizeText(lead.format)} · `}heavyweight paper
+            <p className="text-[15px] text-ink-2">
+              {lead.templateCount} {lead.templateCount === 1 ? "design" : "designs"} ·{" "}
+              {sizeText(lead.format)} · heavyweight paper
             </p>
           </div>
         )}

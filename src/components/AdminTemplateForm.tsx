@@ -7,7 +7,12 @@ import { ArrowDown, ArrowUp, ImagePlus, X } from "lucide-react";
 
 import type { AdminCategory, AdminProduct, AdminTemplate } from "@/lib/adminCatalogue.server";
 import { adminMutate } from "@/lib/adminClient";
-import { COLOUR_PORTRAIT_IDS, MONO_PORTRAIT_IDS } from "@/lib/placeholderPortraits";
+import {
+  COLOUR_PORTRAIT_IDS,
+  ELDER_PORTRAIT_GENDER,
+  ELDER_PORTRAIT_IDS,
+  MONO_PORTRAIT_IDS,
+} from "@/lib/placeholderPortraits";
 
 const fieldInput =
   "rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 font-body text-sm focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15";
@@ -355,13 +360,16 @@ export default function AdminTemplateForm({
             >
               Automatic
             </button>
-            {[...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS].map((id) => (
+            {[...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS, ...ELDER_PORTRAIT_IDS].map((id) => (
               <button
                 key={id}
                 type="button"
                 role="radio"
                 aria-checked={portrait === id}
-                aria-label={id.replace("-", " ")}
+                // The older studio faces record who they show: say so, since a
+                // template's sample wording may name a man or a woman.
+                aria-label={portraitLabel(id)}
+                title={portraitLabel(id)}
                 onClick={() => setPortrait(id)}
                 className={`relative h-24 w-20 overflow-hidden rounded-lg border-2 ${
                   portrait === id ? "border-primary-container" : "border-outline-variant/50"
@@ -400,4 +408,9 @@ export default function AdminTemplateForm({
       </div>
     </form>
   );
+}
+
+function portraitLabel(id: string): string {
+  const gender = ELDER_PORTRAIT_GENDER[id as keyof typeof ELDER_PORTRAIT_GENDER];
+  return gender ? `${id.replace("-", " ")}, ${gender}` : id.replace("-", " ");
 }

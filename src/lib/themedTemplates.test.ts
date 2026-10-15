@@ -7,7 +7,10 @@ import { CLASSIC_TEMPLATE_SPECS } from "@/lib/classicTemplates";
 import { TEMPLATE_PAGE_COUNT, type CanvasElement, type TextElement } from "@/lib/designEditor";
 import { FLAT_TEMPLATE_SPECS } from "@/lib/flatTemplates";
 import {
+  ELDER_PORTRAIT_GENDER,
+  ELDER_PORTRAIT_IDS,
   STUDIO_PORTRAIT_GENDER,
+  STUDIO_PORTRAIT_IDS,
   SUBJECT_PORTRAIT_IDS,
   isPlaceholderPortraitId,
 } from "@/lib/placeholderPortraits";
@@ -16,6 +19,7 @@ import { PLACEHOLDER_INTERIOR, PLACEHOLDER_NAME, TEMPLATE_SPECS } from "@/lib/te
 import {
   ARTWORK_PATH,
   THEMED_DESIGN_IDS,
+  ELDER_PEOPLE,
   PET_YEARS,
   STUDIO_PEOPLE,
   SUBJECT_PEOPLE,
@@ -131,6 +135,30 @@ describe("personalise", () => {
   it("gives every studio portrait a person of the same gender", () => {
     for (const [id, who] of Object.entries(STUDIO_PEOPLE)) {
       expect(who.gender, id).toBe(STUDIO_PORTRAIT_GENDER[id as keyof typeof STUDIO_PORTRAIT_GENDER]);
+    }
+  });
+
+  it("shows each older studio portrait as its younger twin, so a switch changes no wording", () => {
+    ELDER_PORTRAIT_IDS.forEach((id, index) => {
+      expect(ELDER_PEOPLE[id], id).toEqual(STUDIO_PEOPLE[STUDIO_PORTRAIT_IDS[index]]);
+      expect(ELDER_PEOPLE[id].gender, id).toBe(ELDER_PORTRAIT_GENDER[id]);
+    });
+  });
+
+  it("previews every adult template with a face of its sample person's gender", () => {
+    const genders: Record<string, string> = { ...STUDIO_PORTRAIT_GENDER, ...ELDER_PORTRAIT_GENDER };
+    for (const spec of THEMED_TEMPLATE_SPECS.filter((s) => s.portrait in genders)) {
+      expect(spec.person.gender, spec.slug).toBe(genders[spec.portrait]);
+    }
+  });
+
+  it("uses the older faces for the faith and heritage covers, the younger for most sport", () => {
+    const portrait = (slug: string) => THEMED_TEMPLATE_SPECS.find((s) => s.slug === slug)?.portrait;
+    for (const slug of ["celtic-cross", "candlelight", "french", "golden-sunset", "grand-piano", "golf"]) {
+      expect(ELDER_PORTRAIT_IDS as readonly string[], slug).toContain(portrait(slug));
+    }
+    for (const slug of ["football", "rugby", "basketball", "karate-grey", "bob-marley", "lgbt"]) {
+      expect(STUDIO_PORTRAIT_IDS as readonly string[], slug).toContain(portrait(slug));
     }
   });
 });

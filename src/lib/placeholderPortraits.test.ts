@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   COLOUR_PORTRAIT_IDS,
   MONO_PORTRAIT_IDS,
+  ELDER_PORTRAIT_GENDER,
+  ELDER_PORTRAIT_IDS,
   STUDIO_PORTRAIT_GENDER,
   STUDIO_PORTRAIT_IDS,
   PLACEHOLDER_PORTRAIT_IDS,
@@ -83,6 +85,28 @@ describe("studio portraits", () => {
 
   it("each record who they show", () => {
     expect(Object.keys(STUDIO_PORTRAIT_GENDER).sort()).toEqual([...STUDIO_PORTRAIT_IDS].sort());
+  });
+});
+
+describe("older studio portraits", () => {
+  it("never enter the automatic sets, so existing templates keep their faces", () => {
+    for (const id of ELDER_PORTRAIT_IDS) {
+      expect(MONO_PORTRAIT_IDS as readonly string[]).not.toContain(id);
+      expect(COLOUR_PORTRAIT_IDS as readonly string[]).not.toContain(id);
+    }
+  });
+
+  it("can be pinned, and rotate within their own set", () => {
+    const rotation = portraitRotationFor(page([photo(null)]), "golf", "portrait-30");
+    expect(rotation[0]).toBe("portrait-30");
+    expect([...rotation].sort()).toEqual([...ELDER_PORTRAIT_IDS].sort());
+  });
+
+  it("each record who they show, the same as their younger twin", () => {
+    expect(Object.keys(ELDER_PORTRAIT_GENDER).sort()).toEqual([...ELDER_PORTRAIT_IDS].sort());
+    ELDER_PORTRAIT_IDS.forEach((id, index) =>
+      expect(ELDER_PORTRAIT_GENDER[id], id).toBe(STUDIO_PORTRAIT_GENDER[STUDIO_PORTRAIT_IDS[index]]),
+    );
   });
 });
 

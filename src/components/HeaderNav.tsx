@@ -60,8 +60,11 @@ function useDismiss(open: boolean, ref: React.RefObject<HTMLElement | null>, clo
 }
 
 const GROUP_HEADING = "px-3 pb-1.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-label";
-const MENU_ITEM =
-  "block rounded-lg px-3 py-2.5 text-ink no-underline transition-colors hover:bg-mist-2 hover:text-plum";
+const MENU_ITEM_LOOK =
+  "rounded-lg px-3 py-2.5 text-ink no-underline transition-colors hover:bg-mist-2 hover:text-plum";
+const MENU_ITEM = `block ${MENU_ITEM_LOOK}`;
+/** A menu item with an icon before its text. */
+const MENU_ITEM_ICON = `flex items-center gap-2 ${MENU_ITEM_LOOK}`;
 
 /**
  * The client half of the header; Header.tsx feeds it the sellable products
@@ -113,7 +116,10 @@ export default function HeaderNav({
   return (
     <div className="site-chrome font-body">
       <div className="bg-plum-deep text-[15px] text-on-plum">
-        <div className="site-container flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-2.5">
+        {/* On a phone the bar is just the delivery promise, centred; the trade
+            link and the phone number are in the menu there — except while the
+            shop is closed, when the message asks people to call. */}
+        <div className="site-container flex flex-wrap items-center justify-center gap-x-6 gap-y-1 py-2 text-center text-sm sm:justify-between sm:py-2.5 sm:text-left sm:text-[15px]">
           {shopClosed ? (
             <span>
               <strong className="font-semibold text-white">We’re not taking orders online just now.</strong>{" "}
@@ -126,11 +132,15 @@ export default function HeaderNav({
               on a working day
             </span>
           )}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+          <div
+            className={`flex-wrap items-center justify-center gap-x-6 gap-y-1 ${
+              shopClosed ? "flex" : "hidden sm:flex"
+            }`}
+          >
             <Link
               href={trade ? "/account" : TRADE_HREF}
               aria-current={!trade && pathname === TRADE_HREF ? "page" : undefined}
-              className="flex min-h-6 items-center font-semibold text-white underline underline-offset-4 hover:text-on-plum"
+              className="hidden min-h-6 items-center font-semibold text-white underline underline-offset-4 hover:text-on-plum sm:flex"
             >
               {trade ? "Your trade account" : "Trade accounts"}
             </Link>
@@ -337,6 +347,21 @@ export default function HeaderNav({
               <Link href="/account" onClick={() => setMenuOpen(false)} className={MENU_ITEM}>
                 {user ? "My account" : "Sign in"}
               </Link>
+            </div>
+            {/* On a phone the utility bar leaves these out to stay one line. */}
+            <div className="border-t border-line py-2 sm:hidden">
+              <Link
+                href={trade ? "/account" : TRADE_HREF}
+                onClick={() => setMenuOpen(false)}
+                aria-current={!trade && pathname === TRADE_HREF ? "page" : undefined}
+                className={MENU_ITEM}
+              >
+                {trade ? "Your trade account" : "Trade accounts"}
+              </Link>
+              <a href={PHONE_HREF} className={MENU_ITEM_ICON}>
+                <Phone size={18} strokeWidth={1.8} aria-hidden className="text-plum" />
+                {OPENING_HOURS} · {PHONE_DISPLAY}
+              </a>
             </div>
             {user && (
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-3 pt-4">

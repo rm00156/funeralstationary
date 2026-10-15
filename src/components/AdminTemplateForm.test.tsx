@@ -62,6 +62,15 @@ describe("AdminTemplateForm", () => {
     expect(body.placeholderPortrait).toBe("portrait-7");
   });
 
+  it("offers the older studio portraits, each labelled with who it shows", async () => {
+    const { sentBody } = renderForm();
+    expect(screen.getByRole("radio", { name: "portrait 27, woman" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "portrait 30, man" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save template" }));
+
+    expect((await sentBody()).placeholderPortrait).toBe("portrait-30");
+  });
+
   it("sends a preview URL the admin pasted", async () => {
     const { sentBody } = renderForm();
     fireEvent.change(screen.getByLabelText(/paste an image url/i), {
