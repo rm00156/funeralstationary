@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 const HOME_DESIGN_COUNT = 6;
 
 /** How many of them the hero pictures, which the grid then avoids repeating. */
-const HERO_COVER_COUNT = 2;
+const HERO_COVER_COUNT = 4;
 
 /**
  * The template category the grid shows first — the plainer designs, which make

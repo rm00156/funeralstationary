@@ -3,14 +3,14 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
 import TrustpilotBadge from "@/components/TrustpilotBadge";
-import { coverWidthFactor, sizeText, trimAspect } from "@/lib/designEditor";
+import { coverWidthFactor, trimAspect } from "@/lib/designEditor";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { ORDER_CUTOFF, UPLOAD_DESIGN_HREF } from "@/lib/site";
 import type { ProductShowcase, Template } from "@/lib/templates";
 
 /**
  * The home page hero. It leads with the shop's first product (sort order is
- * the admin's call) — its name, design count, "from" price and two of its real
+ * the admin's call) — its name, design count, "from" price and four of its real
  * covers — so nothing here is a hardcoded claim about the catalogue.
  */
 export default function Hero({
@@ -18,10 +18,9 @@ export default function Hero({
   covers,
 }: {
   lead: ProductShowcase | null;
-  /** Up to two of the lead product's designs, shown as overlapping covers. */
+  /** Up to four of the lead product's designs, shown as flat covers in two columns. */
   covers: Template[];
 }) {
-  const [front, back] = covers;
   const trim = lead?.format.trim;
   const aspectRatio = trim ? trimAspect(trim) : undefined;
   const narrow = trim ? coverWidthFactor(trim) : 1;
@@ -72,42 +71,36 @@ export default function Hero({
           </div>
         </div>
 
-        {front && (
-          <div className="relative flex items-end justify-center pb-10 pt-6">
-            <div
-              aria-hidden
-              className="absolute inset-x-[6%] bottom-0 top-[8%] rounded-b-3xl rounded-t-[280px] bg-mist-3"
-            />
-            <div
-              className="relative z-[1] rotate-[-4deg] overflow-hidden rounded-[3px] bg-sheet shadow-cover-lg"
-              style={{ aspectRatio, width: `calc(min(270px, 52%) * ${narrow})` }}
-            >
-              <Image
-                src={front.image}
-                alt={`${front.name} design, front cover`}
-                fill
-                priority
-                sizes="270px"
-                className="object-cover"
-              />
+        {lead && covers.length > 0 && (
+          <div className="flex flex-col items-center gap-6">
+            {/* Two columns, the second dropped a little — flat covers laid
+                out like a shop's product shots, not a fan of tilted prints. */}
+            <div className="grid grid-cols-2 items-start gap-x-[clamp(20px,4vw,44px)]">
+              {[0, 1].map((column) => (
+                <div key={column} className={`flex flex-col gap-6 ${column === 1 ? "mt-10" : ""}`}>
+                  {covers
+                    .filter((_, index) => index % 2 === column)
+                    .map((cover) => (
+                      <div
+                        key={cover.id}
+                        className="relative overflow-hidden rounded-[3px] bg-sheet shadow-cover"
+                        style={{ aspectRatio, width: `calc(min(190px, 40vw) * ${narrow})` }}
+                      >
+                        <Image
+                          src={cover.image}
+                          alt={`${cover.name} design, front cover`}
+                          fill
+                          priority
+                          sizes="190px"
+                          className="object-cover"
+                        />
+                      </div>
+                    ))}
+                </div>
+              ))}
             </div>
-            {back && (
-              <div
-                className="relative z-[2] -mb-5 -ml-[70px] rotate-[5deg] overflow-hidden rounded-[3px] bg-sheet shadow-cover-lg"
-                style={{ aspectRatio, width: `calc(min(240px, 46%) * ${narrow})` }}
-              >
-                <Image
-                  src={back.image}
-                  alt={`${back.name} design, front cover`}
-                  fill
-                  priority
-                  sizes="240px"
-                  className="object-cover"
-                />
-              </div>
-            )}
-            <p className="absolute bottom-0 right-[4%] z-[3] rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink-2 shadow-cover">
-              {lead && `${sizeText(lead.format)} · `}heavyweight paper
+            <p className="text-[15px] text-ink-2">
+              {lead.templateCount} designs · {lead.format.sizeLabel} heavyweight paper
             </p>
           </div>
         )}
