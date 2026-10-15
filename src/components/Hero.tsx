@@ -27,7 +27,7 @@ export default function Hero({
 
   return (
     <section className="bg-paper">
-      <div className="site-container grid grid-cols-[repeat(auto-fit,minmax(min(460px,100%),1fr))] items-center gap-16 pb-20 pt-14 md:pb-24 md:pt-[88px]">
+      <div className="site-container grid grid-cols-[repeat(auto-fit,minmax(min(460px,100%),1fr))] items-center gap-16 pb-20 pt-10 md:pb-24 md:pt-14">
         <div className="flex flex-col gap-7">
           {lead && (
             <p className="text-[15px] font-semibold uppercase tracking-[0.14em] text-plum">
