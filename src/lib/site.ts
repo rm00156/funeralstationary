@@ -25,9 +25,8 @@ export const ADDRESS_LINES = [
 export const ADDRESS_TOWN = "Beckenham";
 
 /**
- * Order cut-off for next-working-day delivery. The handoff's mockups said
- * 11am, the live site 10am; until the owner confirms, the earlier time is the
- * one nobody misses the courier by trusting.
+ * Order cut-off for next-working-day delivery. Confirmed by the owner as 10am
+ * (2026-10-23) — the handoff's mockups said 11am, and were wrong.
  */
 export const ORDER_CUTOFF = "10am";
 
