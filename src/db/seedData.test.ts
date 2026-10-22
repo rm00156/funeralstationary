@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORIES, PRICING, PRODUCTS, TEMPLATES } from "./seedCatalogue";
-import { parseLayoutPages, parsePageCount } from "@/lib/adminValidation";
+import { CLOCK_TIME, optionNoteError, parseLayoutPages, parsePageCount } from "@/lib/adminValidation";
+import { ORDER_CUTOFF, withOrderCutoff } from "@/lib/site";
 import { toProductFormat } from "@/lib/designEditor";
 import {
   buildDeliveryOptionsSeed,
@@ -142,6 +143,26 @@ describe("product formats", () => {
         elements: [],
       }));
       expect(parseLayoutPages(pages, toProductFormat(product).templatePages).ok).toBe(true);
+    }
+  });
+});
+
+describe("seeded delivery notes", () => {
+  // A note that types its own time drifts from ORDER_CUTOFF — the 10am/11am
+  // clash the delivery section showed.
+  it("pass the admin note check and name no cut-off time of their own", () => {
+    for (const pricing of Object.values(PRICING)) {
+      for (const option of pricing.delivery) {
+        expect(option.note, option.id).not.toMatch(CLOCK_TIME);
+        expect(optionNoteError("delivery", option.note), option.id).toBeNull();
+      }
+    }
+  });
+
+  it("show the site's cut-off on the next-day option", () => {
+    for (const pricing of Object.values(PRICING)) {
+      const nextDay = pricing.delivery.find((option) => option.id === "next-day");
+      expect(nextDay && withOrderCutoff(nextDay.note)).toContain(ORDER_CUTOFF);
     }
   });
 });

@@ -17,6 +17,7 @@ import {
   type TemplatePageCount,
 } from "@/lib/designEditor";
 import { MAX_PAGES } from "@/lib/designs.server";
+import { CUTOFF_TOKEN, ORDER_CUTOFF } from "@/lib/site";
 import { PRODUCT_OCCASIONS, type ProductOccasion } from "@/lib/templates";
 import { isVatTreatment, type VatTreatment } from "@/lib/vat";
 
@@ -176,6 +177,30 @@ export function parseImageUrl(value: unknown): string | null {
 
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
+/** A clock time like "10am", "11:30am" or "2 pm". */
+export const CLOCK_TIME = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
+
+/**
+ * What's wrong with an option's note, if anything. A delivery note names the
+ * cut-off as {cutoff}, never as a time — a typed "11am" once contradicted the
+ * 10am on every other page — and no note may carry another {token}, which
+ * customers would see as literal braces. Only delivery notes are filled in.
+ */
+export function optionNoteError(kind: OptionKind, note: string | null): string | null {
+  if (!note) return null;
+  for (const token of note.match(/\{[^}]*\}/g) ?? []) {
+    if (token !== CUTOFF_TOKEN || kind !== "delivery") {
+      return kind === "delivery"
+        ? `Unknown ${token} — the only placeholder is ${CUTOFF_TOKEN}`
+        : `Only delivery notes can use placeholders like ${token}`;
+    }
+  }
+  if (kind === "delivery" && CLOCK_TIME.test(note)) {
+    return `Write ${CUTOFF_TOKEN} instead of a time — it shows the site's order cut-off, ${ORDER_CUTOFF}`;
+  }
+  return null;
+}
+
 const usesMultiplier = (kind: OptionKind) =>
   kind === "paper" || kind === "quantity";
 
@@ -199,6 +224,8 @@ export function parseOptionInput(
   if (note === undefined && body.note !== undefined) {
     return { ok: false, error: "Invalid note" };
   }
+  const noteError = optionNoteError(kind, note ?? null);
+  if (noteError) return { ok: false, error: noteError };
   const sortOrder = body.sortOrder === undefined ? 0 : parseSortOrder(body.sortOrder);
   if (sortOrder === null) return { ok: false, error: "Invalid sortOrder" };
 
@@ -258,6 +285,8 @@ export function parseOptionPatch(
     if (kind === "delivery" && note === null) {
       return { ok: false, error: "Delivery options need a note" };
     }
+    const noteError = optionNoteError(kind, note);
+    if (noteError) return { ok: false, error: noteError };
     patch.note = note;
   }
   if (body.sortOrder !== undefined) {

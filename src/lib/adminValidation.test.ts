@@ -5,6 +5,7 @@ import {
   parseLayoutPages,
   parseMultiplier,
   parseOptionInput,
+  optionNoteError,
   parseOptionPatch,
   pageCountFormatError,
   parsePageCount,
@@ -175,9 +176,49 @@ describe("parseOptionInput", () => {
     });
     expect(parsed.ok).toBe(true);
   });
+
+  // A typed time is how the delivery section came to say 11am while every
+  // other page said 10am.
+  it("refuses a delivery note that types the cut-off instead of {cutoff}", () => {
+    const parsed = parseOptionInput("delivery", {
+      slug: "next-day",
+      label: "Next day",
+      pricePence: 1000,
+      note: "Order before 11am for next working day",
+    });
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.error).toContain("{cutoff}");
+  });
+});
+
+describe("optionNoteError", () => {
+  it("accepts {cutoff} in a delivery note, and no note at all", () => {
+    expect(optionNoteError("delivery", "Order by {cutoff} on a working day")).toBeNull();
+    expect(optionNoteError("paper", null)).toBeNull();
+  });
+
+  it("refuses a clock time in a delivery note, but not in a paper note", () => {
+    expect(optionNoteError("delivery", "By 10:30am")).not.toBeNull();
+    expect(optionNoteError("delivery", "Order before 2 pm")).not.toBeNull();
+    expect(optionNoteError("paper", "Dries by 11am")).toBeNull();
+  });
+
+  it("refuses a misspelt token, which customers would see as braces", () => {
+    expect(optionNoteError("delivery", "Order by {Cutoff}")).toContain("Unknown {Cutoff}");
+    expect(optionNoteError("delivery", "Order by {cut-off}")).not.toBeNull();
+  });
+
+  it("refuses {cutoff} outside a delivery note, where nothing fills it in", () => {
+    expect(optionNoteError("paper", "Next day if ordered by {cutoff}")).not.toBeNull();
+  });
 });
 
 describe("parseOptionPatch", () => {
+  it("checks an edited note like a new one", () => {
+    expect(parseOptionPatch("delivery", { note: "Order before 11am" }).ok).toBe(false);
+    expect(parseOptionPatch("delivery", { note: "Order by {cutoff}" }).ok).toBe(true);
+  });
+
   it("accepts a partial edit", () => {
     const parsed = parseOptionPatch("page-count", { baseRatePence: 250 });
     expect(parsed).toEqual({ ok: true, value: { baseRatePence: 250 } });

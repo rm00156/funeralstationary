@@ -294,7 +294,7 @@ const DELIVERY: ProductPricingSeed["delivery"] = [
     id: "next-day",
     label: "Next day delivery",
     price: 10,
-    note: `Order by ${CUTOFF_TOKEN} for next working day`,
+    note: `Order by ${CUTOFF_TOKEN} on a working day for next-working-day delivery`,
   },
 ];
 

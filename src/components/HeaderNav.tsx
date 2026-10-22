@@ -126,8 +126,8 @@ export default function HeaderNav({
             </span>
           ) : (
             <span>
-              Order by <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong> for
-              next-working-day delivery
+              Order by <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong> on a
+              working day for next-working-day delivery
             </span>
           )}
           <div

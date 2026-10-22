@@ -39,7 +39,7 @@ const BENEFITS = [
   {
     icon: Clock,
     title: "Ready in time",
-    body: `Printed within ${PRINT_TURNAROUND}, then sent to you or straight to the family. Order by ${ORDER_CUTOFF} for next-working-day delivery.`,
+    body: `Printed within ${PRINT_TURNAROUND}, then sent to you or straight to the family. Order by ${ORDER_CUTOFF} on a working day for next-working-day delivery.`,
   },
   {
     icon: Package,

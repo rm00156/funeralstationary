@@ -23,7 +23,6 @@ import { portraitRotationFor, withPlaceholderPhotos } from "@/lib/placeholderPor
 import { getPricingData } from "@/lib/pricing.server";
 import {
   DESIGN_FOR_YOU_HREF,
-  ORDER_CUTOFF,
   PHONE_DISPLAY,
   PHONE_HREF,
   PRINT_TURNAROUND,
@@ -156,9 +155,8 @@ export default async function TemplatePage({
             ))}
           </ul>
           <p className="mt-3">
-            We print within {PRINT_TURNAROUND}, then send it by the delivery you choose. For
-            next-working-day delivery, order by {ORDER_CUTOFF}. If the service is soon, please call
-            us on{" "}
+            We print within {PRINT_TURNAROUND}, then send it by the delivery you choose. If the
+            service is soon, please call us on{" "}
             <a href={PHONE_HREF} className="link">
               {PHONE_DISPLAY}
             </a>
