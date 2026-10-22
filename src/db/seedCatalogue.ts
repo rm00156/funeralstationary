@@ -17,6 +17,7 @@
  */
 
 import type { ProductFormatRow } from "@/lib/designEditor";
+import { CUTOFF_TOKEN } from "@/lib/site";
 import type { ProductOccasion } from "@/lib/templates";
 
 /** A flat A6 card printed on both sides — memorial and thank-you cards. */
@@ -287,13 +288,13 @@ const DELIVERY: ProductPricingSeed["delivery"] = [
     id: "standard",
     label: "Standard delivery",
     price: 0,
-    note: "Free — 3 to 5 working days",
+    note: "Free — 3 to 5 working days once printed",
   },
   {
     id: "next-day",
     label: "Next day delivery",
     price: 10,
-    note: "Order before 11am for next working day",
+    note: `Order by ${CUTOFF_TOKEN} for next working day`,
   },
 ];
 

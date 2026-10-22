@@ -24,9 +24,29 @@ export const ADDRESS_LINES = [
 ] as const;
 export const ADDRESS_TOWN = "Beckenham";
 
-/** Order cut-off for next-working-day delivery. */
+/**
+ * Order cut-off for next-working-day delivery. The handoff's mockups said
+ * 11am, the live site 10am; until the owner confirms, the earlier time is the
+ * one nobody misses the courier by trusting.
+ */
 export const ORDER_CUTOFF = "10am";
-export const STANDARD_TURNAROUND = "24–72 hours";
+
+/**
+ * How long printing takes, before delivery starts. Customer copy says
+ * "printed within …", never "standard turnaround": "Standard" is the free
+ * delivery option's name, and the two read as one promise.
+ */
+export const PRINT_TURNAROUND = "24–72 hours";
+
+/**
+ * What a delivery option's note (edited in /admin) writes in place of the
+ * cut-off time, so a note can never name a different time from ORDER_CUTOFF.
+ */
+export const CUTOFF_TOKEN = "{cutoff}";
+
+export function withOrderCutoff(note: string): string {
+  return note.replaceAll(CUTOFF_TOKEN, ORDER_CUTOFF);
+}
 
 /**
  * The Trustpilot profile. There is deliberately no TrustScore here: on the

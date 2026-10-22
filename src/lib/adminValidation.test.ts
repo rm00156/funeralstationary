@@ -171,7 +171,7 @@ describe("parseOptionInput", () => {
       slug: "next-day",
       label: "Next day",
       pricePence: 1000,
-      note: "Order before 11am",
+      note: "Order by {cutoff}",
     });
     expect(parsed.ok).toBe(true);
   });

@@ -26,7 +26,7 @@ const PRICING: PricingData = {
   ],
   delivery: [
     { id: "standard", label: "Standard delivery", pricePence: 0, note: "Free" },
-    { id: "next-day", label: "Next day delivery", pricePence: 1000, note: "By 11am" },
+    { id: "next-day", label: "Next day delivery", pricePence: 1000, note: "By {cutoff}" },
   ],
 };
 

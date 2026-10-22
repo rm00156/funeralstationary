@@ -26,7 +26,7 @@ import {
   ORDER_CUTOFF,
   PHONE_DISPLAY,
   PHONE_HREF,
-  STANDARD_TURNAROUND,
+  PRINT_TURNAROUND,
 } from "@/lib/site";
 import { isShopOpen } from "@/lib/siteBilling.server";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "@/lib/storage";
@@ -156,8 +156,9 @@ export default async function TemplatePage({
             ))}
           </ul>
           <p className="mt-3">
-            The cut-off for next-working-day delivery is {ORDER_CUTOFF} on a working day, and
-            standard turnaround is {STANDARD_TURNAROUND}. If the service is soon, please call us on{" "}
+            We print within {PRINT_TURNAROUND}, then send it by the delivery you choose. For
+            next-working-day delivery, order by {ORDER_CUTOFF}. If the service is soon, please call
+            us on{" "}
             <a href={PHONE_HREF} className="link">
               {PHONE_DISPLAY}
             </a>

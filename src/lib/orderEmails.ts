@@ -11,7 +11,7 @@ import {
 } from "@/lib/emailLogo";
 import { formatServiceDate } from "@/lib/contact";
 import { formatPence } from "@/lib/orderOfServicePricing";
-import { EMAIL, OPENING_HOURS, PHONE_DISPLAY, SITE_NAME, STANDARD_TURNAROUND } from "@/lib/site";
+import { EMAIL, OPENING_HOURS, PHONE_DISPLAY, PRINT_TURNAROUND, SITE_NAME } from "@/lib/site";
 import { vatIncludedText } from "@/lib/vat";
 
 export interface OrderEmailItem {
@@ -302,7 +302,7 @@ export function orderConfirmationEmail(
     `You can view your order at ${orderUrl}`,
     "",
     "What happens next:",
-    `1. We print it. Our standard turnaround is ${STANDARD_TURNAROUND}.`,
+    `1. We print it, within ${PRINT_TURNAROUND}.`,
     "2. We post it to you, to the address above, by the delivery you chose.",
     `3. Need to change something? Call us on ${PHONE_DISPLAY} (${OPENING_HOURS}) as soon as you can, or reply to this email.`,
     "",
@@ -330,7 +330,7 @@ ${addressHtml(summary.addressLines)}
 ${button("View your order", orderUrl)}
 ${eyebrow("What happens next")}
 ${stepsHtml([
-  ["We print it", `Our standard turnaround is ${escapeHtml(STANDARD_TURNAROUND)}.`],
+  ["We print it", `Within ${escapeHtml(PRINT_TURNAROUND)}.`],
   ["We post it to you", "To the address above, by the delivery you chose."],
   [
     "Need to change something?",

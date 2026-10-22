@@ -44,7 +44,7 @@ export default async function ShopPage() {
               <div>
                 <p className="font-semibold">Next-working-day delivery</p>
                 <p className="text-base text-ink-2">
-                  Order before {ORDER_CUTOFF}, anywhere in the UK.
+                  Order by {ORDER_CUTOFF}, anywhere in the UK.
                 </p>
               </div>
             </div>

@@ -31,6 +31,7 @@ import type {
   QuantityOption,
   SelectOption,
 } from "@/lib/orderOfServicePricing";
+import { withOrderCutoff } from "@/lib/site";
 import { withTradeDiscount } from "@/lib/trade";
 import { getCurrentTradeMembership } from "@/lib/trade.server";
 
@@ -138,7 +139,7 @@ export const getListPricingData = cache(
       id: row.slug,
       label: row.label,
       pricePence: row.pricePence,
-      note: row.note,
+      note: withOrderCutoff(row.note),
     }));
 
     return { quantity, pages, paper, delivery };

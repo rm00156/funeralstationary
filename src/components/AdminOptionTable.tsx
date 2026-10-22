@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import type { AdminOption, OptionKind } from "@/lib/adminCatalogue.server";
 import { adminMutate } from "@/lib/adminClient";
 import { penceToPoundsInput, poundsToPence } from "@/lib/money";
+import { CUTOFF_TOKEN, ORDER_CUTOFF } from "@/lib/site";
 
 /** Numeric column keys, beyond the shared label/note/sort/active columns. */
 type FieldKey = "multiplier" | "copies" | "pageCount" | "baseRatePence" | "pricePence";
@@ -83,6 +84,12 @@ export default function AdminOptionTable({
       <h2 className="border-b border-outline-variant/40 px-5 py-4 font-display text-lg text-primary">
         {title}
       </h2>
+      {kind === "delivery" && (
+        <p className="border-b border-outline-variant/40 px-5 py-3 font-body text-sm text-on-surface-variant">
+          Write <code>{CUTOFF_TOKEN}</code> in a note wherever the order cut-off goes — it shows as{" "}
+          {ORDER_CUTOFF}, the same time as everywhere else on the site.
+        </p>
+      )}
       <div className="table-stack">
         <table className="w-full min-w-[720px] text-left">
           <thead>

@@ -225,6 +225,13 @@
       "when": 1791925957240,
       "tag": "0031_invoice_updated_at_ms",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1792710141283,
+      "tag": "0032_delivery_note_cutoff",
+      "breakpoints": true
     }
   ]
 }
