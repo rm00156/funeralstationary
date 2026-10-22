@@ -12,7 +12,7 @@ import {
   ORDER_CUTOFF,
   PHONE_DISPLAY,
   PHONE_HREF,
-  STANDARD_TURNAROUND,
+  PRINT_TURNAROUND,
 } from "@/lib/site";
 import { tradeOrderTypes } from "@/lib/tradeApplication";
 
@@ -39,7 +39,7 @@ const BENEFITS = [
   {
     icon: Clock,
     title: "Ready in time",
-    body: `Order before ${ORDER_CUTOFF} on a working day for ${STANDARD_TURNAROUND} delivery, to you or straight to the family.`,
+    body: `Printed within ${PRINT_TURNAROUND}, then sent to you or straight to the family. Order by ${ORDER_CUTOFF} on a working day for next-working-day delivery.`,
   },
   {
     icon: Package,

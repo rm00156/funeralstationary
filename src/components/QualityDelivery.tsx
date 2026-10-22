@@ -3,7 +3,7 @@ import { Clock, FileText, Truck } from "lucide-react";
 
 import { sizeRangeText, sizeText, type ProductFormat } from "@/lib/designEditor";
 import { formatPence, type DeliveryOption } from "@/lib/orderOfServicePricing";
-import { STANDARD_TURNAROUND } from "@/lib/site";
+import { PRINT_TURNAROUND } from "@/lib/site";
 
 /**
  * "Printed properly, delivered on time". The delivery rows are the lead
@@ -28,16 +28,18 @@ export default function QualityDelivery({
           ? `Printed at the size you choose, ${sizeRangeText(format)}, made to be kept.`
           : `Exact ${sizeText(format)}, made to be kept.`,
     },
+    // Printing, then delivery, in the order they happen — kept apart so the
+    // print time can't be read as a delivery time, or the other way round.
+    {
+      icon: Clock,
+      title: `Printed within ${PRINT_TURNAROUND}`,
+      body: "Then sent by the delivery you choose. If your service date is close, call us and we’ll tell you exactly what’s possible.",
+    },
     ...delivery.map((option) => ({
       icon: Truck,
       title: `${option.label}, ${option.pricePence === 0 ? "free" : formatPence(option.pricePence)}`,
       body: option.note,
     })),
-    {
-      icon: Clock,
-      title: `Standard turnaround ${STANDARD_TURNAROUND}`,
-      body: "If your service date is close, call us and we’ll tell you exactly what’s possible.",
-    },
   ];
 
   return (

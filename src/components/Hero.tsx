@@ -77,7 +77,7 @@ export default function Hero({
           </p>
           <ul className="flex flex-col gap-3 text-left text-[17px]">
             {[
-              `Order by ${ORDER_CUTOFF} for next-working-day delivery`,
+              `Order by ${ORDER_CUTOFF} on a working day for next-working-day delivery`,
               lead && `From ${formatPence(lead.fromPence)} for ${copiesText(lead.fromCopies)}`,
               "Made something in Canva? Send it to us and we’ll print it",
             ]

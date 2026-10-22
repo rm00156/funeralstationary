@@ -12,7 +12,6 @@ import {
   DESIGN_FOR_YOU_HREF,
   OPENING_HOURS,
   ORDER_CUTOFF,
-  STANDARD_TURNAROUND,
   PHONE_DISPLAY,
   PHONE_HREF,
   TRADE_HREF,
@@ -127,9 +126,8 @@ export default function HeaderNav({
             </span>
           ) : (
             <span>
-              <strong className="font-semibold text-white">{STANDARD_TURNAROUND}</strong> delivery
-              if ordered before <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong>{" "}
-              on a working day
+              Order by <strong className="font-semibold text-white">{ORDER_CUTOFF}</strong> on a
+              working day for next-working-day delivery
             </span>
           )}
           <div
