@@ -35,7 +35,6 @@ import {
   PLACEHOLDER_NAME,
   PLACEHOLDER_SERVICE,
   THANKS,
-  slugForName,
 } from "@/lib/templateGenerator";
 
 /*
@@ -464,13 +463,13 @@ export interface ClassicTemplateSpec {
 const CURATED_CLASSIC: Array<
   [name: string, design: ClassicDesignId, categories: string[], portrait: PlaceholderPortraitId]
 > = [
-  ["Border Corner 2", "border-corner-2", ["classic", "simple"], "portrait-4"],
+  ["Vintage Frame", "border-corner-2", ["classic", "simple"], "portrait-4"],
   ["Border Corners", "border-corners", ["classic", "simple"], "portrait-5"],
   ["Classic Posh", "classic-posh", ["classic", "colourful"], "portrait-1"],
-  ["Classic Template", "classic-template", ["simple", "minimalistic"], "portrait-6"],
-  ["Classic Template 2", "classic-template-2", ["simple", "minimalistic", "classic"], "portrait-7"],
-  ["Classic Template Blue", "classic-template-blue", ["colourful", "calm"], "portrait-8"],
-  ["Classic Template Peach", "classic-template-peach", ["colourful", "calm"], "portrait-9"],
+  ["Simple Celebration", "classic-template", ["simple", "minimalistic"], "portrait-6"],
+  ["Graceful Script", "classic-template-2", ["simple", "minimalistic", "classic"], "portrait-7"],
+  ["Pastel Blue", "classic-template-blue", ["colourful", "calm"], "portrait-8"],
+  ["Pastel Peach", "classic-template-peach", ["colourful", "calm"], "portrait-9"],
   ["Order of Gold", "order-of-gold", ["classic", "religious"], "portrait-6"],
   ["Outer Border", "outer-border", ["classic", "simple"], "portrait-2"],
   ["Peach Tones", "peach-tones", ["colourful", "classic"], "portrait-7"],
@@ -480,7 +479,9 @@ const CURATED_CLASSIC: Array<
 
 export const CLASSIC_TEMPLATE_SPECS: ClassicTemplateSpec[] = CURATED_CLASSIC.map(
   ([name, design, categories, portrait]) => ({
-    slug: slugForName(name),
+    // The design id is the slug, not the name: slugs are immutable (URLs, order
+    // history), and a name is customer copy that can be improved.
+    slug: design,
     name,
     design,
     categories,

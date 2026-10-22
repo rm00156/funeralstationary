@@ -54,7 +54,6 @@ import {
 import {
   PLACEHOLDER_NAME,
   PLACEHOLDER_OFFICIANT,
-  slugForName,
   type PaletteId,
 } from "@/lib/templateGenerator";
 
@@ -1111,8 +1110,8 @@ const CURATED_THEMED: Array<
   ["Grey Cross", "grey-cross", ["religious", "simple"], "portrait-32"],
   ["New Cross", "new-cross", ["religious", "classic"], "portrait-34"],
   ["Cross Doves", "cross-doves", ["religious", "birds", "colourful"], "portrait-35"],
-  ["Religious Cross 1", "religious-cross-1", ["religious", "simple"], "portrait-33"],
-  ["Religious Cross 2", "religious-cross-2", ["religious", "simple"], "portrait-27"],
+  ["Ebony Cross", "religious-cross-1", ["religious", "simple"], "portrait-33"],
+  ["Quiet Cross", "religious-cross-2", ["religious", "simple"], "portrait-27"],
   ["Brown Heart", "brown-heart", ["classic", "cultural"], "portrait-38"],
   ["French", "french", ["cultural", "colourful"], "portrait-36"],
   ["Italian", "italian", ["cultural", "colourful"], "portrait-30"],
@@ -1150,7 +1149,9 @@ const CURATED_THEMED: Array<
 
 export const THEMED_TEMPLATE_SPECS: ThemedTemplateSpec[] = CURATED_THEMED.map(
   ([name, design, categories, portrait, backgrounds]) => ({
-    slug: slugForName(name),
+    // The design id is the slug, not the name: slugs are immutable (URLs, order
+    // history), and a name is customer copy that can be improved.
+    slug: design,
     name,
     design,
     categories,

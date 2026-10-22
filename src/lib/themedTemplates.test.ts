@@ -108,6 +108,20 @@ describe("buildThemedLayout", () => {
   });
 });
 
+describe("THEMED_TEMPLATE_SPECS names", () => {
+  // Once "Religious Cross 1" and "2": renaming must not move the slug.
+  it("keeps each slug when its name changes", () => {
+    const slugs = Object.fromEntries(THEMED_TEMPLATE_SPECS.map((spec) => [spec.name, spec.slug]));
+    expect(slugs).toMatchObject({ "Ebony Cross": "religious-cross-1", "Quiet Cross": "religious-cross-2" });
+  });
+
+  it("names every design for a customer, not like a file", () => {
+    for (const spec of THEMED_TEMPLATE_SPECS) {
+      expect(spec.name, spec.slug).not.toMatch(/\btemplate\b|\d/i);
+    }
+  });
+});
+
 describe("personalise", () => {
   const sue = STUDIO_PEOPLE["portrait-12"];
 

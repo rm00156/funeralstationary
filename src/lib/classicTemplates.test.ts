@@ -113,6 +113,25 @@ describe("CLASSIC_TEMPLATE_SPECS", () => {
     expect(new Set(slugs).size).toBe(slugs.length);
   });
 
+  // These were once named after their slugs ("Classic Template 2"); renaming
+  // them must not move the slug, which URLs and order history carry.
+  it("keeps each slug when its name changes", () => {
+    const slugs = Object.fromEntries(CLASSIC_TEMPLATE_SPECS.map((spec) => [spec.name, spec.slug]));
+    expect(slugs).toMatchObject({
+      "Simple Celebration": "classic-template",
+      "Graceful Script": "classic-template-2",
+      "Pastel Blue": "classic-template-blue",
+      "Pastel Peach": "classic-template-peach",
+      "Vintage Frame": "border-corner-2",
+    });
+  });
+
+  it("names every design for a customer, not like a file", () => {
+    for (const spec of CLASSIC_TEMPLATE_SPECS) {
+      expect(spec.name, spec.slug).not.toMatch(/\btemplate\b|\d/i);
+    }
+  });
+
   it("files each under categories that exist, with a real stand-in portrait", () => {
     const categories = new Set(CATEGORIES.map((category) => category.id));
     for (const spec of CLASSIC_TEMPLATE_SPECS) {
