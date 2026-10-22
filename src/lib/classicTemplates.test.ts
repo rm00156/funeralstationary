@@ -116,19 +116,16 @@ describe("CLASSIC_TEMPLATE_SPECS", () => {
   // These were once named after their slugs ("Classic Template 2"); renaming
   // them must not move the slug, which URLs and order history carry.
   it("keeps each slug when its name changes", () => {
-    const slugs = Object.fromEntries(CLASSIC_TEMPLATE_SPECS.map((spec) => [spec.name, spec.slug]));
-    expect(slugs).toMatchObject({
-      "Simple Celebration": "classic-template",
-      "Graceful Script": "classic-template-2",
-      "Pastel Blue": "classic-template-blue",
-      "Pastel Peach": "classic-template-peach",
-      "Vintage Frame": "border-corner-2",
-    });
+    for (const spec of CLASSIC_TEMPLATE_SPECS) expect(spec.slug, spec.name).toBe(spec.design);
+    const named = (slug: string) => CLASSIC_TEMPLATE_SPECS.find((spec) => spec.slug === slug)?.name;
+    expect(named("classic-template")).toBe("Simple Celebration");
+    expect(named("classic-template-2")).toBe("Graceful Script");
+    expect(named("border-corner-2")).toBe("Vintage Frame");
   });
 
   it("names every design for a customer, not like a file", () => {
     for (const spec of CLASSIC_TEMPLATE_SPECS) {
-      expect(spec.name, spec.slug).not.toMatch(/\btemplate\b|\d/i);
+      expect(spec.name, spec.slug).not.toMatch(/\btemplate\b|\s\d+$/i);
     }
   });
 

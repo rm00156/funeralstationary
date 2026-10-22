@@ -232,6 +232,13 @@
       "when": 1792710141283,
       "tag": "0032_delivery_note_cutoff",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1792711160085,
+      "tag": "0033_template_customer_names",
+      "breakpoints": true
     }
   ]
 }
