@@ -71,6 +71,16 @@ describe("AdminTemplateForm", () => {
     expect((await sentBody()).placeholderPortrait).toBe("portrait-30");
   });
 
+  it("offers each life story by its lead alone, for a photo collage", async () => {
+    const { sentBody } = renderForm();
+    expect(screen.queryByRole("radio", { name: "portrait 40" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "life story, man (for a photo collage)" }));
+    expect(screen.getByRole("radio", { name: "life story, woman (for a photo collage)" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save template" }));
+
+    expect((await sentBody()).placeholderPortrait).toBe("portrait-39");
+  });
+
   it("sends a preview URL the admin pasted", async () => {
     const { sentBody } = renderForm();
     fireEvent.change(screen.getByLabelText(/paste an image url/i), {

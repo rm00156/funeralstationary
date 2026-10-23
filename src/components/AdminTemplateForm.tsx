@@ -11,6 +11,7 @@ import {
   COLOUR_PORTRAIT_IDS,
   ELDER_PORTRAIT_GENDER,
   ELDER_PORTRAIT_IDS,
+  LIFE_STORIES,
   MONO_PORTRAIT_IDS,
 } from "@/lib/placeholderPortraits";
 
@@ -383,6 +384,52 @@ export default function AdminTemplateForm({
                 />
               </button>
             ))}
+            {/* A life story fills a whole collage, not one window, so each is
+                its own option that shows every photo it will use. Pinning its
+                lead is what makes the rotation take the rest in order. */}
+            {LIFE_STORIES.map(({ ids, gender }) => {
+              const lead = ids[0];
+              return (
+                <button
+                  key={lead}
+                  type="button"
+                  role="radio"
+                  aria-checked={portrait === lead}
+                  aria-label={portraitLabel(lead)}
+                  onClick={() => setPortrait(lead)}
+                  className={`mt-2 flex basis-full items-center gap-4 rounded-lg border-2 p-3 text-left ${
+                    portrait === lead ? "border-primary-container" : "border-outline-variant/50"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={portraitUrls[lead]}
+                    alt=""
+                    className="h-24 w-24 shrink-0 rounded-md object-cover"
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-body text-sm font-medium text-on-surface">
+                      Life story, {gender} — for a photo collage
+                    </span>
+                    <span className="mt-1 block font-body text-xs text-on-surface-variant">
+                      One {gender} through {gender === "man" ? "his" : "her"} life: this portrait
+                      in the large window, then these in the smaller ones, in order.
+                    </span>
+                    <span className="mt-2 flex flex-wrap gap-1">
+                      {ids.slice(1, 5).map((id) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={id}
+                          src={portraitUrls[id]}
+                          alt=""
+                          className="h-8 w-[60px] rounded object-cover"
+                        />
+                      ))}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -411,6 +458,8 @@ export default function AdminTemplateForm({
 }
 
 function portraitLabel(id: string): string {
+  const story = LIFE_STORIES.find(({ ids }) => ids[0] === id);
+  if (story) return `life story, ${story.gender} (for a photo collage)`;
   const gender = ELDER_PORTRAIT_GENDER[id as keyof typeof ELDER_PORTRAIT_GENDER];
   return gender ? `${id.replace("-", " ")}, ${gender}` : id.replace("-", " ");
 }
