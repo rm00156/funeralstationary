@@ -15,7 +15,7 @@
  * Pure and DB-free, same discipline as templateGenerator.ts.
  */
 
-import type { DesignPage } from "@/lib/designEditor";
+import type { DesignPage, PhotoCrop } from "@/lib/designEditor";
 
 /**
  * Two sets, matched to the cover rather than dealt out evenly. Black-and-white
@@ -152,8 +152,20 @@ export function isPlaceholderPortraitId(value: unknown): value is PlaceholderPor
   return (PLACEHOLDER_PORTRAIT_IDS as readonly unknown[]).includes(value);
 }
 
+/**
+ * Portraits redrawn since they were first uploaded, under a new key so a
+ * thumbnail rendered from the old file keeps it. The automatic sets were
+ * close-cropped headshots that touched a squarer window's frame; their `-v2`
+ * files are the same people outpainted and re-cropped to a looser head and
+ * shoulders. Add to this, never overwrite a key in place.
+ */
+const REFRAMED_PORTRAIT_IDS: ReadonlySet<PlaceholderPortraitId> = new Set([
+  ...MONO_PORTRAIT_IDS,
+  ...COLOUR_PORTRAIT_IDS,
+]);
+
 export function placeholderPortraitKey(id: PlaceholderPortraitId): string {
-  return `templates/placeholders/${id}.webp`;
+  return `templates/placeholders/${id}${REFRAMED_PORTRAIT_IDS.has(id) ? "-v2" : ""}.webp`;
 }
 
 /**
@@ -191,6 +203,11 @@ export function portraitIdForSeed(
  *
  * Given several portraits, successive windows cycle through them, so a photo
  * collage previews as a family rather than the same face repeated.
+ *
+ * Each stand-in is anchored to the top of its window (PLACEHOLDER_CROP). The
+ * portraits are 3:4 and most windows are squarer, so a centred crop takes
+ * its share off the top and leaves the hair touching the frame; anchored, the
+ * crop comes off the chest instead. A window with its own crop keeps it.
  */
 export function withPlaceholderPhotos(
   page: DesignPage,
@@ -203,11 +220,18 @@ export function withPlaceholderPhotos(
     ...page,
     elements: page.elements.map((element) =>
       element.type === "image" && element.src === null
-        ? { ...element, src: sources[filled++ % sources.length] }
+        ? {
+            ...element,
+            src: sources[filled++ % sources.length],
+            crop: element.crop ?? PLACEHOLDER_CROP,
+          }
         : element,
     ),
   };
 }
+
+/** Where a stand-in portrait sits in its window: centred across, top down. */
+export const PLACEHOLDER_CROP: PhotoCrop = { x: 50, y: 0, zoom: 1 };
 
 /**
  * The portraits for a template's previews: the cover's set, ordered so
