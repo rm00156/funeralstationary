@@ -77,6 +77,20 @@
     "sourceUrl": ""
   },
   {
+    "id": "pink-aura-low",
+    "name": "Pink Aura",
+    "licence": "Owner's own (supplied as pink aura.psd)",
+    "credit": "Pink petals, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "pink-rose-low",
+    "name": "Pink Roses",
+    "licence": "Owner's own (supplied as pink rose.psd)",
+    "credit": "Pink roses, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
     "id": "pastel-rose-band",
     "name": "Pastel Rose Band",
     "licence": "CC0",

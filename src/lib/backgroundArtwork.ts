@@ -436,6 +436,41 @@ const MANIFEST: readonly BackgroundSpec[] = [
     palettes: ["bronze"],
   },
   {
+    id: "pink-aura-low",
+    name: "Pink Aura",
+    source: { kind: "file", path: "assets/backgrounds/pink-aura.jpg" },
+    licence: "Owner's own (supplied as pink aura.psd)",
+    credit: "Pink petals, supplied by The Funeral Stationery.",
+    // The petals fill the photograph's bottom third and already fade into its
+    // white, so the page fade is only a short join at the band's top edge.
+    placement: { x: 0, y: 68, w: 100, h: 32 },
+    focus: { x: 0.5, y: 1 },
+    inset: 0,
+    fade: { edge: "top", start: 71, end: 68 },
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["rose"],
+  },
+  {
+    id: "pink-rose-low",
+    name: "Pink Roses",
+    source: { kind: "file", path: "assets/backgrounds/pink-rose.jpg" },
+    licence: "Owner's own (supplied as pink rose.psd)",
+    credit: "Pink roses, supplied by The Funeral Stationery.",
+    // A bouquet weighted to the right, about the band's own shape, so it
+    // reads as a corner spray without a radial fade.
+    placement: { x: 0, y: 68, w: 100, h: 32 },
+    focus: { x: 0.6, y: 0.6 },
+    inset: 0,
+    fade: { edge: "top", start: 80, end: 68 },
+    wash: 0,
+    tint: 0,
+    glow: { color: "#efbfcf", end: 44 },
+    textZone: "top",
+    palettes: ["rose"],
+  },
+  {
     id: "pastel-rose-band",
     name: "Pastel Rose Band",
     source: { kind: "commons", file: "File:Pastel pink roses (Unsplash).jpg" },
