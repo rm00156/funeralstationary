@@ -17,8 +17,10 @@ import {
   type BackgroundFormat,
 } from "@/lib/backgroundArtwork";
 import {
+  placeholderCrop,
   placeholderPortraitKey,
   type PlaceholderPortraitId,
+  type PlaceholderSource,
 } from "@/lib/placeholderPortraits";
 import type { PaletteId } from "@/lib/templateGenerator";
 
@@ -55,6 +57,11 @@ export async function backgroundAssetExists(
 export function placeholderPortraitUrl(id: PlaceholderPortraitId): string {
   const key = placeholderPortraitKey(id);
   return isStorageConfigured() ? publicUrlFor(key) : `/${key}`;
+}
+
+/** Stand-ins ready for withPlaceholderPhotos: each portrait's URL and crop. */
+export function placeholderPortraitSources(ids: readonly PlaceholderPortraitId[]): PlaceholderSource[] {
+  return ids.map((id) => ({ src: placeholderPortraitUrl(id), crop: placeholderCrop(id) }));
 }
 
 /** The URL a page element should use for a rendered cutout spray. */

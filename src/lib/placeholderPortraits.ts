@@ -90,12 +90,50 @@ export const ELDER_PORTRAIT_IDS = [
   "portrait-38",
 ] as const;
 
+/**
+ * One person's life for a photo collage, so its windows read as one person
+ * rather than a row of strangers. The first of each set is them late in
+ * life, for the large window; the rest is the life around it in order. His:
+ * a boy on the step, a young man by his car, his wedding, a young father on
+ * the beach, retired on the allotment. Hers: a girl at the gate, a young
+ * woman on the promenade, her wedding, a young mother in the park, baking
+ * in her kitchen. The photos are square scenes, each with its own crop
+ * height (placeholderCrop) so the memory board's wide windows and a
+ * booklet's squarer ones both frame it. Pinned per template: pin the lead
+ * and the rotation fills the rest in order. Only the leads are offered in
+ * the admin picker.
+ */
+export const HIS_LIFE_PORTRAIT_IDS = [
+  "portrait-39",
+  "portrait-40",
+  "portrait-41",
+  "portrait-42",
+  "portrait-43",
+  "portrait-44",
+] as const;
+export const HER_LIFE_PORTRAIT_IDS = [
+  "portrait-45",
+  "portrait-46",
+  "portrait-47",
+  "portrait-48",
+  "portrait-49",
+  "portrait-50",
+] as const;
+
+/** The life story sets, each with who it follows, for the admin picker. */
+export const LIFE_STORIES = [
+  { ids: HIS_LIFE_PORTRAIT_IDS, gender: "man" },
+  { ids: HER_LIFE_PORTRAIT_IDS, gender: "woman" },
+] as const;
+
 export const PLACEHOLDER_PORTRAIT_IDS = [
   ...MONO_PORTRAIT_IDS,
   ...COLOUR_PORTRAIT_IDS,
   ...STUDIO_PORTRAIT_IDS,
   ...SUBJECT_PORTRAIT_IDS,
   ...ELDER_PORTRAIT_IDS,
+  ...HIS_LIFE_PORTRAIT_IDS,
+  ...HER_LIFE_PORTRAIT_IDS,
 ] as const;
 
 export type PlaceholderPortraitId = (typeof PLACEHOLDER_PORTRAIT_IDS)[number];
@@ -146,6 +184,8 @@ const PORTRAIT_SETS: ReadonlyArray<readonly PlaceholderPortraitId[]> = [
   STUDIO_PORTRAIT_IDS,
   SUBJECT_PORTRAIT_IDS,
   ELDER_PORTRAIT_IDS,
+  HIS_LIFE_PORTRAIT_IDS,
+  HER_LIFE_PORTRAIT_IDS,
 ];
 
 export function isPlaceholderPortraitId(value: unknown): value is PlaceholderPortraitId {
@@ -206,34 +246,64 @@ export function portraitIdForSeed(
  * Given several portraits, successive windows cycle through them, so a photo
  * collage previews as a family rather than the same face repeated.
  *
- * Each stand-in is anchored to the top of its window (PLACEHOLDER_CROP). The
- * portraits are 3:4 and most windows are squarer, so a centred crop takes
- * its share off the top and leaves the hair touching the frame; anchored, the
- * crop comes off the chest instead. A window with its own crop keeps it.
+ * Each stand-in sits high in its window (PLACEHOLDER_CROP). The portraits are
+ * 3:4 and most windows are squarer, so a centred crop takes its share off the
+ * top and leaves the hair touching the frame. Pinned right to the top fails
+ * the other way in a wide window — the board collage's 1.86:1 windows show
+ * only hair down to the nose. A fifth of the way down keeps headroom in a
+ * squarer window and the whole face in a wide one. A source can carry its
+ * own crop instead (placeholderCrop), and a window with its own crop keeps it.
  */
 export function withPlaceholderPhotos(
   page: DesignPage,
-  src: string | readonly string[],
+  src: PlaceholderSource | readonly PlaceholderSource[],
 ): DesignPage {
-  const sources = typeof src === "string" ? [src] : src;
+  const sources = (Array.isArray(src) ? src : [src]) as readonly PlaceholderSource[];
   if (sources.length === 0) return page;
   let filled = 0;
   return {
     ...page,
-    elements: page.elements.map((element) =>
-      element.type === "image" && element.src === null
-        ? {
-            ...element,
-            src: sources[filled++ % sources.length],
-            crop: element.crop ?? PLACEHOLDER_CROP,
-          }
-        : element,
-    ),
+    elements: page.elements.map((element) => {
+      if (element.type !== "image" || element.src !== null) return element;
+      const source = sources[filled++ % sources.length];
+      const { src: url, crop } = typeof source === "string" ? { src: source, crop: PLACEHOLDER_CROP } : source;
+      return { ...element, src: url, crop: element.crop ?? crop };
+    }),
   };
 }
 
-/** Where a stand-in portrait sits in its window: centred across, top down. */
-export const PLACEHOLDER_CROP: PhotoCrop = { x: 50, y: 0, zoom: 1 };
+/** A stand-in's image URL, alone or with the crop it should sit at. */
+export type PlaceholderSource = string | { src: string; crop: PhotoCrop };
+
+/** Where a stand-in portrait sits in its window: centred across, high up. */
+export const PLACEHOLDER_CROP: PhotoCrop = { x: 50, y: 20, zoom: 1 };
+
+/**
+ * The life story photos are square scenes, not head-and-shoulders portraits,
+ * so each has its own height to sit at — chosen so a 1.86:1 window (the
+ * memory board collage) shows the band with the face in it, while a squarer
+ * window, which shows nearly the whole photo, barely moves. In a square
+ * photo a 1.86:1 window shows 54% of the height, so `y` is the band's top
+ * as a fraction of the photo divided by the 46% left over.
+ */
+const LIFE_PORTRAIT_CROP_Y: Partial<Record<PlaceholderPortraitId, number>> = {
+  "portrait-40": 56, // the boy on the step sits low in the frame
+  "portrait-41": 15,
+  "portrait-42": 17,
+  "portrait-43": 26,
+  "portrait-44": 4,
+  "portrait-46": 30,
+  "portrait-47": 15,
+  "portrait-48": 42,
+  "portrait-49": 13,
+  "portrait-50": 0,
+};
+
+/** The crop a stand-in portrait sits at: its own, or PLACEHOLDER_CROP. */
+export function placeholderCrop(id: PlaceholderPortraitId): PhotoCrop {
+  const y = LIFE_PORTRAIT_CROP_Y[id];
+  return y === undefined ? PLACEHOLDER_CROP : { ...PLACEHOLDER_CROP, y };
+}
 
 /**
  * The portraits for a template's previews: the cover's set, ordered so

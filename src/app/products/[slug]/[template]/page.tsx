@@ -10,7 +10,7 @@ import ProductCard from "@/components/ProductCard";
 import TemplateBuyBox from "@/components/TemplateBuyBox";
 import TemplateGallery from "@/components/TemplateGallery";
 import TradePriceNote from "@/components/TradePriceNote";
-import { placeholderPortraitUrl } from "@/lib/backgroundAssets.server";
+import { placeholderPortraitSources } from "@/lib/backgroundAssets.server";
 import {
   getCategories,
   getSellableProduct,
@@ -105,7 +105,7 @@ export default async function TemplatePage({
   const layout =
     toTemplateLayout(template.layout, format.templatePages) ??
     makeTemplateLayout(template, format);
-  const portraits = portraitRotationFor(layout[0], template.id, template.placeholderPortrait).map(placeholderPortraitUrl);
+  const portraits = placeholderPortraitSources(portraitRotationFor(layout[0], template.id, template.placeholderPortrait));
   const views = layout.map((page, index) => ({
     label: VIEW_LABELS[format.templatePages][index] ?? `Page ${index + 1}`,
     page: withPlaceholderPhotos(page, portraits),

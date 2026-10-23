@@ -14,7 +14,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { launchHeadlessBrowser } from "@/lib/headlessBrowser.server";
 import { isStorageConfigured, uploadObject } from "@/lib/storage";
-import { placeholderPortraitUrl } from "@/lib/backgroundAssets.server";
+import { placeholderPortraitSources } from "@/lib/backgroundAssets.server";
 import {
   portraitRotationFor,
   withPlaceholderPhotos,
@@ -33,7 +33,7 @@ export async function renderTemplateThumbnail(
 ): Promise<Buffer> {
   const page0 = withPlaceholderPhotos(
     coverPage,
-    portraitRotationFor(coverPage, seed, portrait).map(placeholderPortraitUrl),
+    placeholderPortraitSources(portraitRotationFor(coverPage, seed, portrait)),
   );
   const browser = await launchHeadlessBrowser();
   try {

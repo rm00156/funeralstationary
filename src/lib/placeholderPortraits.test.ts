@@ -4,6 +4,9 @@ import {
   MONO_PORTRAIT_IDS,
   ELDER_PORTRAIT_GENDER,
   ELDER_PORTRAIT_IDS,
+  HER_LIFE_PORTRAIT_IDS,
+  HIS_LIFE_PORTRAIT_IDS,
+  placeholderCrop,
   STUDIO_PORTRAIT_GENDER,
   STUDIO_PORTRAIT_IDS,
   PLACEHOLDER_CROP,
@@ -80,6 +83,53 @@ describe("portraitRotationFor", () => {
   });
 });
 
+describe("life story portraits", () => {
+  it("fill a collage as one life when its lead is pinned: late in life first, then the years in order", () => {
+    const collage = page([photo(null), photo(null), photo(null), photo(null), photo(null)]);
+    const rotation = portraitRotationFor(collage, "memory-board-life-in-pictures", "portrait-39");
+    const filled = withPlaceholderPhotos(collage, rotation);
+    expect(filled.elements.map((el) => (el.type === "image" ? el.src : null))).toEqual([
+      "portrait-39",
+      "portrait-40",
+      "portrait-41",
+      "portrait-42",
+      "portrait-43",
+    ]);
+  });
+
+  it("keeps her story apart from his", () => {
+    const collage = page([photo(null), photo(null), photo(null)]);
+    const rotation = portraitRotationFor(collage, "memory-board-family-album", "portrait-45");
+    expect(rotation).toEqual([...HER_LIFE_PORTRAIT_IDS]);
+  });
+
+  it("gives each earlier photo its own crop height, and the leads the default", () => {
+    expect(placeholderCrop("portrait-40")).toEqual({ x: 50, y: 56, zoom: 1 });
+    expect(placeholderCrop("portrait-39")).toEqual(PLACEHOLDER_CROP);
+    expect(placeholderCrop("portrait-45")).toEqual(PLACEHOLDER_CROP);
+    for (const id of [...HIS_LIFE_PORTRAIT_IDS.slice(1), ...HER_LIFE_PORTRAIT_IDS.slice(1)]) {
+      expect(placeholderCrop(id)).not.toEqual(PLACEHOLDER_CROP);
+    }
+  });
+
+  it("puts a source's own crop on the window it fills", () => {
+    const filled = withPlaceholderPhotos(page([photo(null), photo(null)]), [
+      { src: "/boy.webp", crop: { x: 50, y: 56, zoom: 1 } },
+      "/plain.webp",
+    ]);
+    const [a, b] = filled.elements;
+    expect(a.type === "image" && a.crop).toEqual({ x: 50, y: 56, zoom: 1 });
+    expect(b.type === "image" && b.crop).toEqual(PLACEHOLDER_CROP);
+  });
+
+  it("never enter the automatic sets", () => {
+    for (const id of [...HIS_LIFE_PORTRAIT_IDS, ...HER_LIFE_PORTRAIT_IDS]) {
+      expect(MONO_PORTRAIT_IDS as readonly string[]).not.toContain(id);
+      expect(COLOUR_PORTRAIT_IDS as readonly string[]).not.toContain(id);
+    }
+  });
+});
+
 describe("studio portraits", () => {
   it("never enter the automatic sets, so existing templates keep their faces", () => {
     for (const id of STUDIO_PORTRAIT_IDS) {
@@ -134,14 +184,16 @@ describe("withPlaceholderPhotos", () => {
     expect(filled.elements[2].type).toBe("text");
   });
 
-  it("anchors a stand-in to the top of its window, so a squarer window doesn't crop the head", () => {
+  it("sets a stand-in high in its window: headroom when square, the whole face when wide", () => {
     const filled = withPlaceholderPhotos(
       page([{ id: "a", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 }]),
       "/portrait.jpg",
     );
     const el = filled.elements[0];
     expect(el.type === "image" && el.crop).toEqual(PLACEHOLDER_CROP);
-    expect(PLACEHOLDER_CROP).toEqual({ x: 50, y: 0, zoom: 1 });
+    // Not 50 (centred: hair against a squarer window's frame) and not 0
+    // (pinned: a wide collage window shows only hair down to the nose).
+    expect(PLACEHOLDER_CROP).toEqual({ x: 50, y: 20, zoom: 1 });
   });
 
   it("keeps a window's own crop, and leaves artwork's crop alone", () => {
