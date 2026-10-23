@@ -6,6 +6,7 @@ import {
   ELDER_PORTRAIT_IDS,
   STUDIO_PORTRAIT_GENDER,
   STUDIO_PORTRAIT_IDS,
+  PLACEHOLDER_CROP,
   PLACEHOLDER_PORTRAIT_IDS,
   placeholderPortraitKey,
   portraitIdForSeed,
@@ -39,7 +40,17 @@ describe("portraitIdForSeed", () => {
 
 describe("placeholderPortraitKey", () => {
   it("keys by id", () => {
-    expect(placeholderPortraitKey("portrait-2")).toBe("templates/placeholders/portrait-2.webp");
+    expect(placeholderPortraitKey("portrait-10")).toBe("templates/placeholders/portrait-10.webp");
+  });
+
+  it("gives the reframed automatic sets their own -v2 files", () => {
+    for (const id of [...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS].filter((id) => id !== "portrait-3")) {
+      expect(placeholderPortraitKey(id)).toBe(`templates/placeholders/${id}-v2.webp`);
+    }
+    // portrait-3 already had room above the head, so it was never redrawn.
+    for (const id of ["portrait-3", ...STUDIO_PORTRAIT_IDS, ...ELDER_PORTRAIT_IDS] as const) {
+      expect(placeholderPortraitKey(id)).toBe(`templates/placeholders/${id}.webp`);
+    }
   });
 });
 
@@ -121,6 +132,30 @@ describe("withPlaceholderPhotos", () => {
     expect(filled.elements[0].type === "image" && filled.elements[0].src).toBe("/portrait.jpg");
     expect(filled.elements[1].type === "image" && filled.elements[1].src).toBe("/spray.png");
     expect(filled.elements[2].type).toBe("text");
+  });
+
+  it("anchors a stand-in to the top of its window, so a squarer window doesn't crop the head", () => {
+    const filled = withPlaceholderPhotos(
+      page([{ id: "a", type: "image", src: null, x: 0, y: 0, w: 10, h: 10 }]),
+      "/portrait.jpg",
+    );
+    const el = filled.elements[0];
+    expect(el.type === "image" && el.crop).toEqual(PLACEHOLDER_CROP);
+    expect(PLACEHOLDER_CROP).toEqual({ x: 50, y: 0, zoom: 1 });
+  });
+
+  it("keeps a window's own crop, and leaves artwork's crop alone", () => {
+    const own = { x: 30, y: 40, zoom: 1.5 };
+    const filled = withPlaceholderPhotos(
+      page([
+        { id: "a", type: "image", src: null, crop: own, x: 0, y: 0, w: 10, h: 10 },
+        { id: "b", type: "image", src: "/spray.png", x: 0, y: 0, w: 10, h: 10 },
+      ]),
+      "/portrait.jpg",
+    );
+    const [a, b] = filled.elements;
+    expect(a.type === "image" && a.crop).toEqual(own);
+    expect(b.type === "image" && b.crop).toBeUndefined();
   });
 
   it("never mutates the page it was given — the stored layout keeps its nulls", () => {
