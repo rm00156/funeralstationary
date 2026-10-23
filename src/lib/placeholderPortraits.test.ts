@@ -44,10 +44,11 @@ describe("placeholderPortraitKey", () => {
   });
 
   it("gives the reframed automatic sets their own -v2 files", () => {
-    for (const id of [...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS]) {
+    for (const id of [...MONO_PORTRAIT_IDS, ...COLOUR_PORTRAIT_IDS].filter((id) => id !== "portrait-3")) {
       expect(placeholderPortraitKey(id)).toBe(`templates/placeholders/${id}-v2.webp`);
     }
-    for (const id of [...STUDIO_PORTRAIT_IDS, ...ELDER_PORTRAIT_IDS]) {
+    // portrait-3 already had room above the head, so it was never redrawn.
+    for (const id of ["portrait-3", ...STUDIO_PORTRAIT_IDS, ...ELDER_PORTRAIT_IDS] as const) {
       expect(placeholderPortraitKey(id)).toBe(`templates/placeholders/${id}.webp`);
     }
   });

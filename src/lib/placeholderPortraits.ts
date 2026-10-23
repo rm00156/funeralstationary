@@ -157,10 +157,12 @@ export function isPlaceholderPortraitId(value: unknown): value is PlaceholderPor
  * thumbnail rendered from the old file keeps it. The automatic sets were
  * close-cropped headshots that touched a squarer window's frame; their `-v2`
  * files are the same people outpainted and re-cropped to a looser head and
- * shoulders. Add to this, never overwrite a key in place.
+ * shoulders (portrait-3 already had the room, so it keeps its file). Add to
+ * this, never overwrite a key in place.
  */
 const REFRAMED_PORTRAIT_IDS: ReadonlySet<PlaceholderPortraitId> = new Set([
-  ...MONO_PORTRAIT_IDS,
+  "portrait-1",
+  "portrait-2",
   ...COLOUR_PORTRAIT_IDS,
 ]);
 
