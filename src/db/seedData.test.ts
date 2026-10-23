@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { CATEGORIES, PRICING, PRODUCTS, TEMPLATES } from "./seedCatalogue";
-import { CLOCK_TIME, optionNoteError, parseLayoutPages, parsePageCount } from "@/lib/adminValidation";
+import {
+  CLOCK_TIME,
+  optionNoteError,
+  parseLayoutPages,
+  parsePageCount,
+  sizeFormatError,
+} from "@/lib/adminValidation";
 import { ORDER_CUTOFF, withOrderCutoff } from "@/lib/site";
-import { toProductFormat } from "@/lib/designEditor";
+import { BOOKLET_FORMAT, toProductFormat } from "@/lib/designEditor";
+import { defaultSelection, getQuote, type PricingData } from "@/lib/orderOfServicePricing";
 import {
   buildDeliveryOptionsSeed,
   buildPageCountOptionsSeed,
   buildPaperOptionsSeed,
   buildProductsSeed,
   buildQuantityOptionsSeed,
+  buildSizeOptionsSeed,
   buildTemplateCategoriesSeed,
   buildTemplateCategoryLinksSeed,
   buildTemplatesSeed,
@@ -64,6 +72,22 @@ describe("pricing seed coverage", () => {
     expect(buildDeliveryOptionsSeed()).toHaveLength(total("delivery"));
   });
 
+  it("sells the booklet at A5 by default, and at A6 and A4", () => {
+    const sizes = buildSizeOptionsSeed().filter((row) => row.productSlug === "order-of-service");
+    expect(sizes.map((row) => [row.slug, row.isActive, row.multiplier])).toEqual([
+      ["a5", true, "1.0000"],
+      ["a6", true, "0.8000"],
+      ["a4", true, "1.4422"],
+    ]);
+    // The booklet has no format of its own in the seed: it is the default, A5.
+    const booklet = {
+      trimWidthMm: BOOKLET_FORMAT.trim.widthMm,
+      trimHeightMm: BOOKLET_FORMAT.trim.heightMm,
+      sizedByOption: false,
+    };
+    for (const row of sizes) expect(sizeFormatError(booklet, row.widthMm, row.heightMm)).toBeNull();
+  });
+
   it("only prices products that exist", () => {
     const productSlugs = new Set(PRODUCTS.map((product) => product.id));
     for (const slug of Object.keys(PRICING)) expect(productSlugs.has(slug)).toBe(true);
@@ -88,7 +112,7 @@ describe("pricing seed coverage", () => {
 
   it("converts pound rates to integer pence", () => {
     const fourPage = oos(buildPageCountOptionsSeed()).find((o) => o.slug === "4");
-    expect(fourPage?.baseRatePence).toBe(220);
+    expect(fourPage?.baseRatePence).toBe(276);
 
     const nextDay = oos(buildDeliveryOptionsSeed()).find((o) => o.slug === "next-day");
     expect(nextDay?.pricePence).toBe(1000);
@@ -99,7 +123,7 @@ describe("pricing seed coverage", () => {
 
   it("keeps multiplier precision as a fixed 4dp string", () => {
     const fifty = oos(buildQuantityOptionsSeed()).find((o) => o.slug === "50");
-    expect(fifty?.multiplier).toBe("0.9000");
+    expect(fifty?.multiplier).toBe("0.4181");
   });
 });
 
@@ -163,6 +187,45 @@ describe("seeded delivery notes", () => {
     for (const pricing of Object.values(PRICING)) {
       const nextDay = pricing.delivery.find((option) => option.id === "next-day");
       expect(nextDay && withOrderCutoff(nextDay.note)).toContain(ORDER_CUTOFF);
+    }
+  });
+});
+
+describe("seeded booklet prices", () => {
+  const seed = PRICING["order-of-service"];
+  const pricing: PricingData = {
+    quantity: seed.quantity,
+    pages: seed.pages.map((option) => ({ ...option, baseRatePence: Math.round(option.rate * 100) })),
+    paper: seed.paper,
+    delivery: seed.delivery.map((option) => ({ ...option, pricePence: Math.round(option.price * 100) })),
+    size: seed.sizes!,
+  };
+  const total = (size: string, pages: string, quantity: string) =>
+    getQuote(pricing, { ...defaultSelection(pricing), size, pages, quantity }).printCostPence;
+
+  it("is the owner's list plus about 15% on the orders families place", () => {
+    // His list: A5 8 page — £70.40 for 50, £101.20 for 100; 12 page — £114.40 for 100.
+    expect(total("a5", "8", "50")).toBe(8400);
+    expect(total("a5", "8", "100")).toBe(12000);
+    expect(total("a5", "12", "100")).toBe(14200);
+    // His A4 8 page, 100 copies: £158.40.
+    expect(total("a4", "8", "100")).toBe(17400);
+    // A6 isn't on his list: A5 less 20%.
+    expect(total("a6", "8", "100")).toBe(9600);
+  });
+
+  it("never charges less for more copies, more pages or a bigger size", () => {
+    for (const size of ["a6", "a5", "a4"]) {
+      for (const pages of pricing.pages) {
+        const totals = pricing.quantity.map((quantity) => total(size, pages.id, quantity.id));
+        expect(totals).toEqual([...totals].sort((a, b) => a - b));
+      }
+    }
+    for (const quantity of pricing.quantity) {
+      const bySize = ["a6", "a5", "a4"].map((size) => total(size, "8", quantity.id));
+      expect(bySize).toEqual([...bySize].sort((a, b) => a - b));
+      const byPages = pricing.pages.map((pages) => total("a5", pages.id, quantity.id));
+      expect(byPages).toEqual([...byPages].sort((a, b) => a - b));
     }
   });
 });

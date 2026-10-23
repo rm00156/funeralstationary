@@ -3,7 +3,7 @@ import { products, templateCategories, templateCategoryLinks, templates } from "
 import { artworkUploads } from "./artwork";
 import { designAssets, designs, designVersions } from "./designs";
 import { orderEvents, orderItems, orderProofPages, orderProofs, orders } from "./orders";
-import { deliveryOptions, pageCountOptions, paperOptions, quantityOptions } from "./pricing";
+import { deliveryOptions, pageCountOptions, paperOptions, quantityOptions, sizeOptions } from "./pricing";
 import { users } from "./users";
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -17,6 +17,7 @@ export const productsRelations = relations(products, ({ many }) => ({
   quantityOptions: many(quantityOptions),
   pageCountOptions: many(pageCountOptions),
   deliveryOptions: many(deliveryOptions),
+  sizeOptions: many(sizeOptions),
 }));
 
 export const templateCategoriesRelations = relations(templateCategories, ({ many }) => ({

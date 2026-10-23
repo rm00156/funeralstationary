@@ -16,7 +16,7 @@ import { adminGetOrder } from "@/lib/adminOrders.server";
 import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
 import { fileSizeText } from "@/lib/artwork";
 import { trimText } from "@/lib/designEditor";
-import { ORDER_STATUS_LABELS, lineSpec, refundStatusEffect, refundedPence } from "@/lib/orders";
+import { ORDER_STATUS_LABELS, lineSpec, pressScaleNote, refundStatusEffect, refundedPence } from "@/lib/orders";
 import { canSendToThintent } from "@/lib/thintent";
 import { isThintentConfigured } from "@/lib/thintent.server";
 import { vatRateLabel } from "@/lib/vat";
@@ -50,6 +50,9 @@ const formatDateTime = (date: Date | null) =>
         minute: "2-digit",
       }).format(date)
     : "—";
+
+/** " — note" after the spec line, or nothing. */
+const withDash = (note: string | null) => (note ? ` — ${note}` : null);
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -164,8 +167,7 @@ export default async function AdminOrderPage({
                         <p className="font-body font-medium text-on-surface">{item.designName}</p>
                         <p className="font-body text-sm text-on-surface-variant">
                           {copiesText(item.quantityCopies)} · {lineSpec(item.format, item.quote)}
-                          {item.format.sizedByOption &&
-                            ` — artwork drawn at ${trimText(item.artworkTrim)}; scale to the size ordered`}
+                          {withDash(pressScaleNote(item.format, item.artworkTrim, item.quote))}
                         </p>
                         {item.serviceDate && (
                           <p className="font-body text-sm font-medium text-on-surface">

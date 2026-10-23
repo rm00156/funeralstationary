@@ -8,6 +8,7 @@ import {
   paperOptions,
   products,
   quantityOptions,
+  sizeOptions,
   templateCategories,
   templateCategoryLinks,
   templates,
@@ -18,6 +19,7 @@ import {
   buildPaperOptionsSeed,
   buildProductsSeed,
   buildQuantityOptionsSeed,
+  buildSizeOptionsSeed,
   buildTemplateCategoriesSeed,
   buildTemplateCategoryLinksSeed,
   buildTemplatesSeed,
@@ -167,6 +169,8 @@ async function main() {
     "sortOrder",
     "isActive",
   ]);
+
+  await upsertPricingTable(sizeOptions, buildSizeOptionsSeed(), [...specColumns, "widthMm", "heightMm"]);
 
   console.log("Seed complete.");
   process.exit(0);

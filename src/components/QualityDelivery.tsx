@@ -2,7 +2,7 @@ import Image from "next/image";
 import { Clock, FileText, Truck } from "lucide-react";
 
 import { sizeRangeText, sizeText, type ProductFormat } from "@/lib/designEditor";
-import { formatPence, type DeliveryOption } from "@/lib/orderOfServicePricing";
+import { formatPence, sizesText, type DeliveryOption, type SizeOption } from "@/lib/orderOfServicePricing";
 import { PRINT_TURNAROUND } from "@/lib/site";
 
 /**
@@ -14,9 +14,12 @@ import { PRINT_TURNAROUND } from "@/lib/site";
 export default function QualityDelivery({
   delivery,
   format,
+  sizes = [],
 }: {
   delivery: DeliveryOption[];
   format: ProductFormat | null;
+  /** The product's print sizes, when it is sold in several. */
+  sizes?: SizeOption[];
 }) {
   const rows = [
     {
@@ -26,7 +29,9 @@ export default function QualityDelivery({
         ? "Printed to be kept."
         : format.sizedByOption
           ? `Printed at the size you choose, ${sizeRangeText(format)}, made to be kept.`
-          : `Exact ${sizeText(format)}, made to be kept.`,
+          : sizes.length > 1
+            ? `Printed at the size you choose, ${sizesText(sizes)}, made to be kept.`
+            : `Exact ${sizeText(format)}, made to be kept.`,
     },
     // Printing, then delivery, in the order they happen — kept apart so the
     // print time can't be read as a delivery time, or the other way round.

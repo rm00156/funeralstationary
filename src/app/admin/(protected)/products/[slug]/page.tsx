@@ -2,31 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
-import AdminOptionTable from "@/components/AdminOptionTable";
-import AdminProductFormatForm from "@/components/AdminProductFormatForm";
+import AdminPricingEditor from "@/components/AdminPricingEditor";
 import {
   adminGetProduct,
   adminListOptions,
   OPTION_KINDS,
+  type AdminOption,
   type OptionKind,
 } from "@/lib/adminCatalogue.server";
 
 export const dynamic = "force-dynamic";
-
-const KIND_TITLES: Record<OptionKind, string> = {
-  quantity: "Quantities",
-  "page-count": "Page counts",
-  paper: "Paper stocks",
-  delivery: "Delivery options",
-};
-
-/** Display order — mirrors the order the customer configurator asks in. */
-const KIND_ORDER: OptionKind[] = [
-  "quantity",
-  "page-count",
-  "paper",
-  "delivery",
-];
 
 export default async function AdminProductPricingPage({
   params,
@@ -35,11 +20,11 @@ export default async function AdminProductPricingPage({
   const product = await adminGetProduct(slug);
   if (!product) notFound();
 
-  const optionsByKind = new Map(
+  const options = Object.fromEntries(
     await Promise.all(
-      OPTION_KINDS.map(async (kind) => [kind, await adminListOptions(slug, kind)] as const),
+      OPTION_KINDS.map(async (kind) => [kind, (await adminListOptions(slug, kind)) ?? []] as const),
     ),
-  );
+  ) as Record<OptionKind, AdminOption[]>;
 
   return (
     <>
@@ -59,28 +44,11 @@ export default async function AdminProductPricingPage({
       </h1>
       <p className="mb-8 max-w-2xl font-body text-on-surface-variant">
         Prices are entered in pounds and stored to the penny. A quote multiplies
-        the page-count base rate by the paper and quantity
+        the page-count base rate by the paper, size and quantity
         multipliers, then adds delivery.
       </p>
 
-      <div className="flex flex-col gap-8">
-        <AdminProductFormatForm product={product} />
-        {KIND_ORDER.map((kind) => (
-          <AdminOptionTable
-            key={kind}
-            productSlug={slug}
-            kind={kind}
-            title={
-              kind === "page-count" && product.sizedByOption
-                ? "Sizes (1 page each)"
-                : kind === "paper" && product.paperLabel !== "Paper"
-                  ? `${product.paperLabel} options`
-                  : KIND_TITLES[kind]
-            }
-            options={optionsByKind.get(kind) ?? []}
-          />
-        ))}
-      </div>
+      <AdminPricingEditor product={product} options={options} />
     </>
   );
 }

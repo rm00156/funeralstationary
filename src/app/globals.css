@@ -438,7 +438,8 @@ body {
  * A data table that becomes one card per row when its own box is too narrow
  * to show it whole — a phone, or a column beside a sidebar — rather than a
  * table to scroll sideways. Put `table-stack` (or `table-stack table-stack-wide`
- * for a table that needs ~960px) on the table's wrapper. It's a container
+ * for a table that needs ~960px, `table-stack table-stack-compact` for one of
+ * short columns that fits in ~576px) on the table's wrapper. It's a container
  * query, so it follows the wrapper, not the screen.
  *
  * A stacked row is a two-column grid of label-over-value pairs. On each cell:
@@ -451,7 +452,7 @@ body {
  * Unlayered on purpose: the cells carry Tailwind padding utilities, and only
  * an unlayered rule outranks the utilities layer.
  *
- * The two @container blocks below are the same rules at two widths — keep
+ * The three @container blocks below are the same rules at three widths — keep
  * them in step. Plain CSS can't share one block between two size queries;
  * a style query could, but Firefox and the older browsers many customers
  * use don't support one.
@@ -461,7 +462,7 @@ body {
   overflow-x: auto;
 }
 @container (width < 48rem) {
-  .table-stack:not(.table-stack-wide) {
+  .table-stack:not(.table-stack-wide, .table-stack-compact) {
     & :is(table, tbody) {
       display: block;
       width: 100%;
@@ -527,6 +528,71 @@ body {
 }
 @container (width < 60rem) {
   .table-stack-wide {
+    & :is(table, tbody) {
+      display: block;
+      width: 100%;
+      min-width: 0;
+    }
+    & thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    & tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-auto-flow: dense;
+      gap: 14px 24px;
+      padding: 18px 20px;
+    }
+    & td {
+      min-width: 0;
+      padding: 0;
+      text-align: start;
+      overflow-wrap: anywhere;
+    }
+    & td :is(input, select, textarea) {
+      min-width: 0;
+      max-width: 100%;
+    }
+    & td:empty {
+      display: none;
+    }
+    & td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      padding-bottom: 2px;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-ink-3);
+    }
+    & td:is([data-stack="full"], [colspan]) {
+      grid-column: 1 / -1;
+    }
+    & td[data-stack="title"] {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: center;
+      font-size: 16px;
+    }
+    & td[data-stack="end"] {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: center;
+      justify-self: end;
+      text-align: end;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+}
+@container (width < 36rem) {
+  .table-stack-compact {
     & :is(table, tbody) {
       display: block;
       width: 100%;

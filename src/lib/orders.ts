@@ -6,7 +6,7 @@
  * without a database. The server seam that uses these is orders.server.ts.
  */
 import { orderStatusValues } from "@/db/schema/orders";
-import type { ProductFormat } from "@/lib/designEditor";
+import { sameTrim, trimText, type PageTrim, type ProductFormat } from "@/lib/designEditor";
 import {
   getQuote,
   type PricingData,
@@ -193,6 +193,7 @@ export const SELECTION_AXES: readonly SelectionAxis[] = [
   "pages",
   "paper",
   "delivery",
+  "size",
 ];
 
 /**
@@ -201,16 +202,68 @@ export const SELECTION_AXES: readonly SelectionAxis[] = [
  * the client or were stored before an option was deactivated. This is the
  * strict form: every slug must exist in the (active) PricingData, or the
  * offending axes are reported and nothing is priced.
+ *
+ * Size is the one optional axis: a product with no size options prints at its
+ * own trim, and its selection's size is "". Once a product has sizes, a line
+ * without one (or with one since switched off) is stale like any other axis.
  */
 export function resolveSelectionStrict(
   data: PricingData,
   selection: Selection,
 ): { ok: true; quote: Quote } | { ok: false; invalid: SelectionAxis[] } {
-  const invalid = SELECTION_AXES.filter(
-    (axis) => !data[axis].some((option) => option.id === selection[axis]),
+  const invalid = SELECTION_AXES.filter((axis) =>
+    axis === "size" && data.size.length === 0
+      ? selection.size !== ""
+      : !data[axis].some((option) => option.id === selection[axis]),
   );
   if (invalid.length > 0) return { ok: false, invalid };
   return { ok: true, quote: getQuote(data, selection) };
+}
+
+/**
+ * The size slug a basket line stands for today. A line's size is the size it
+ * prints at, not an option row: one stored with no size printed at the
+ * product's trim, and so did one stored at the trim's own size. Each is read
+ * as the offered option at those dimensions — or "" once the product prints
+ * only at its trim again — so an admin switching sizes on or off never
+ * strands a basket. Any other size that's no longer offered stays as stored,
+ * for resolveSelectionStrict to report stale: an A4 line must not quietly
+ * become an A5 one.
+ *
+ * `storedSize` is the size the line was last priced at (its quote snapshot),
+ * null when it had none — the dimensions of a slug whose row is now off.
+ */
+export function lineSizeSlug(
+  data: PricingData,
+  stored: string,
+  storedSize: PageTrim | null,
+  trim: PageTrim,
+): string {
+  if (data.size.some((option) => option.id === stored)) return stored;
+  const printsAt = stored === "" ? trim : storedSize;
+  if (!printsAt) return stored;
+  if (data.size.length === 0) return sameTrim(printsAt, trim) ? "" : stored;
+  return data.size.find((option) => sameTrim(option, printsAt))?.id ?? stored;
+}
+
+/**
+ * What a basket edit does with a line. The edit names the choices it
+ * changes and the rest are kept as stored. A choice the customer sent must
+ * price, or the edit is refused. One they didn't send that has since been
+ * switched off doesn't block it: the sent choice is saved and the line stays
+ * stale on the other ("save"), so a line stale on two choices can be put
+ * right one at a time — rather than refusing every edit, or quietly
+ * replacing a choice the customer never touched.
+ */
+export function lineEditOutcome(
+  data: PricingData,
+  selection: Selection,
+  sent: readonly SelectionAxis[],
+): { kind: "price"; quote: Quote } | { kind: "refuse"; axis: SelectionAxis } | { kind: "save" } {
+  const resolved = resolveSelectionStrict(data, selection);
+  if (resolved.ok) return { kind: "price", quote: resolved.quote };
+  const refused = resolved.invalid.find((axis) => sent.includes(axis));
+  return refused ? { kind: "refuse", axis: refused } : { kind: "save" };
 }
 
 /* ------------------------------------------------------------------ */
@@ -278,18 +331,34 @@ export function sumLineItems(lines: ReadonlyArray<StripeLineItem>): number {
 /**
  * A line's printed spec, as the basket, the order pages and the emails show
  * it: "A5 · 8 page · Silk", "A6 · Printed both sides · Silk card". The size
- * leads unless it is itself what the customer chose — a board sold in several
- * sizes, whose page-count option *is* the size ("A1 · Mounted on 5mm board").
+ * leads: the print size chosen when the product offers sizes ("A4 · 8 page ·
+ * Silk"), else the product's own — unless the size is itself the page-count
+ * option, a board sold in several sizes ("A1 · Mounted on 5mm board").
  */
 export function lineSpec(
   format: Pick<ProductFormat, "sizeLabel" | "sizedByOption">,
-  quote: { pages: { label: string }; paper: { label: string } },
+  quote: { pages: { label: string }; paper: { label: string }; size?: { label: string } | null },
 ): string {
-  return [
-    ...(format.sizedByOption ? [] : [format.sizeLabel]),
-    quote.pages.label,
-    quote.paper.label,
-  ].join(" · ");
+  const size = quote.size?.label ?? (format.sizedByOption ? null : format.sizeLabel);
+  return [...(size ? [size] : []), quote.pages.label, quote.paper.label].join(" · ");
+}
+
+/**
+ * What the press needs told about scaling, for the admin order page and the
+ * Thintent job: a board's one design goes out at whichever A size was
+ * ordered, and a line printed at a size other than the one its artwork was
+ * drawn at (an A5 booklet ordered at A4) is scaled to it. Null when the
+ * artwork is already the size it prints at.
+ */
+export function pressScaleNote(
+  format: Pick<ProductFormat, "sizedByOption">,
+  artworkTrim: PageTrim,
+  quote: { size?: { label: string; widthMm: number; heightMm: number } | null },
+): string | null {
+  if (format.sizedByOption) return `Artwork drawn at ${trimText(artworkTrim)}; scale to the size ordered`;
+  const size = quote.size;
+  if (!size || sameTrim(size, artworkTrim)) return null;
+  return `Artwork drawn at ${trimText(artworkTrim)}; print at ${size.label} (${trimText(size)}), scaled ${Math.round((size.widthMm / artworkTrim.widthMm) * 100)}%`;
 }
 
 /**

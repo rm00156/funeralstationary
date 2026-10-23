@@ -243,7 +243,7 @@ export default function DesignEditor({
   initialLayout?: DesignPage[] | null;
   /**
    * Options carried from the product page, already validated against
-   * `pricing`. pages/paper seed a new design; quantity/delivery are sent with
+   * `pricing`. pages/paper seed a new design; quantity/delivery/size are sent with
    * "Add to basket" so the line starts on what the customer priced.
    */
   initialSelection?: Partial<Selection>;
@@ -522,7 +522,7 @@ export default function DesignEditor({
   /**
    * Save first (the row may not exist yet — see persist), then put the
    * design in the basket and go there. Pages and paper come from the design
-   * itself; copies and delivery start on whatever the product page carried
+   * itself; copies, delivery and size start on whatever the product page carried
    * (else the defaults) and stay editable on the basket page.
    */
   const addToCart = useCallback(async (acknowledgeDefaults = false) => {
@@ -543,6 +543,7 @@ export default function DesignEditor({
           designId: id,
           quantity: initialSelection.quantity,
           delivery: initialSelection.delivery,
+          size: initialSelection.size,
           acknowledgeDefaults,
         }),
       });
@@ -569,7 +570,16 @@ export default function DesignEditor({
       setAddingToCart(false);
       flash(error instanceof Error ? error.message : "Could not add to your basket — please try again");
     }
-  }, [customerChrome, persist, flash, router, setPreview, initialSelection.quantity, initialSelection.delivery]);
+  }, [
+    customerChrome,
+    persist,
+    flash,
+    router,
+    setPreview,
+    initialSelection.quantity,
+    initialSelection.delivery,
+    initialSelection.size,
+  ]);
 
   /**
    * Authoring only: promote the draft to the live layout. Saves first, so
@@ -605,7 +615,7 @@ export default function DesignEditor({
    * lingering ?template=/?product= would start lying the moment a different
    * template was applied, so they're dropped here (they only ever seed a new
    * design, from its design page) — and so are ?pages=/?paper=, which the row now
-   * owns. ?quantity=/?delivery= stay: they're basket choices, not properties
+   * owns. ?quantity=/?delivery=/?size= stay: they're basket choices, not properties
    * of the design, so a refresh must still add the line on what was priced.
    */
   useEffect(() => {
@@ -616,7 +626,7 @@ export default function DesignEditor({
       url.searchParams.get("design") === designId &&
       ["template", "product", "pages", "paper"].every((key) => !url.searchParams.has(key));
     if (alreadyClean) return;
-    const lineChoice = ["quantity", "delivery"].flatMap((key) => {
+    const lineChoice = ["quantity", "delivery", "size"].flatMap((key) => {
       const value = url.searchParams.get(key);
       return value ? [[key, value] as const] : [];
     });

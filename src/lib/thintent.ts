@@ -19,11 +19,12 @@ import {
   ORDER_STATUS_TRANSITIONS,
   canTransition,
   lineSpec,
+  pressScaleNote,
   type OrderRefund,
   type OrderStatus,
 } from "@/lib/orders";
 import type { OrderDetail, OrderDetailItem } from "@/lib/orders.server";
-import { trimText } from "@/lib/designEditor";
+import { sameTrim } from "@/lib/designEditor";
 import { tradeDiscountText } from "@/lib/trade";
 import { VAT_TREATMENT_LABELS, type VatTreatment } from "@/lib/vat";
 
@@ -97,7 +98,7 @@ export interface ThintentOrderLine {
  * whole order refused with a 422, so free text from the customer — a file
  * name, a phone number — is trimmed to fit rather than risk that.
  */
-const LIMITS = { title: 300, specValue: 300, fileLabel: 120, name: 200, phone: 32, postcode: 16, deliveryLabel: 120 };
+const LIMITS = { productCode: 200, title: 300, specValue: 300, fileLabel: 120, name: 200, phone: 32, postcode: 16, deliveryLabel: 120 };
 
 const clip = (value: string, max: number): string =>
   value.length <= max ? value : `${value.slice(0, max - 1)}…`;
@@ -167,9 +168,8 @@ function lineNotes(item: OrderDetailItem): string | null {
       `Customer chose to print it as it is: ${accepted.map((check) => `${check.title}. ${check.detail}`).join(" ")}`,
     );
   }
-  if (item.format.sizedByOption) {
-    notes.push(`Artwork drawn at ${trimText(item.artworkTrim)}; scale to the size ordered.`);
-  }
+  const scale = pressScaleNote(item.format, item.artworkTrim, item.quote);
+  if (scale) notes.push(`${scale}.`);
   return notes.length ? notes.join("\n") : null;
 }
 
@@ -236,19 +236,32 @@ export function splitDeliveryCharges(
 
 /**
  * The product a line sold, as Thintent costs it. The code is the product and
- * the options it was printed at — page count (or, for a sized-by-option
- * product, the size) then paper — "order-of-service/8/silk": the things that
+ * the options it was printed at — a print size other than the product's own
+ * trim, page count (or, for a sized-by-option product, the size) then paper —
+ * "order-of-service/8/silk", "order-of-service/a4/8/silk": the things that
  * change what a copy costs to make. Copies aren't in it; they're the line's
  * quantity. Slugs, read off the quote frozen at the pay click, and never
  * renamed (adminCatalogue.server.ts), so a code the shop has linked keeps
- * matching. 3 × 64-char slugs, so always inside Thintent's 200.
+ * matching. Real slugs are a few characters each; the clip only guards
+ * Thintent's 200 against four maximal ones.
  */
 export function lineProduct(
   item: Pick<OrderDetailItem, "productId" | "format" | "quote">,
   productLabel: string,
 ): { code: string; name: string } {
   return {
-    code: [item.productId, item.quote.pages.id, item.quote.paper.id].join("/"),
+    code: [
+      item.productId,
+      // Only a size other than the product's trim, so an A5 booklet keeps the
+      // code it had before sizes existed. The product's trim, not the
+      // artwork's: an uploaded A4 file is drawn at A4, but it's still the A4
+      // booklet, not the A5 one.
+      ...(item.quote.size && !sameTrim(item.quote.size, item.format.trim) ? [item.quote.size.id] : []),
+      item.quote.pages.id,
+      item.quote.paper.id,
+    ]
+      .join("/")
+      .slice(0, LIMITS.productCode),
     name: clip(`${productLabel} · ${lineSpec(item.format, item.quote)}`, LIMITS.title),
   };
 }

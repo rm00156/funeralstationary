@@ -6,10 +6,8 @@ import { useState } from "react";
 import type { AdminProduct } from "@/lib/adminCatalogue.server";
 import { adminMutate } from "@/lib/adminClient";
 
-const INPUT =
-  "w-full rounded-lg border border-outline-variant/60 bg-surface-container-lowest px-3 py-2 font-body text-sm focus:border-primary-container focus:outline-none focus:ring-4 focus:ring-primary-container/15 disabled:opacity-50";
-const LABEL =
-  "mb-2 block font-body text-xs font-medium uppercase tracking-[0.18em] text-secondary";
+const INPUT = "field min-h-11 py-2 disabled:bg-mist-3 disabled:text-ink-2";
+const LABEL = "mb-2 block font-body font-medium text-ink";
 
 const PAGE_STRUCTURES = [
   { value: 3, label: "Booklet — cover, middle (repeats), back" },
@@ -57,10 +55,10 @@ export default function AdminProductFormatForm({ product }: { product: AdminProd
   return (
     <form
       onSubmit={save}
-      className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-6 ambient-shadow"
+      className="rounded-xl border border-line bg-surface px-6 py-6 font-body ambient-shadow sm:px-8"
     >
-      <h2 className="mb-1 font-display text-lg text-primary">Format</h2>
-      <p className="mb-5 max-w-2xl font-body text-sm text-on-surface-variant">
+      <h2 className="mb-2 font-display text-3xl text-plum">Format</h2>
+      <p className="mb-6 max-w-2xl text-ink-2">
         {locked
           ? `The trim and page structure are fixed: ${product.templateCount} ${
               product.templateCount === 1 ? "template is" : "templates are"
@@ -141,32 +139,28 @@ export default function AdminProductFormatForm({ product }: { product: AdminProd
           />
         </div>
       </div>
-      <label className="mt-4 flex max-w-2xl items-start gap-3 font-body text-sm text-on-surface">
+      <label className="mt-6 flex max-w-2xl items-start gap-3 rounded-xl bg-mist-2 px-5 py-4 text-ink">
         <input
           type="checkbox"
           checked={sizedByOption}
           onChange={(event) => setSizedByOption(event.target.checked)}
-          className="mt-0.5 h-4 w-4 accent-primary-container"
+          className="mt-1 h-5 w-5 shrink-0 accent-plum"
         />
         <span>
-          Page-count options are print sizes
-          <span className="block text-on-surface-variant">
+          <span className="font-medium">Page-count options are print sizes</span>
+          <span className="mt-1 block text-sm text-ink-2">
             For a one-page product sold in several A sizes (a memory board): each page-count option
             is a size with 1 page, and the trim above is the size it is drawn at. Only for sizes that
             share the trim&apos;s shape.
           </span>
         </span>
       </label>
-      <div className="mt-5 flex items-center gap-4">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-primary-container px-5 py-2.5 font-body text-sm font-medium text-white transition-colors duration-300 hover:bg-primary disabled:opacity-40"
-        >
+      <div className="mt-6 flex flex-wrap items-center gap-4">
+        <button type="submit" disabled={saving} className="btn btn-primary min-h-11 px-6">
           {saving ? "Saving…" : "Save format"}
         </button>
         {error && (
-          <p role="alert" className="font-body text-sm text-primary">
+          <p role="alert" className="rounded-lg bg-block-bg px-4 py-3 text-sm text-block-text">
             {error}
           </p>
         )}

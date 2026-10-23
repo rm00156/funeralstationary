@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  artworkTargetTrim,
   evaluateArtwork,
   fileSizeText,
   pagesText,
@@ -54,6 +55,11 @@ const board = (size = "a1"): ArtworkTarget => ({
   pages: BOARD_SIZES.find((option) => option.id === size)!,
   pageOptions: BOARD_SIZES,
 });
+
+const A4_SIZE = { id: "a4", label: "A4", widthMm: 210, heightMm: 297 };
+const A6_SIZE = { id: "a6", label: "A6", widthMm: 105, heightMm: 148 };
+/** The booklet ordered at a print size other than the A5 it's drawn at. */
+const bookletAt = (size: typeof A4_SIZE, pages = 8): ArtworkTarget => ({ ...booklet(pages), size });
 
 /** A5 with 3mm bleed, as Canva's "PDF Print" with bleed comes out. */
 const A5_BLEED: AnalysedPage = { mediaMm: { w: 154, h: 216 } };
@@ -153,6 +159,42 @@ describe("evaluateArtwork — size", () => {
       status: "pass",
       detail: "The right shape to print at A1.",
     });
+  });
+});
+
+describe("evaluateArtwork — print sizes", () => {
+  const A4_BLEED: AnalysedPage = { mediaMm: { w: 216, h: 303 } };
+
+  it("passes a file made at the size it's ordered at", () => {
+    expect(check(file(repeat(A4_BLEED, 8)), bookletAt(A4_SIZE), "size")).toMatchObject({
+      status: "pass",
+      detail: "A4, with bleed, ready to print and fold.",
+    });
+  });
+
+  it("warns that an A5 file will be enlarged to an A4 order", () => {
+    const size = check(file(repeat(A5_BLEED, 8)), bookletAt(A4_SIZE), "size");
+    expect(size).toMatchObject({ status: "warn", title: "Your file is 154 × 216 mm" });
+    expect(size?.detail).toContain("A4 (210 × 297 mm)");
+    expect(size?.detail).toContain("larger");
+  });
+
+  it("judges photos at the size the booklet prints", () => {
+    // 200ppi across an A5 page is 141ppi once enlarged to A4 — under the floor.
+    const pages = repeat({ ...A5_BLEED, minImagePpi: 200 }, 8);
+    expect(check(file(pages), booklet(), "photos")?.status).toBe("pass");
+    expect(check(file(pages), bookletAt(A4_SIZE), "photos")?.status).toBe("warn");
+    expect(check(file(pages), bookletAt(A6_SIZE), "photos")?.status).toBe("pass");
+  });
+
+  it("still blocks the wrong shape at any size", () => {
+    const letter: AnalysedPage = { mediaMm: { w: 216, h: 279 } };
+    expect(evaluateArtwork(file(repeat(letter, 8)), bookletAt(A6_SIZE)).blocking).toBe(true);
+  });
+
+  it("records the print size as the artwork's trim", () => {
+    expect(artworkTargetTrim(bookletAt(A4_SIZE))).toEqual({ widthMm: 210, heightMm: 297 });
+    expect(artworkTargetTrim(booklet())).toEqual(BOOKLET_FORMAT.trim);
   });
 });
 
@@ -284,6 +326,11 @@ describe("printTrim", () => {
     expect(printTrim(BOARD, { label: "Poster" })).toEqual(BOARD.trim);
     expect(printTrim(BOARD, { label: "A10" })).toEqual(BOARD.trim);
     expect(printTrim(BOOKLET_FORMAT, { label: "A1" })).toEqual(BOOKLET_FORMAT.trim);
+  });
+
+  it("is the print size chosen, when there is one", () => {
+    expect(printTrim(BOOKLET_FORMAT, { label: "8 page" }, A4_SIZE)).toEqual({ widthMm: 210, heightMm: 297 });
+    expect(printTrim(BOOKLET_FORMAT, { label: "8 page" }, null)).toEqual(BOOKLET_FORMAT.trim);
   });
 
   it("finds the A size in an edited label, then in the slug", () => {

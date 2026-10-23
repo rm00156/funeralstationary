@@ -19,6 +19,8 @@ import { priceVatNote, type VatTreatment } from "@/lib/vat";
 
 /** Each axis, with the narrowest its option buttons may get before wrapping. */
 const axes = (format: ProductFormat): { key: keyof Selection; label: string; minWidth: string }[] => [
+  // The print size, for a product sold in several (the booklet's A6/A5/A4).
+  { key: "size", label: "Size", minWidth: "72px" },
   // A board's page-count options are its print sizes, and its paper is its finish.
   { key: "pages", label: pagesAxisLabel(format), minWidth: "96px" },
   { key: "quantity", label: "Copies", minWidth: "72px" },
@@ -28,7 +30,7 @@ const axes = (format: ProductFormat): { key: keyof Selection; label: string; min
 
 /**
  * The options and live price on a design's page. Product-agnostic: it renders
- * whichever options the product's four pricing tables hold, and hides an axis
+ * whichever options the product's pricing tables hold, and hides an axis
  * that offers only one choice (a single-card product has one "page count",
  * which isn't a decision to put in front of the customer).
  *
@@ -64,7 +66,7 @@ export default function TemplateBuyBox({
         : undefined;
     }
     // The delivery note is shown in the summary panel instead.
-    return key === "delivery" ? undefined : quote[key].note;
+    return key === "delivery" ? undefined : quote[key]?.note;
   };
 
   return (
@@ -121,7 +123,9 @@ export default function TemplateBuyBox({
       <div className="flex flex-col gap-[18px] rounded-xl border border-line bg-surface p-6">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-base text-ink-2">
-            {copiesText(quote.quantity.value)} · {quote.pages.label}
+            {copiesText(quote.quantity.value)} ·{" "}
+            {pricing.size.length > 1 && quote.size ? `${quote.size.label} · ` : ""}
+            {quote.pages.label}
             <span className="block text-[15px] text-ink-3">
               {formatPence(quote.unitPricePence)} each
               {quote.delivery.pricePence > 0 &&

@@ -31,11 +31,11 @@ export async function POST(request: NextRequest, ctx: RouteContext<"/api/uploads
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { product, pages } = (body ?? {}) as Record<string, unknown>;
+  const { product, pages, size } = (body ?? {}) as Record<string, unknown>;
 
   const owner = await getOrCreateOwner();
   try {
-    const report = await checkUpload(owner, id, { product, pages });
+    const report = await checkUpload(owner, id, { product, pages, size });
     return Response.json({ report });
   } catch (error) {
     const response = uploadErrorResponse(error);

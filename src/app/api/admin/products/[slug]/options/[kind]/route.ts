@@ -3,11 +3,17 @@ import {
   adminCreateOption,
   adminGetProduct,
   adminListOptions,
+  adminReorderOptions,
   isDuplicateKeyError,
   isOptionKind,
 } from "@/lib/adminCatalogue.server";
 import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
-import { pageCountFormatError, parseOptionInput } from "@/lib/adminValidation";
+import {
+  pageCountFormatError,
+  parseOptionInput,
+  parseSlugOrder,
+  sizeFormatError,
+} from "@/lib/adminValidation";
 import type { TemplatePageCount } from "@/lib/designEditor";
 
 export const runtime = "nodejs";
@@ -57,6 +63,12 @@ export async function POST(
     );
     if (formatError) return Response.json({ error: formatError }, { status: 400 });
   }
+  if (parsed.value.widthMm !== undefined && parsed.value.heightMm !== undefined) {
+    const product = await adminGetProduct(slug);
+    if (!product) return Response.json({ error: "Product not found" }, { status: 404 });
+    const formatError = sizeFormatError(product, parsed.value.widthMm, parsed.value.heightMm);
+    if (formatError) return Response.json({ error: formatError }, { status: 400 });
+  }
 
   try {
     const created = await adminCreateOption(slug, kind, parsed.value);
@@ -71,4 +83,39 @@ export async function POST(
     }
     throw error;
   }
+}
+
+/**
+ * PUT /api/admin/products/:slug/options/:kind — `{ order: slug[] }`, every
+ * option of the kind once, in the order customers should see them. 409 when
+ * the list no longer matches (an option was added in another tab).
+ */
+export async function PUT(
+  request: NextRequest,
+  ctx: RouteContext<"/api/admin/products/[slug]/options/[kind]">,
+) {
+  if (!(await isAdmin())) return unauthorised();
+  const { slug, kind } = await ctx.params;
+  if (!isOptionKind(kind)) {
+    return Response.json({ error: "Unknown option kind" }, { status: 404 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const order = parseSlugOrder((body as Record<string, unknown> | null)?.order);
+  if (!order) return Response.json({ error: "order must list each option slug once" }, { status: 400 });
+
+  const result = await adminReorderOptions(slug, kind, order);
+  if (result === null) return Response.json({ error: "Product not found" }, { status: 404 });
+  if (!result) {
+    return Response.json(
+      { error: "These options have changed since you opened them — reload the page and try again" },
+      { status: 409 },
+    );
+  }
+  return Response.json({ ok: true });
 }

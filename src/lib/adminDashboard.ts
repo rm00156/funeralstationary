@@ -7,6 +7,8 @@
  * in Europe/London whatever zone the server runs in (Vercel runs in UTC, and
  * for half the year midnight there is 1am here).
  */
+import { sameTrim, type PageTrim } from "@/lib/designEditor";
+import { quoteSize, type Quote } from "@/lib/orderOfServicePricing";
 import type { OrderStatus } from "@/lib/orders";
 
 export const SHOP_TIME_ZONE = "Europe/London";
@@ -214,6 +216,16 @@ export interface ActionItem {
 
 /** Before then fulfilment is still rendering proofs and sending to Thintent itself. */
 const SETTLE_MINUTES = 10;
+
+/**
+ * "A4 · 8 page" — a line's pages, led by its print size only when that isn't
+ * the product's own trim: that's what the press sets up differently. A
+ * booklet at A5, or a product with one size, reads as it always did.
+ */
+export function linePagesLabel(quote: Quote, trim: PageTrim): string {
+  const size = quoteSize(quote);
+  return size && !sameTrim(size, trim) ? `${size.label} · ${quote.pages.label}` : quote.pages.label;
+}
 
 export function productSummary(lines: readonly Pick<DashboardLine, "productLabel">[]): string {
   const labels = [...new Set(lines.map((line) => line.productLabel))];

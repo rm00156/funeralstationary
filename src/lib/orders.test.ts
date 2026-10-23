@@ -11,8 +11,11 @@ import {
   staleLineSpec,
   makeOrderNumber,
   parseOrderStatus,
+  pressScaleNote,
   refundStatusEffect,
   earliestServiceDate,
+  lineEditOutcome,
+  lineSizeSlug,
   refundedPence,
   resolveSelectionStrict,
   sumLineItems,
@@ -36,7 +39,12 @@ const pricing: PricingData = {
   pages: [{ id: "p8", label: "8 pages", pages: 8, baseRatePence: 200 }],
   paper: [{ id: "silk", label: "Silk", multiplier: 1 }],
   delivery: [{ id: "standard", label: "Standard", pricePence: 0, note: "" }],
+  size: [],
 };
+
+const A5 = { id: "a5", label: "A5", multiplier: 1, widthMm: 148, heightMm: 210 };
+const A4 = { id: "a4", label: "A4", multiplier: 1.5, widthMm: 210, heightMm: 297 };
+const sized: PricingData = { ...pricing, size: [A5, A4] };
 
 describe("status machine", () => {
   it("allows the documented forward path", () => {
@@ -119,6 +127,7 @@ describe("resolveSelectionStrict", () => {
     pages: "p8",
     paper: "silk",
     delivery: "standard",
+    size: "",
   };
 
   it("prices a fully valid selection", () => {
@@ -137,6 +146,74 @@ describe("resolveSelectionStrict", () => {
       paper: "gone",
     });
     expect(result).toEqual({ ok: false, invalid: ["quantity", "paper"] });
+  });
+
+  it("accepts no size for a product that has none, and refuses one it doesn't sell", () => {
+    expect(resolveSelectionStrict(pricing, selection).ok).toBe(true);
+    expect(resolveSelectionStrict(pricing, { ...selection, size: "a4" })).toEqual({ ok: false, invalid: ["size"] });
+  });
+
+  it("prices a chosen size, and calls a missing one stale once the product has sizes", () => {
+    const result = resolveSelectionStrict(sized, { ...selection, size: "a4" });
+    expect(result.ok && result.quote.unitPricePence).toBe(270); // 200 × 1.5 × 0.9
+    expect(resolveSelectionStrict(sized, selection)).toEqual({ ok: false, invalid: ["size"] });
+    expect(resolveSelectionStrict(sized, { ...selection, size: "a3" })).toEqual({ ok: false, invalid: ["size"] });
+  });
+});
+
+describe("lineSizeSlug", () => {
+  const trim = { widthMm: 148, heightMm: 210 };
+  const A6 = { id: "a6", label: "A6", multiplier: 0.8, widthMm: 105, heightMm: 148 };
+
+  it("keeps a size that is still offered", () => {
+    expect(lineSizeSlug(sized, "a4", A4, trim)).toBe("a4");
+  });
+
+  it("reads a line from before the product had sizes as its trim's size", () => {
+    expect(lineSizeSlug(sized, "", null, trim)).toBe("a5");
+    // No size at the trim on offer: still stale, nothing guessed.
+    expect(lineSizeSlug({ ...pricing, size: [A6, A4] }, "", null, trim)).toBe("");
+  });
+
+  it("reads a line at the trim's size as no size once sizes are switched off", () => {
+    expect(lineSizeSlug(pricing, "a5", A5, trim)).toBe("");
+    expect(resolveSelectionStrict(pricing, {
+      quantity: "q15", pages: "p8", paper: "silk", delivery: "standard",
+      size: lineSizeSlug(pricing, "a5", A5, trim),
+    }).ok).toBe(true);
+  });
+
+  it("never turns another size into the trim's", () => {
+    expect(lineSizeSlug(pricing, "a4", A4, trim)).toBe("a4");
+    expect(lineSizeSlug({ ...pricing, size: [A5] }, "a4", A4, trim)).toBe("a4");
+    // Dimensions unknown (quoted before sizes were snapshotted): left alone.
+    expect(lineSizeSlug(pricing, "a5", null, trim)).toBe("a5");
+  });
+
+  it("follows a size to a re-made option at the same dimensions", () => {
+    const a5New = { ...A5, id: "a5-new" };
+    expect(lineSizeSlug({ ...pricing, size: [a5New] }, "a5", A5, trim)).toBe("a5-new");
+  });
+});
+
+describe("lineEditOutcome", () => {
+  const selection = { quantity: "q50", pages: "p8", paper: "silk", delivery: "standard", size: "" };
+
+  it("prices an edit when every choice prices", () => {
+    expect(lineEditOutcome(pricing, selection, ["quantity"]).kind).toBe("price");
+  });
+
+  it("refuses a choice the customer sent that doesn't price", () => {
+    expect(lineEditOutcome(pricing, { ...selection, quantity: "q999" }, ["quantity"])).toEqual({
+      kind: "refuse",
+      axis: "quantity",
+    });
+  });
+
+  it("saves a good choice on a line stale on two, so each can be fixed in turn", () => {
+    const twoStale = { ...selection, quantity: "q25", delivery: "gone" };
+    expect(lineEditOutcome(pricing, { ...twoStale, quantity: "q50" }, ["quantity"])).toEqual({ kind: "save" });
+    expect(lineEditOutcome(pricing, { ...twoStale, delivery: "standard" }, ["delivery"])).toEqual({ kind: "save" });
   });
 });
 
@@ -191,6 +268,36 @@ describe("lineSpec", () => {
         { pages: { label: "A1" }, paper: { label: "Mounted on 5mm board" } },
       ),
     ).toBe("A1 · Mounted on 5mm board");
+  });
+
+  it("leads with the print size chosen, when the product is sold in several", () => {
+    expect(lineSpec({ sizeLabel: "A5", sizedByOption: false }, { ...quote, size: A4 })).toBe("A4 · 8 page · Silk");
+    expect(lineSpec({ sizeLabel: "A5", sizedByOption: false }, { ...quote, size: null })).toBe("A5 · 8 page · Silk");
+  });
+});
+
+describe("pressScaleNote", () => {
+  const a5 = { widthMm: 148, heightMm: 210 };
+
+  it("says nothing when the artwork is the size it prints at", () => {
+    expect(pressScaleNote({ sizedByOption: false }, a5, { size: A5 })).toBeNull();
+    expect(pressScaleNote({ sizedByOption: false }, a5, {})).toBeNull();
+    expect(pressScaleNote({ sizedByOption: false }, a5, { size: null })).toBeNull();
+  });
+
+  it("tells the press the size to print an A5 design at", () => {
+    expect(pressScaleNote({ sizedByOption: false }, a5, { size: A4 })).toBe(
+      "Artwork drawn at 148 × 210 mm; print at A4 (210 × 297 mm), scaled 142%",
+    );
+    expect(
+      pressScaleNote({ sizedByOption: false }, a5, { size: { label: "A6", widthMm: 105, heightMm: 148 } }),
+    ).toBe("Artwork drawn at 148 × 210 mm; print at A6 (105 × 148 mm), scaled 71%");
+  });
+
+  it("keeps a board's note, whose page option is the size", () => {
+    expect(pressScaleNote({ sizedByOption: true }, { widthMm: 210, heightMm: 297 }, {})).toBe(
+      "Artwork drawn at 210 × 297 mm; scale to the size ordered",
+    );
   });
 });
 

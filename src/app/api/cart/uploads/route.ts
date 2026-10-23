@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { uploadId, product, pages, paper, quantity, delivery, serviceDate, confirmed, acceptWarnings } =
+  const { uploadId, product, pages, paper, size, quantity, delivery, serviceDate, confirmed, acceptWarnings } =
     (body ?? {}) as Record<string, unknown>;
   if (typeof uploadId !== "string" || !uploadId) {
     return Response.json({ error: "uploadId is required" }, { status: 400 });
@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       product,
       pages,
       paper: optionalSlug(paper),
+      size: optionalSlug(size),
       quantity: optionalSlug(quantity),
       delivery: optionalSlug(delivery),
       serviceDate,

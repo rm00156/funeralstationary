@@ -1,7 +1,12 @@
 import type { NextRequest } from "next/server";
-import { adminGetProduct, adminUpdateOption, isOptionKind } from "@/lib/adminCatalogue.server";
+import {
+  adminGetProduct,
+  adminListOptions,
+  adminUpdateOption,
+  isOptionKind,
+} from "@/lib/adminCatalogue.server";
 import { isAdmin, unauthorised } from "@/lib/adminAuth.server";
-import { pageCountFormatError, parseOptionPatch } from "@/lib/adminValidation";
+import { pageCountFormatError, parseOptionPatch, sizeFormatError } from "@/lib/adminValidation";
 import type { TemplatePageCount } from "@/lib/designEditor";
 
 export const runtime = "nodejs";
@@ -33,6 +38,23 @@ export async function PATCH(
     const formatError = pageCountFormatError(
       parsed.value.pageCount,
       product.templatePages as TemplatePageCount,
+    );
+    if (formatError) return Response.json({ error: formatError }, { status: 400 });
+  }
+  // A size is checked against the format when it's re-measured and when it's
+  // switched back on — the format may have changed while it was off.
+  if (
+    parsed.value.widthMm !== undefined ||
+    parsed.value.heightMm !== undefined ||
+    (kind === "size" && parsed.value.isActive === true)
+  ) {
+    const [product, options] = await Promise.all([adminGetProduct(slug), adminListOptions(slug, kind)]);
+    const existing = options?.find((option) => option.slug === optionSlug);
+    if (!product || !existing) return Response.json({ error: "Option not found" }, { status: 404 });
+    const formatError = sizeFormatError(
+      product,
+      parsed.value.widthMm ?? existing.widthMm!,
+      parsed.value.heightMm ?? existing.heightMm!,
     );
     if (formatError) return Response.json({ error: formatError }, { status: 400 });
   }

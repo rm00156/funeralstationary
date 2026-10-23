@@ -8,7 +8,7 @@
  * float drift end-to-end.
  *
  * total = (quantity x unitPrice) + delivery
- * unitPrice = pageRate x paper x quantity-break
+ * unitPrice = pageRate x paper x size x quantity-break
  */
 
 export interface SelectOption {
@@ -32,6 +32,15 @@ export interface PageCountOption {
   note?: string;
 }
 
+/**
+ * A print size (A6 / A5 / A4). The design is drawn once, at the product's
+ * own trim, and scaled to this — so it is always the trim's own shape.
+ */
+export interface SizeOption extends SelectOption {
+  widthMm: number;
+  heightMm: number;
+}
+
 export interface DeliveryOption {
   id: string;
   label: string;
@@ -45,6 +54,8 @@ export interface PricingData {
   pages: PageCountOption[];
   paper: SelectOption[];
   delivery: DeliveryOption[];
+  /** Empty for a product that prints only at its own trim. */
+  size: SizeOption[];
 }
 
 export interface Selection {
@@ -52,9 +63,11 @@ export interface Selection {
   pages: string;
   paper: string;
   delivery: string;
+  /** "" for a product with no size options. */
+  size: string;
 }
 
-export const SELECTION_AXES = ["quantity", "pages", "paper", "delivery"] as const;
+export const SELECTION_AXES = ["quantity", "pages", "paper", "delivery", "size"] as const;
 
 /**
  * The design page's selection as query params, so it survives the hops
@@ -98,6 +111,7 @@ export function defaultSelection(data: PricingData): Selection {
     pages: data.pages[0]?.id ?? "",
     paper: data.paper[0]?.id ?? "",
     delivery: data.delivery[0]?.id ?? "",
+    size: data.size[0]?.id ?? "",
   };
 }
 
@@ -106,6 +120,11 @@ export interface Quote {
   pages: PageCountOption;
   paper: SelectOption;
   delivery: DeliveryOption;
+  /**
+   * The print size; null when the product offers none. Absent on quotes
+   * frozen before sizes existed — read it through `quoteSize`.
+   */
+  size?: SizeOption | null;
   /** Price of a single booklet, in pence. */
   unitPricePence: number;
   /** quantity x unitPrice, in pence. */
@@ -122,10 +141,12 @@ export function getQuote(data: PricingData, selection: Selection): Quote {
   const pages = find(data.pages, selection.pages);
   const paper = find(data.paper, selection.paper);
   const delivery = find(data.delivery, selection.delivery);
+  const size = find(data.size, selection.size) ?? null;
 
   const unitPricePence = Math.round(
     pages.baseRatePence *
       paper.multiplier *
+      (size?.multiplier ?? 1) *
       quantity.multiplier,
   );
   const printCostPence = unitPricePence * quantity.value;
@@ -135,6 +156,7 @@ export function getQuote(data: PricingData, selection: Selection): Quote {
     pages,
     paper,
     delivery,
+    size,
     unitPricePence,
     printCostPence,
     totalPence: printCostPence + delivery.pricePence,
@@ -150,20 +172,23 @@ function cheapest<T>(options: T[], cost: (option: T) => number): T | undefined {
 
 /**
  * The lowest total this product can be bought for — the "from £X" figure on
- * the product cards and product page. Cheapest option on every multiplier
- * axis, cheapest page rate and delivery, and whichever quantity gives the
- * lowest print cost (a bigger break lowers the unit price but multiplies it
- * by more copies, so that axis is searched rather than min'd). Null when any
+ * the product cards and product page. Cheapest paper, page rate and
+ * delivery, and whichever quantity gives the lowest print cost (a bigger
+ * break lowers the unit price but multiplies it by more copies, so that axis
+ * is searched rather than min'd). The size is the default one, not the
+ * cheapest: the price table and the buy box both start there, and a "from"
+ * figure below every price they show would read as a mistake. Null when any
  * axis has no options, since then nothing can be priced at all.
  */
 export function cheapestQuote(data: PricingData): Quote | null {
   const paper = cheapest(data.paper, (option) => option.multiplier);
   const pages = cheapest(data.pages, (option) => option.baseRatePence);
   const delivery = cheapest(data.delivery, (option) => option.pricePence);
+  const size = data.size[0];
   if (!paper || !pages || !delivery || data.quantity.length === 0) {
     return null;
   }
-  const base = { paper: paper.id, pages: pages.id, delivery: delivery.id };
+  const base = { paper: paper.id, pages: pages.id, delivery: delivery.id, size: size?.id ?? "" };
   const quotes = data.quantity.map((quantity) => getQuote(data, { ...base, quantity: quantity.id }));
   return cheapest(quotes, (quote) => quote.totalPence) ?? null;
 }
@@ -172,6 +197,17 @@ const GBP = new Intl.NumberFormat("en-GB", {
   style: "currency",
   currency: "GBP",
 });
+
+/** A quote's print size — null for a product without sizes and for a quote frozen before they existed. */
+export const quoteSize = (quote: Quote): SizeOption | null => quote.size ?? null;
+
+/** "A6, A5 or A4" — a product's print sizes, smallest first; "" when it has none. */
+export function sizesText(sizes: readonly Pick<SizeOption, "label" | "widthMm" | "heightMm">[]): string {
+  const labels = [...sizes]
+    .sort((a, b) => a.widthMm * a.heightMm - b.widthMm * b.heightMm)
+    .map((size) => size.label);
+  return labels.length <= 1 ? labels.join("") : `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}`;
+}
 
 export const formatPence = (pence: number) => GBP.format(pence / 100);
 

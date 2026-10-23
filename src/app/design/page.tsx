@@ -108,11 +108,11 @@ export default async function DesignPage({
     saved ? null : getTemplateBySlug(template.id),
   ]);
   // The options picked on the product page. Pages and paper belong to the
-  // design, so they only seed a new one; copies and delivery are basket-line
-  // choices and ride along to "Add to basket" either way.
+  // design, so they only seed a new one; copies, delivery and size are
+  // basket-line choices and ride along to "Add to basket" either way.
   const carried = parseCarriedSelection(pricing, carriedParams);
   const initialSelection: Partial<Selection> = saved
-    ? { quantity: carried.quantity, delivery: carried.delivery }
+    ? { quantity: carried.quantity, delivery: carried.delivery, size: carried.size }
     : carried;
 
   return (

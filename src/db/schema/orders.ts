@@ -202,6 +202,13 @@ export const orderItems = mysqlTable(
     pageCountOptionId: varchar("page_count_option_id", { length: 64 }),
     paperOptionId: varchar("paper_option_id", { length: 64 }),
     /**
+     * The print size (size_options), a per-line choice like copies. Null on a
+     * product that offers no sizes, and on lines from before sizes existed —
+     * both print at the artwork's own trim. The size's dimensions are frozen
+     * in quote_snapshot.size at the pay click.
+     */
+    sizeOptionId: varchar("size_option_id", { length: 64 }),
+    /**
      * Delivery is a per-line choice: each product ships on its own delivery
      * options, and a line is priced and dispatched as its own print job.
      * Label and price are snapshotted beside the slug like the order's totals

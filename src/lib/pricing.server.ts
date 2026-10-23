@@ -1,7 +1,7 @@
 /**
  * Server-side reads for a product's pricing options.
  *
- * Loads the four option tables into the pure PricingData shape getQuote()
+ * Loads the five option tables into the pure PricingData shape getQuote()
  * consumes. Money columns are already integer pence; multiplier columns are
  * decimal(6,4) strings from the driver and become plain numbers here (exact
  * for 4dp values). Only active rows are returned, in sort order — the admin
@@ -23,6 +23,7 @@ import {
   paperOptions,
   products,
   quantityOptions,
+  sizeOptions,
 } from "@/db/schema";
 import type {
   DeliveryOption,
@@ -30,6 +31,7 @@ import type {
   PricingData,
   QuantityOption,
   SelectOption,
+  SizeOption,
 } from "@/lib/orderOfServicePricing";
 import { withOrderCutoff } from "@/lib/site";
 import { withTradeDiscount } from "@/lib/trade";
@@ -65,13 +67,37 @@ async function loadPaperOptions(productId: number): Promise<SelectOption[]> {
   }));
 }
 
+async function loadSizeOptions(productId: number): Promise<SizeOption[]> {
+  const rows = await db
+    .select({
+      slug: sizeOptions.slug,
+      label: sizeOptions.label,
+      multiplier: sizeOptions.multiplier,
+      note: sizeOptions.note,
+      widthMm: sizeOptions.widthMm,
+      heightMm: sizeOptions.heightMm,
+    })
+    .from(sizeOptions)
+    .where(and(eq(sizeOptions.productId, productId), eq(sizeOptions.isActive, true)))
+    .orderBy(asc(sizeOptions.sortOrder), asc(sizeOptions.id));
+  return rows.map((row) => ({
+    id: row.slug,
+    label: row.label,
+    multiplier: Number(row.multiplier),
+    note: row.note ?? undefined,
+    widthMm: row.widthMm,
+    heightMm: row.heightMm,
+  }));
+}
+
 export const getListPricingData = cache(
   async (productSlug: string): Promise<PricingData> => {
     const productId = await resolveProductId(productSlug);
 
-    const [paper, quantityRows, pageRows, deliveryRows] =
+    const [paper, size, quantityRows, pageRows, deliveryRows] =
       await Promise.all([
         loadPaperOptions(productId),
+        loadSizeOptions(productId),
         db
           .select({
             slug: quantityOptions.slug,
@@ -142,7 +168,7 @@ export const getListPricingData = cache(
       note: withOrderCutoff(row.note),
     }));
 
-    return { quantity, pages, paper, delivery };
+    return { quantity, pages, paper, delivery, size };
   },
 );
 
