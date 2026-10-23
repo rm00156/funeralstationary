@@ -4,9 +4,10 @@
  * heritage — rebuilt the same way as the classic family (classicTemplates.ts),
  * whose builders and placeholder wording these share.
  *
- * Flat, many-coloured artwork (a flag, a rainbow, a sunburst, the Jamaican
- * butterfly) is drawn as SVG under public/elements/templates/ and placed as a
- * locked image, so it ships with the code and prints as vector. Photographs
+ * Flat, many-coloured artwork (a flag, a rainbow, a sunburst) is drawn as SVG
+ * under public/elements/templates/ and placed as a locked image, so it ships
+ * with the code and prints as vector; the owner's own cutouts (the Jamaican
+ * butterfly) ship there too, as transparent PNGs. Photographs
  * come from the background pipeline (backgroundArtwork.ts): a design that
  * needs one names it, and the runner hands the rendered URL in through
  * `ArtworkUrls`, so this module stays pure.
@@ -328,7 +329,9 @@ function jamaicanButterfly(): ClassicDesign {
       field({ text: SERVICE_DAY, fontFamily: "ebGaramond", fontSize: 11, italic: true, align: "left", color: ink, x: 11.9, y: 86, w: 50, h: 0 }),
       fixed({ text: "At", fontFamily: "ebGaramond", fontSize: 10.5, align: "left", color: ink, x: 11.9, y: 88.4, w: 20, h: 0 }),
       field({ text: SERVICE_TIME, fontFamily: "ebGaramond", fontSize: 11, italic: true, align: "left", color: ink, x: 11.9, y: 90.6, w: 50, h: 0 }),
-      artwork(art("jamaican-butterfly.svg"), { x: 58, y: 47, w: 42, h: squareH(42) * (100 / 60) }),
+      // The owner's own butterfly (947 × 838, shadow included). The older
+      // jamaican-butterfly.svg stays in public/: saved designs still draw it.
+      artwork(art("jamaican-butterfly.png"), { x: 56.5, y: 71.5, w: 38, h: squareH(38) / (947 / 838) }),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "allura", ink, muted: GREY_MUTED, accent: green },
   };
