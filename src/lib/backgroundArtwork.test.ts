@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BACKGROUND_SPECS,
@@ -83,6 +85,18 @@ describe("BACKGROUND_SPECS", () => {
         expect(reach, spec.id).toBeGreaterThanOrEqual(64);
       }
     }
+  });
+
+  it("finds every file source in the repo", () => {
+    const files = BACKGROUND_SPECS.flatMap((s) => (s.source.kind === "file" ? [s.source.path] : []));
+    expect(files).toContain("assets/backgrounds/orchid.jpg");
+    for (const file of files) expect(existsSync(path.join(process.cwd(), file)), file).toBe(true);
+  });
+
+  it("lays the owner's white-ground orchid onto the cream paper", () => {
+    const orchid = getBackgroundSpec("orchid-low")!;
+    expect(orchid.onPaper).toBe(true);
+    expect(TEMPLATE_PALETTES[orchid.palettes[0]].paper).not.toBe("#ffffff");
   });
 
   it("keeps focus within the source image", () => {

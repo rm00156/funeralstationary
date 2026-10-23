@@ -31,6 +31,11 @@ export type BackgroundSourceRef =
   /** Anything else — record the licence and credit by hand. */
   | { kind: "url"; url: string }
   /**
+   * The owner's own photograph, committed under assets/backgrounds/ (a path
+   * from the repo root) as an sRGB JPEG — there is nowhere to fetch it from.
+   */
+  | { kind: "file"; path: string }
+  /**
    * Draped satin, generated on the render canvas rather than sourced: there is
    * no public-domain photograph of plain satin worth printing. Own work, so no
    * licence question. `seed` fixes the folds, so a re-render is identical.
@@ -163,6 +168,11 @@ export interface BackgroundSpec {
    * the source as it was taken.
    */
   mirror?: boolean;
+  /**
+   * Multiply the photograph onto the paper: a photograph shot on a white
+   * ground would otherwise show as a whiter strip on a cream page.
+   */
+  onPaper?: boolean;
   /** Which zone compositions should put the name and dates in. */
   textZone: TextZone;
   /** Palettes to render a tinted variant for. Empty for a plate used only as a cutout. */
@@ -401,6 +411,26 @@ const MANIFEST: readonly BackgroundSpec[] = [
     fade: { edge: "top", start: 70, end: 55 },
     wash: 0,
     tint: 0,
+    glow: { color: "#f3df93", end: 46 },
+    textZone: "top",
+    palettes: ["bronze"],
+  },
+  {
+    id: "orchid-low",
+    name: "Orchid",
+    source: { kind: "file", path: "assets/backgrounds/orchid.jpg" },
+    licence: "Owner's own (supplied as orchid.psd)",
+    credit: "White blossom, supplied by The Funeral Stationery.",
+    // Drawn for the booklet only, in its bottom third like the `-low` bands
+    // (hence the name; there is no taller original). Zoomed in (inset) and
+    // anchored on the cluster at the top right of the photograph.
+    placement: { x: 0, y: 68, w: 100, h: 32 },
+    focus: { x: 0.85, y: 0.15 },
+    inset: 0.1,
+    fade: { edge: "top", start: 80, end: 68 },
+    wash: 0,
+    tint: 0,
+    onPaper: true,
     glow: { color: "#f3df93", end: 46 },
     textZone: "top",
     palettes: ["bronze"],

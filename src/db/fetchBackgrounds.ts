@@ -161,6 +161,9 @@ async function resolveSource(ref: BackgroundSourceRef): Promise<ResolvedSource> 
     case "satin":
       // Painted by the renderer in process_; there is nothing to fetch.
       return { url: "", sourceUrl: "" };
+    case "file":
+      // Read from the repo in process_; there is nothing to fetch.
+      return { url: "", sourceUrl: "" };
   }
 }
 
@@ -217,7 +220,9 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
   const image =
     spec.source.kind === "satin"
       ? await renderer.renderSatin(spec.source)
-      : await download(spec, source);
+      : spec.source.kind === "file"
+        ? { bytes: await readFile(path.join(process.cwd(), spec.source.path)), contentType: "image/jpeg" }
+        : await download(spec, source);
 
   // Cutout spray, if this plate supports one. Not per palette — see
   // sprayAssetKey. Best-effort: a failed cut leaves the backgrounds usable.
@@ -263,6 +268,7 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
       glow: layout.glow ?? null,
       shade: layout.shade ?? null,
       mirror: spec.mirror ?? false,
+      onPaper: spec.onPaper ?? false,
     });
     const url = await saveBackgroundAsset(spec.id, palette, jpeg, format);
     console.log(`  ✓ ${spec.id}/${palette}/${format} → ${url} (${Math.round(jpeg.length / 1024)} KB)`);

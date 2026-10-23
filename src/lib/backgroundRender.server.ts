@@ -63,6 +63,8 @@ export interface BackgroundRenderOptions {
   shade: BackgroundSpec["shade"] | null;
   /** Draw the photograph flipped left to right. */
   mirror: boolean;
+  /** Multiply the photograph onto the paper, so its white ground becomes the paper. */
+  onPaper: boolean;
   /** Which artboard to render: the A5 page (default) or the bookmark. */
   format?: BackgroundFormat;
 }
@@ -128,6 +130,14 @@ async function drawInBrowser(input: DrawInput): Promise<string> {
     ctx.globalCompositeOperation = "multiply";
     ctx.globalAlpha = input.tint;
     ctx.fillStyle = input.accent;
+    ctx.fillRect(rx, ry, rw, rh);
+  }
+  // Multiplying by the paper turns a white-ground photograph's white into the
+  // page's own paper, and barely touches anything darker.
+  if (input.onPaper) {
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = input.paper;
     ctx.fillRect(rx, ry, rw, rh);
   }
   ctx.globalCompositeOperation = "source-over";
