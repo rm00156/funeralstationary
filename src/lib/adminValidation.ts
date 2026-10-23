@@ -89,6 +89,14 @@ export function parseSortOrder(value: unknown): number | null {
   return value >= 0 && value <= 32767 ? value : null;
 }
 
+/** A list's new order (products, or one product's options): distinct slugs, at most 500. */
+export function parseSlugOrder(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 500) return null;
+  const slugs = value.map(parseSlug);
+  if (slugs.some((slug) => slug === null)) return null;
+  return new Set(slugs).size === slugs.length ? (slugs as string[]) : null;
+}
+
 export function parseBoolean(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
@@ -129,6 +137,51 @@ export function pageCountFormatError(
 export function parseTrimMm(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value)) return null;
   return value >= 20 && value <= 1500 ? value : null;
+}
+
+/** Within this much (relative) of the trim's aspect, a size is the same shape — A sizes are rounded to the millimetre. */
+const SAME_SHAPE_TOLERANCE = 0.01;
+
+/**
+ * Whether a print size suits a product, or why not. The design is drawn once
+ * at the trim and the press scales it, which is only honest at the trim's own
+ * shape (A6/A5/A4 to an A5 booklet). A board's page-count options are its
+ * sizes already, so it can't have a second size axis too.
+ */
+export function sizeFormatError(
+  product: { trimWidthMm: number; trimHeightMm: number; sizedByOption: boolean },
+  widthMm: number,
+  heightMm: number,
+): string | null {
+  if (product.sizedByOption) {
+    return "This product's page options are already its print sizes";
+  }
+  const trimAspect = product.trimWidthMm / product.trimHeightMm;
+  if (Math.abs(widthMm / heightMm / trimAspect - 1) > SAME_SHAPE_TOLERANCE) {
+    return `A print size must be the product's own shape (${product.trimWidthMm} × ${product.trimHeightMm} mm, scaled) — the design is drawn once and scaled to it`;
+  }
+  return null;
+}
+
+/**
+ * Whether a product's format can change to `next` with the print sizes it
+ * has switched on, or why not — sizeFormatError from the other side, so
+ * neither ticking "page options are print sizes" nor a new trim leaves the
+ * product selling sizes it mustn't have. Switched-off sizes don't count;
+ * switching one back on is checked then.
+ */
+export function formatSizesError(
+  next: { trimWidthMm: number; trimHeightMm: number; sizedByOption: boolean },
+  activeSizes: readonly { label: string; widthMm: number; heightMm: number }[],
+): string | null {
+  if (activeSizes.length === 0) return null;
+  if (next.sizedByOption) {
+    return "Switch off this product's print sizes first — once its page options are its print sizes it can't have a second size choice";
+  }
+  const misfit = activeSizes.find((size) => sizeFormatError(next, size.widthMm, size.heightMm));
+  return misfit
+    ? `Switch off the ${misfit.label} print size first — it isn't the shape of a ${next.trimWidthMm} × ${next.trimHeightMm} mm trim`
+    : null;
 }
 
 /** How many template pages a product authors: front, front + back, or cover/middle/back. */
@@ -202,13 +255,13 @@ export function optionNoteError(kind: OptionKind, note: string | null): string |
 }
 
 const usesMultiplier = (kind: OptionKind) =>
-  kind === "paper" || kind === "quantity";
+  kind === "paper" || kind === "quantity" || kind === "size";
 
 /**
  * Full create payload for one pricing-option row. Which fields are required
  * depends on the table: paper takes a multiplier, quantity adds
- * copies, page-count takes pageCount + baseRatePence, delivery takes
- * pricePence and a mandatory note. Money crosses the wire as integer pence.
+ * copies, size adds widthMm + heightMm, page-count takes pageCount +
+ * baseRatePence, delivery takes pricePence and a mandatory note. Money crosses the wire as integer pence.
  */
 export function parseOptionInput(
   kind: OptionKind,
@@ -242,6 +295,15 @@ export function parseOptionInput(
     const copies = parseCopies(body.copies);
     if (copies === null) return { ok: false, error: "copies must be a whole number of at least 1" };
     input.copies = copies;
+  }
+  if (kind === "size") {
+    const widthMm = parseTrimMm(body.widthMm);
+    const heightMm = parseTrimMm(body.heightMm);
+    if (widthMm === null || heightMm === null) {
+      return { ok: false, error: "widthMm and heightMm must be whole millimetres from 20 to 1500" };
+    }
+    input.widthMm = widthMm;
+    input.heightMm = heightMm;
   }
   if (kind === "page-count") {
     const pageCount = parsePageCount(body.pageCount);
@@ -312,6 +374,13 @@ export function parseOptionPatch(
     const copies = parseCopies(body.copies);
     if (copies === null) return { ok: false, error: "copies must be a whole number of at least 1" };
     patch.copies = copies;
+  }
+  for (const key of ["widthMm", "heightMm"] as const) {
+    if (body[key] === undefined) continue;
+    if (kind !== "size") return { ok: false, error: `Only size options have ${key}` };
+    const mm = parseTrimMm(body[key]);
+    if (mm === null) return { ok: false, error: `${key} must be whole millimetres from 20 to 1500` };
+    patch[key] = mm;
   }
   if (body.pageCount !== undefined) {
     if (kind !== "page-count") return { ok: false, error: "Only page-count options have pageCount" };

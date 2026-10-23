@@ -238,6 +238,33 @@ describe("buildThintentOrderPayload", () => {
     expect(gloss.lines[0].product?.code).toBe("order-of-service/8/gloss");
   });
 
+  it("names a print size other than the artwork's, and tells the press to scale", () => {
+    const a4 = { id: "a4", label: "A4", multiplier: 1.6, widthMm: 210, heightMm: 297 };
+    const [line] = buildThintentOrderPayload(order({ items: [item({ quote: { ...quote, size: a4 } })] }), options).lines;
+    expect(line.product).toEqual({
+      code: "order-of-service/a4/8/silk",
+      name: "Order of Service booklet · A4 · 8 page · Silk",
+    });
+    expect(line.notes).toBe("Artwork drawn at 148 × 210 mm; print at A4 (210 × 297 mm), scaled 142%.");
+  });
+
+  it("names the print size of an uploaded file drawn at that size", () => {
+    const a4 = { id: "a4", label: "A4", multiplier: 1.6, widthMm: 210, heightMm: 297 };
+    const a6 = { id: "a6", label: "A6", multiplier: 0.8, widthMm: 105, heightMm: 148 };
+    for (const size of [a4, a6]) {
+      const upload = item({ quote: { ...quote, size }, artworkTrim: { widthMm: size.widthMm, heightMm: size.heightMm } });
+      const [line] = buildThintentOrderPayload(order({ items: [upload] }), options).lines;
+      expect(line.product?.code).toBe(`order-of-service/${size.id}/8/silk`);
+    }
+  });
+
+  it("keeps an A5 booklet's code and adds no note when it prints at A5", () => {
+    const a5 = { id: "a5", label: "A5", multiplier: 1, widthMm: 148, heightMm: 210 };
+    const [line] = buildThintentOrderPayload(order({ items: [item({ quote: { ...quote, size: a5 } })] }), options).lines;
+    expect(line.product?.code).toBe("order-of-service/8/silk");
+    expect(line.notes).toBeNull();
+  });
+
   it("leaves the product off a delivery charge sent as a line", () => {
     const payload = buildThintentOrderPayload(taxedOrder([["standard", 6000, 499], ["zero", 3000, 299]]), options);
     const deliveryLines = payload.lines.filter((line) => line.externalRef.startsWith("delivery-"));

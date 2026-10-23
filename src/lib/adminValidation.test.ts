@@ -12,8 +12,11 @@ import {
   parsePence,
   parseProductDescription,
   parseProductOccasion,
+  parseSlugOrder,
   parseVatTreatment,
   parseSlug,
+  sizeFormatError,
+  formatSizesError,
 } from "@/lib/adminValidation";
 
 describe("parseSlug", () => {
@@ -94,6 +97,60 @@ describe("pageCountFormatError", () => {
   });
 });
 
+describe("formatSizesError", () => {
+  const a5Booklet = { trimWidthMm: 148, trimHeightMm: 210, sizedByOption: false };
+  const sizes = [
+    { label: "A6", widthMm: 105, heightMm: 148 },
+    { label: "A4", widthMm: 210, heightMm: 297 },
+  ];
+
+  it("allows any format change while no size is switched on", () => {
+    expect(formatSizesError({ ...a5Booklet, sizedByOption: true }, [])).toBeNull();
+    expect(formatSizesError({ ...a5Booklet, trimWidthMm: 210 }, [])).toBeNull();
+  });
+
+  it("allows a trim of the same shape", () => {
+    expect(formatSizesError({ ...a5Booklet, trimWidthMm: 210, trimHeightMm: 297 }, sizes)).toBeNull();
+  });
+
+  it("refuses turning page options into sizes while print sizes are on", () => {
+    expect(formatSizesError({ ...a5Booklet, sizedByOption: true }, sizes)).toMatch(/Switch off this product's print sizes/);
+  });
+
+  it("names the size a new trim's shape doesn't fit", () => {
+    expect(formatSizesError({ ...a5Booklet, trimWidthMm: 210, trimHeightMm: 210 }, sizes)).toMatch(/Switch off the A6 print size/);
+  });
+});
+
+describe("sizeFormatError", () => {
+  const a5Booklet = { trimWidthMm: 148, trimHeightMm: 210, sizedByOption: false };
+
+  it("takes every A size for an A5 product, rounded millimetres and all", () => {
+    expect(sizeFormatError(a5Booklet, 105, 148)).toBeNull();
+    expect(sizeFormatError(a5Booklet, 148, 210)).toBeNull();
+    expect(sizeFormatError(a5Booklet, 210, 297)).toBeNull();
+    expect(sizeFormatError(a5Booklet, 841, 1189)).toBeNull();
+  });
+
+  it("refuses another shape, or the A shape turned round", () => {
+    expect(sizeFormatError(a5Booklet, 210, 210)).toMatch(/own shape/);
+    expect(sizeFormatError(a5Booklet, 297, 210)).toMatch(/own shape/);
+    expect(sizeFormatError(a5Booklet, 216, 279)).toMatch(/own shape/);
+  });
+
+  it("scales a square product only to squares", () => {
+    const square = { trimWidthMm: 210, trimHeightMm: 210, sizedByOption: false };
+    expect(sizeFormatError(square, 250, 250)).toBeNull();
+    expect(sizeFormatError(square, 148, 210)).toMatch(/own shape/);
+  });
+
+  it("refuses sizes on a board, whose page options are its sizes", () => {
+    expect(sizeFormatError({ trimWidthMm: 210, trimHeightMm: 297, sizedByOption: true }, 420, 594)).toMatch(
+      /already its print sizes/,
+    );
+  });
+});
+
 describe("parseHexColour", () => {
   it("normalises #rrggbb to lowercase", () => {
     expect(parseHexColour("#6B2D6A")).toBe("#6b2d6a");
@@ -125,6 +182,18 @@ describe("parseOptionInput", () => {
         sortOrder: 0,
         multiplier: "1.0500",
       },
+    });
+  });
+
+  it("requires a multiplier and both edges for size options", () => {
+    expect(parseOptionInput("size", { slug: "a4", label: "A4", multiplier: 1.6, widthMm: 210 }).ok).toBe(false);
+    expect(parseOptionInput("size", { slug: "a4", label: "A4", widthMm: 210, heightMm: 297 }).ok).toBe(false);
+    expect(parseOptionInput("size", { slug: "a4", label: "A4", multiplier: 1.6, widthMm: 210.5, heightMm: 297 }).ok).toBe(
+      false,
+    );
+    expect(parseOptionInput("size", { slug: "a4", label: "A4", multiplier: 1.6, widthMm: 210, heightMm: 297 })).toEqual({
+      ok: true,
+      value: { slug: "a4", label: "A4", note: null, sortOrder: 0, multiplier: "1.6000", widthMm: 210, heightMm: 297 },
     });
   });
 
@@ -227,6 +296,15 @@ describe("parseOptionPatch", () => {
   it("rejects fields that don't belong to the kind", () => {
     expect(parseOptionPatch("paper", { pricePence: 100 }).ok).toBe(false);
     expect(parseOptionPatch("delivery", { multiplier: 1 }).ok).toBe(false);
+    expect(parseOptionPatch("paper", { widthMm: 210 }).ok).toBe(false);
+  });
+
+  it("edits a size's multiplier or one edge", () => {
+    expect(parseOptionPatch("size", { multiplier: 1.6, heightMm: 297 })).toEqual({
+      ok: true,
+      value: { multiplier: "1.6000", heightMm: 297 },
+    });
+    expect(parseOptionPatch("size", { widthMm: 0 }).ok).toBe(false);
   });
 
   it("refuses to null a delivery note", () => {
@@ -305,5 +383,19 @@ describe("parseVatTreatment", () => {
     expect(parseVatTreatment("20%")).toBeNull();
     expect(parseVatTreatment("none")).toBeNull();
     expect(parseVatTreatment(undefined)).toBeNull();
+  });
+});
+
+describe("parseSlugOrder", () => {
+  it("accepts distinct slugs in the order given", () => {
+    expect(parseSlugOrder(["order-of-service", "bookmark"])).toEqual(["order-of-service", "bookmark"]);
+  });
+
+  it("refuses an empty list, a repeat, a bad slug or a non-list", () => {
+    expect(parseSlugOrder([])).toBeNull();
+    expect(parseSlugOrder(["bookmark", "bookmark"])).toBeNull();
+    expect(parseSlugOrder(["bookmark", "Not A Slug"])).toBeNull();
+    expect(parseSlugOrder(["bookmark", 3])).toBeNull();
+    expect(parseSlugOrder("bookmark")).toBeNull();
   });
 });

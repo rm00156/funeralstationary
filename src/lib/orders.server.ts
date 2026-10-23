@@ -43,6 +43,7 @@ import {
 import {
   evaluateArtwork,
   parseServiceDate,
+  artworkTargetTrim,
   printTrim,
   type ArtworkReport,
   type ArtworkSnapshot,
@@ -76,6 +77,8 @@ import {
   earliestServiceDate,
   lineSpec,
   makeOrderNumber,
+  lineEditOutcome,
+  lineSizeSlug,
   resolveSelectionStrict,
   vatRateToDecimalString,
   type OrderRefund,
@@ -87,6 +90,7 @@ import {
   copiesText,
   defaultSelection,
   type DeliveryOption,
+  quoteSize,
   type PricingData,
   type Quote,
   type Selection,
@@ -155,7 +159,7 @@ export interface CartItem {
   templateName: string;
   templateImage: string | null;
   pageCount: number;
-  /** pages/paper follow the live design; quantity/delivery are the line's. */
+  /** pages/paper follow the live design; quantity/delivery/size are the line's. */
   selection: Selection;
   /** Live-priced from the catalogue; null while any axis is stale. */
   quote: Quote | null;
@@ -449,6 +453,11 @@ function resolveDelivery(item: OrderItemRow, pricing: PricingData): CartDelivery
   return option ? { optionId: option.id, label: option.label, pricePence: option.pricePence } : null;
 }
 
+/** A line's stored size, read as the size it prints at today (lineSizeSlug). */
+function lineSize(item: OrderItemRow, pricing: PricingData, format: ProductFormat): string {
+  return lineSizeSlug(pricing, item.sizeOptionId ?? "", quoteSize(item.quoteSnapshot), format.trim);
+}
+
 /**
  * The delivery to start a new line on: what the customer already chose for
  * another line of the same product (so a second booklet doesn't silently
@@ -552,6 +561,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
         pages: item.pageCountOptionId ?? "",
         paper: item.paperOptionId ?? "",
         delivery: item.deliveryOptionId ?? "",
+        size: lineSize(item, pricing, format),
       };
       const resolved = resolveSelectionStrict(pricing, selection);
       const quote = resolved.ok ? resolved.quote : null;
@@ -586,6 +596,7 @@ export async function getCart(owner: Owner): Promise<Cart | null> {
       pages: design?.pagesOptionId ?? item.pageCountOptionId ?? "",
       paper: design?.paperId ?? item.paperOptionId ?? "",
       delivery: item.deliveryOptionId ?? "",
+      size: lineSize(item, pricing, format),
     };
     const resolved = resolveSelectionStrict(pricing, selection);
     const quote = resolved.ok ? resolved.quote : null;
@@ -657,7 +668,7 @@ export async function getCartCount(owner: Owner): Promise<number> {
   return rows.length;
 }
 
-type LineChoice = Partial<Pick<Selection, "quantity" | "delivery">>;
+type LineChoice = Partial<Pick<Selection, "quantity" | "delivery" | "size">>;
 
 interface AddCartItemOptions extends LineChoice {
   /**
@@ -732,6 +743,7 @@ export async function addCartItem(
     pages: design.pagesOptionId,
     paper: design.paperId,
     delivery: choice.delivery ?? initialDeliverySlug(existing, design.productId, pricing),
+    size: choice.size ?? base.size,
   };
   const quote = assertLineChoiceValid(pricing, selection);
 
@@ -746,6 +758,7 @@ export async function addCartItem(
     pageCountOptionId: selection.pages,
     paperOptionId: selection.paper,
     deliveryOptionId: selection.delivery,
+    sizeOptionId: selection.size || null,
     deliveryLabel: quote.delivery.label,
     deliveryPricePence: quote.delivery.pricePence,
     quoteSnapshot: quote,
@@ -798,7 +811,7 @@ export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemIn
 
   const found = await getUpload(owner, input.uploadId);
   if (!found) throw new CartError(404, "Upload not found");
-  const { product, pricing, target } = await resolveArtworkTarget(input.product, input.pages);
+  const { product, pricing, target } = await resolveArtworkTarget(input.product, input.pages, input.size);
 
   // Checked before a basket is created, so a refused file leaves nothing
   // behind. A Canva link has no file to read until staff download it. The
@@ -833,6 +846,8 @@ export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemIn
     pages: target.pages.id,
     paper: input.paper ?? base.paper,
     delivery: input.delivery ?? initialDeliverySlug(others, product.id, pricing),
+    // Checked against the file, so fixed with it — not the basket's to change.
+    size: target.size?.id ?? "",
   };
   const quote = assertLineChoiceValid(pricing, selection);
 
@@ -845,7 +860,7 @@ export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemIn
     byteSize: upload.byteSize,
     canvaUrl: upload.canvaUrl,
     pageCount: analysis?.ok ? analysis.pageCount : null,
-    trim: product.format.trim,
+    trim: artworkTargetTrim(target),
     checks: report.checks,
     warningsAcceptedAt: report.warnings ? now.toISOString() : null,
     confirmedAt: now.toISOString(),
@@ -857,6 +872,7 @@ export async function addUploadCartItem(owner: Owner, input: AddUploadCartItemIn
     pageCountOptionId: selection.pages,
     paperOptionId: selection.paper,
     deliveryOptionId: selection.delivery,
+    sizeOptionId: selection.size || null,
     deliveryLabel: quote.delivery.label,
     deliveryPricePence: quote.delivery.pricePence,
     quoteSnapshot: quote,
@@ -898,21 +914,31 @@ async function getOwnedDraftItem(owner: Owner, itemId: string) {
   return { order, item };
 }
 
-/** Change a line's quantity/delivery. Reprices from the live catalogue. */
+/**
+ * Change a line's quantity/delivery, and a design line's print size.
+ * Reprices from the live catalogue. An artwork line's size was checked
+ * against its file, so it stays as added.
+ */
 export async function updateCartItem(
   owner: Owner,
   itemId: string,
   choice: LineChoice,
 ): Promise<Cart> {
   const { item } = await getOwnedDraftItem(owner, itemId);
+  const pricing = await getPricingData(item.productId);
+  const format = (await getProductFormats()).get(item.productId) ?? BOOKLET_FORMAT;
+  const storedSize = lineSize(item, pricing, format);
   // An artwork line's pages and paper were fixed by its file; a design
   // line's follow the live design.
-  let spec: { productId: string; pages: string; paper: string; doc: DesignDoc | null };
+  let spec: { pages: string; paper: string; size?: string; doc: DesignDoc | null };
   if (item.artworkSnapshot) {
+    if (choice.size !== undefined && choice.size !== storedSize) {
+      throw new CartError(409, "Your file was checked at the size you chose — add it again to print another size");
+    }
     spec = {
-      productId: item.productId,
       pages: item.pageCountOptionId ?? "",
       paper: item.paperOptionId ?? "",
+      size: storedSize,
       doc: null,
     };
   } else {
@@ -920,34 +946,50 @@ export async function updateCartItem(
     if (!design) {
       throw new CartError(409, "That design has been removed — take it out of your basket");
     }
-    spec = { productId: design.productId, pages: design.pagesOptionId, paper: design.paperId, doc: design.doc };
+    spec = { pages: design.pagesOptionId, paper: design.paperId, doc: design.doc };
   }
 
-  const pricing = await getPricingData(spec.productId);
+  // Priced against the line's product, as getCart and the pay click do.
   const selection: Selection = {
     quantity: choice.quantity ?? item.quantityOptionId ?? "",
     pages: spec.pages,
     paper: spec.paper,
     delivery: choice.delivery ?? item.deliveryOptionId ?? "",
+    size: spec.size ?? choice.size ?? storedSize,
   };
-  const quote = assertLineChoiceValid(pricing, selection);
+  const sent = (["quantity", "delivery", "size"] as const).filter((axis) => choice[axis] !== undefined);
+  const outcome = lineEditOutcome(pricing, selection, sent);
+  if (outcome.kind === "refuse") {
+    throw new CartError(400, `Unknown ${outcome.axis} option "${selection[outcome.axis]}"`);
+  }
 
-  await db
-    .update(orderItems)
-    .set({
-      quantityOptionId: selection.quantity,
-      pageCountOptionId: selection.pages,
-      paperOptionId: selection.paper,
-      deliveryOptionId: selection.delivery,
-      deliveryLabel: quote.delivery.label,
-      deliveryPricePence: quote.delivery.pricePence,
-      quoteSnapshot: quote,
-      quantityCopies: quote.quantity.value,
-      unitPricePence: quote.unitPricePence,
-      lineTotalPence: quote.printCostPence,
-      docSnapshot: spec.doc,
-    })
-    .where(eq(orderItems.id, item.id));
+  const slugs = {
+    quantityOptionId: selection.quantity,
+    pageCountOptionId: selection.pages,
+    paperOptionId: selection.paper,
+    deliveryOptionId: selection.delivery,
+    sizeOptionId: selection.size || null,
+  };
+  if (outcome.kind === "save") {
+    // Another choice is still off, so there's nothing to price yet: keep the
+    // one just made and let the basket ask for the other.
+    await db.update(orderItems).set(slugs).where(eq(orderItems.id, item.id));
+  } else {
+    const { quote } = outcome;
+    await db
+      .update(orderItems)
+      .set({
+        ...slugs,
+        deliveryLabel: quote.delivery.label,
+        deliveryPricePence: quote.delivery.pricePence,
+        quoteSnapshot: quote,
+        quantityCopies: quote.quantity.value,
+        unitPricePence: quote.unitPricePence,
+        lineTotalPence: quote.printCostPence,
+        docSnapshot: spec.doc,
+      })
+      .where(eq(orderItems.id, item.id));
+  }
 
   const cart = await getCart(owner);
   if (!cart) throw new Error("Basket vanished");
@@ -1067,6 +1109,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
         pages: item.pageCountOptionId ?? "",
         paper: item.paperOptionId ?? "",
         delivery: item.deliveryOptionId ?? "",
+        size: lineSize(item, pricings.get(item.productId)!, formats.get(item.productId) ?? BOOKLET_FORMAT),
       };
       const name = artworkName(item.artworkSnapshot);
       const resolved = resolveSelectionStrict(pricings.get(item.productId)!, selection);
@@ -1083,11 +1126,12 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
       // option since would charge for one thing and print another, so the
       // customer has to add the file again and see it checked afresh.
       const format = formats.get(item.productId) ?? BOOKLET_FORMAT;
-      const checkedAgainst = item.quoteSnapshot.pages;
-      const printedSize = (option: { id: string; label: string }) => trimText(printTrim(format, option));
+      const checkedAgainst = item.quoteSnapshot;
+      const printedSize = (quote: Quote) =>
+        trimText(printTrim(format, quote.pages, quoteSize(quote)));
       if (
-        resolved.quote.pages.pages !== checkedAgainst.pages ||
-        printedSize(resolved.quote.pages) !== printedSize(checkedAgainst)
+        resolved.quote.pages.pages !== checkedAgainst.pages.pages ||
+        printedSize(resolved.quote) !== printedSize(checkedAgainst)
       ) {
         return {
           ok: false,
@@ -1133,6 +1177,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
       pages: design.pagesOptionId,
       paper: design.paperId,
       delivery: item.deliveryOptionId ?? "",
+      size: lineSize(item, pricings.get(item.productId)!, formats.get(item.productId) ?? BOOKLET_FORMAT),
     };
     // The line's product, not the design's: the two only differ if the
     // design was re-pointed at another product after being added, and the
@@ -1173,6 +1218,7 @@ export async function prepareOrderForPayment(owner: Owner): Promise<PrepareResul
           pageCountOptionId: line.selection.pages,
           paperOptionId: line.selection.paper,
           deliveryOptionId: line.selection.delivery,
+          sizeOptionId: line.selection.size || null,
           deliveryLabel: line.quote.delivery.label,
           deliveryPricePence: line.quote.delivery.pricePence,
           quoteSnapshot: line.quote,

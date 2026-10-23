@@ -19,7 +19,8 @@ export const runtime = "nodejs";
  * PATCH /api/admin/products/:slug — edit label / blurb / occasion / VAT
  * treatment / sort / active, and the format (size label, trim, template pages, sized-by-option,
  * paper label). Not slug. The trim and template pages 409 once the product
- * has a template, since its layout is drawn on them.
+ * has a template, since its layout is drawn on them; the trim and
+ * sized-by-option 409 while a print size switched on wouldn't suit them.
  */
 export async function PATCH(
   request: NextRequest,
@@ -125,6 +126,9 @@ export async function PATCH(
 
   const updated = await adminUpdateProduct(slug, patch);
   if (!updated) return Response.json({ error: "Product not found" }, { status: 404 });
+  if ("sizeConflict" in updated) {
+    return Response.json({ error: updated.sizeConflict }, { status: 409 });
+  }
   if ("locked" in updated) {
     return Response.json(
       {

@@ -22,6 +22,7 @@ import {
   defaultSelection,
   formatPence,
   getQuote,
+  sizesText,
   type PricingData,
   type Selection,
 } from "@/lib/orderOfServicePricing";
@@ -37,7 +38,7 @@ export interface UploadProduct {
 }
 
 /** The step-1 choice. Delivery isn't asked here — it's chosen in the basket. */
-type Choice = Pick<Selection, "pages" | "paper" | "quantity">;
+type Choice = Pick<Selection, "pages" | "paper" | "quantity" | "size">;
 
 interface ChosenFile {
   file: File;
@@ -51,12 +52,14 @@ interface ChosenFile {
 
 const MAX_MB = Math.floor(MAX_ARTWORK_BYTES / (1024 * 1024));
 
-/** "A5 · 148 × 210 mm, folded", "50 × 200 mm", "A4 to A0" */
-function sizeLine(format: ProductFormat): string {
+/** "A5 · 148 × 210 mm, folded", "50 × 200 mm", "A4 to A0", "A6, A5 or A4, folded" */
+function sizeLine(format: ProductFormat, sizes: PricingData["size"]): string {
   const base =
-    format.sizedByOption || format.sizeLabel.includes("mm")
-      ? format.sizeLabel
-      : `${format.sizeLabel} · ${trimText(format.trim)}`;
+    sizes.length > 1
+      ? sizesText(sizes)
+      : format.sizedByOption || format.sizeLabel.includes("mm")
+        ? format.sizeLabel
+        : `${format.sizeLabel} · ${trimText(format.trim)}`;
   return format.templatePages === 3 ? `${base}, folded` : base;
 }
 
@@ -64,7 +67,7 @@ function sizeLine(format: ProductFormat): string {
 function choiceFor(product: UploadProduct, keepCopies?: number): Choice {
   const base = defaultSelection(product.pricing);
   const sameCopies = product.pricing.quantity.find((option) => option.value === keepCopies);
-  return { pages: base.pages, paper: base.paper, quantity: sameCopies?.id ?? base.quantity };
+  return { pages: base.pages, paper: base.paper, size: base.size, quantity: sameCopies?.id ?? base.quantity };
 }
 
 /** PUT the file to its presigned URL, reporting progress (fetch can't, for uploads). */
@@ -234,7 +237,9 @@ export default function UploadFlow({
   const updateChoice = (patch: Partial<Choice>) => {
     setChoice((current) => ({ ...current, ...patch }));
     // A report answers "does this file fit *that* choice" — a new choice needs a new check.
-    if (patch.pages && patch.pages !== choice.pages) setReport(null);
+    if ((patch.pages && patch.pages !== choice.pages) || (patch.size && patch.size !== choice.size)) {
+      setReport(null);
+    }
   };
 
   /* -------------------------------- step 2 -------------------------------- */
@@ -309,6 +314,7 @@ export default function UploadFlow({
       const result = await postJson<{ report: ArtworkReport }>(`/api/uploads/${uploadId}/check`, {
         product: product.id,
         pages,
+        size: choice.size,
       });
       if (!result.ok) {
         setStepError(errorText(result.data, "We couldn’t check your file — please try again."));
@@ -383,6 +389,7 @@ export default function UploadFlow({
         product: product.id,
         pages: choice.pages,
         paper: choice.paper,
+        size: choice.size,
         quantity: choice.quantity,
         // The delivery this step shows and totals, not whatever the basket
         // would otherwise pick from another line.
@@ -434,8 +441,10 @@ export default function UploadFlow({
 
   const paperOptions = product.pricing.paper;
   const pageOptions = product.pricing.pages;
+  const sizeOptions = product.pricing.size;
   const details = [
     copiesText(quote.quantity.value),
+    ...(sizeOptions.length > 1 && quote.size ? [quote.size.label] : []),
     ...(pageOptions.length > 1 ? [pageOptionText(product.format, pageOption)] : []),
     ...(paperOptions.length > 1 ? [quote.paper.label] : []),
   ].join(" · ");
@@ -462,12 +471,32 @@ export default function UploadFlow({
                   className="opt flex flex-col items-start gap-1 px-5 py-4 text-left"
                 >
                   <span className="font-display text-[22px] font-normal leading-snug text-ink">{option.label}</span>
-                  <span className="text-[15px] font-normal text-ink-3">{sizeLine(option.format)}</span>
+                  <span className="text-[15px] font-normal text-ink-3">{sizeLine(option.format, option.pricing.size)}</span>
                 </button>
               ))}
             </div>
 
             <div className="mt-9 grid gap-8 md:grid-cols-2">
+              {sizeOptions.length > 1 && (
+                <OptionGroup
+                  id="upload-size"
+                  label="What size?"
+                  note={quote.size ? `Your file should be ${quote.size.label} (${trimText(quote.size)}).` : undefined}
+                  minWidth="64px"
+                >
+                  {sizeOptions.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className="opt"
+                      aria-pressed={choice.size === option.id}
+                      onClick={() => updateChoice({ size: option.id })}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </OptionGroup>
+              )}
               {pageOptions.length > 1 && (
                 <OptionGroup
                   id="upload-pages"

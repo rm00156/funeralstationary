@@ -19,6 +19,7 @@ import {
   defaultSelection,
   formatPence,
   getQuote,
+  sizesText,
   type PricingData,
 } from "@/lib/orderOfServicePricing";
 import { getPricingData } from "@/lib/pricing.server";
@@ -44,7 +45,7 @@ const priceOrFree = (pence: number) => (pence === 0 ? "Free" : formatPence(pence
 
 /**
  * "Prices at a glance": print cost for every copies × page-count pair, on the
- * product's default paper, read from the same PricingData as the buy box — so
+ * product's default paper and size, read from the same PricingData as the buy box — so
  * the table can never disagree with what a design's page goes on to charge.
  * Delivery is left out (it is chosen per order) and listed beside the table.
  */
@@ -52,6 +53,8 @@ function priceTable(pricing: PricingData) {
   const base = defaultSelection(pricing);
   return {
     paper: pricing.paper[0],
+    // Named only when there's a choice of size to name.
+    size: pricing.size.length > 1 ? pricing.size[0] : undefined,
     columns: pricing.pages,
     rows: pricing.quantity.map((quantity) => ({
       quantity,
@@ -119,7 +122,9 @@ export default async function ProductPage({
                 Choose a design, then add their photographs and words online.{" "}
                 {product.format.sizedByOption
                   ? `Printed at the size you choose, ${sizeRangeText(product.format)}.`
-                  : `Printed at exact ${sizeText(product.format)}.`}
+                  : pricing.size.length > 1
+                    ? `Printed at the size you choose: ${sizesText(pricing.size)}.`
+                    : `Printed at exact ${sizeText(product.format)}.`}
               </p>
             </div>
             <dl className="grid grid-cols-2 gap-4">
@@ -162,10 +167,11 @@ export default async function ProductPage({
                     : " and pages"
                   : ""}{" "}
                 you need
+                {table.size ? ` and the size, shown here at ${table.size.label}` : ""}
                 {table.paper
                   ? product.format.paperLabel === "Paper"
-                    ? `, shown here on ${table.paper.label.toLowerCase()} paper`
-                    : `, shown here as ${table.paper.label.toLowerCase()}`
+                    ? `${table.size ? "" : ", shown here"} on ${table.paper.label.toLowerCase()} paper`
+                    : `${table.size ? "" : ", shown here"} as ${table.paper.label.toLowerCase()}`
                   : ""}
                 .
                 Delivery is added at the basket:{" "}

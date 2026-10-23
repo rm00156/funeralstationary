@@ -18,7 +18,7 @@ import {
   getTemplateBySlug,
 } from "@/lib/catalogue.server";
 import { makeTemplateLayout, sizeRangeText, sizeText, toTemplateLayout } from "@/lib/designEditor";
-import { copiesText, formatPence } from "@/lib/orderOfServicePricing";
+import { copiesText, formatPence, sizesText } from "@/lib/orderOfServicePricing";
 import { portraitRotationFor, withPlaceholderPhotos } from "@/lib/placeholderPortraits";
 import { getPricingData } from "@/lib/pricing.server";
 import {
@@ -121,6 +121,12 @@ export default async function TemplatePage({
             <p>
               Printed at the size you choose, {sizeRangeText(format)}.
               Every A size is the same shape, so your design scales up exactly as you made it.
+            </p>
+          ) : pricing.size.length > 1 ? (
+            <p>
+              Printed at the size you choose: {sizesText(pricing.size)}. Every A size is the same shape, so
+              your design prints exactly as you made it, just larger or smaller. Printed on heavyweight
+              paper so it lasts as a keepsake.
             </p>
           ) : (
             <p>

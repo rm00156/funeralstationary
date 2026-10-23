@@ -21,11 +21,12 @@ import {
   paperOptions,
   products,
   quantityOptions,
+  sizeOptions,
   templateCategories,
   templateCategoryLinks,
   templates,
 } from "@/db/schema";
-import { parseLayoutPages, type TemplateStatus } from "@/lib/adminValidation";
+import { formatSizesError, parseLayoutPages, type TemplateStatus } from "@/lib/adminValidation";
 import { productFormatColumns } from "@/lib/catalogue.server";
 import { toProductFormat, type DesignPage, type ProductFormat } from "@/lib/designEditor";
 import type { ProductOccasion } from "@/lib/templates";
@@ -72,6 +73,8 @@ export interface AdminProduct {
    * are fixed — its layout is percentages of them.
    */
   templateCount: number;
+  /** Published templates — a product needs one (and pricing) before customers see it. */
+  publishedTemplateCount: number;
 }
 
 /** The format columns an admin may only change while a product has no templates. */
@@ -87,12 +90,16 @@ const productSelection = {
   isActive: products.isActive,
   ...productFormatColumns,
   templateCount: sql<number>`(select count(*) from ${templates} where ${templates.productId} = ${products.id})`,
+  publishedTemplateCount: sql<number>`(select count(*) from ${templates} where ${templates.productId} = ${products.id} and ${templates.status} = 'published')`,
 };
 
 /** count(*) arrives as a string from mysql2. */
-const withCount = <T extends { templateCount: number | string }>(row: T) => ({
+const withCount = <T extends { templateCount: number | string; publishedTemplateCount: number | string }>(
+  row: T,
+) => ({
   ...row,
   templateCount: Number(row.templateCount),
+  publishedTemplateCount: Number(row.publishedTemplateCount),
 });
 
 export async function adminListProducts(): Promise<AdminProduct[]> {
@@ -112,13 +119,41 @@ export async function adminGetProduct(slug: string): Promise<AdminProduct | null
   return row ? withCount(row) : null;
 }
 
+/** A new product goes to the end of the range unless a sort order is given. */
 export async function adminCreateProduct(input: {
   slug: string;
   label: string;
-  sortOrder: number;
+  occasion?: ProductOccasion;
+  vatTreatment?: VatTreatment;
+  isActive?: boolean;
+  sortOrder?: number;
 }): Promise<AdminProduct> {
-  await db.insert(products).values(input);
+  let sortOrder = input.sortOrder;
+  if (sortOrder === undefined) {
+    const [row] = await db
+      .select({ last: sql<number | null>`max(${products.sortOrder})` })
+      .from(products);
+    sortOrder = row?.last == null ? 0 : Number(row.last) + 1;
+  }
+  await db.insert(products).values({ ...input, sortOrder });
   return (await adminGetProduct(input.slug))!;
+}
+
+/**
+ * Renumber the whole range in the order given (0, 1, 2, …). The list must
+ * name every product exactly once — anything else means the admin was
+ * looking at a list that has since changed, and false is returned.
+ */
+export async function adminReorderProducts(slugs: string[]): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const rows = await tx.select({ slug: products.slug }).from(products).for("update");
+    const known = new Set(rows.map((row) => row.slug));
+    if (rows.length !== slugs.length || !slugs.every((slug) => known.has(slug))) return false;
+    for (const [index, slug] of slugs.entries()) {
+      await tx.update(products).set({ sortOrder: index }).where(eq(products.slug, slug));
+    }
+    return true;
+  });
 }
 
 export async function adminUpdateProduct(
@@ -137,7 +172,7 @@ export async function adminUpdateProduct(
     sizedByOption?: boolean;
     paperLabel?: string;
   },
-): Promise<AdminProduct | { locked: LockedFormatField[] } | null> {
+): Promise<AdminProduct | { locked: LockedFormatField[] } | { sizeConflict: string } | null> {
   const existing = await adminGetProduct(slug);
   if (!existing) return null;
   // Changing the trim or the page structure under existing templates would
@@ -146,6 +181,15 @@ export async function adminUpdateProduct(
     (field) => patch[field] !== undefined && patch[field] !== existing[field],
   );
   if (locked.length > 0 && existing.templateCount > 0) return { locked };
+  if (patch.trimWidthMm !== undefined || patch.trimHeightMm !== undefined || patch.sizedByOption !== undefined) {
+    const activeSizes = await db
+      .select({ label: sizeOptions.label, widthMm: sizeOptions.widthMm, heightMm: sizeOptions.heightMm })
+      .from(sizeOptions)
+      .innerJoin(products, eq(products.id, sizeOptions.productId))
+      .where(and(eq(products.slug, slug), eq(sizeOptions.isActive, true)));
+    const sizeConflict = formatSizesError({ ...existing, ...patch }, activeSizes);
+    if (sizeConflict) return { sizeConflict };
+  }
   await db.update(products).set(patch).where(eq(products.slug, slug));
   return adminGetProduct(slug);
 }
@@ -159,6 +203,7 @@ export const OPTION_KINDS = [
   "quantity",
   "page-count",
   "delivery",
+  "size",
 ] as const;
 export type OptionKind = (typeof OPTION_KINDS)[number];
 
@@ -178,6 +223,8 @@ export interface AdminOption {
   pageCount?: number;
   baseRatePence?: number;
   pricePence?: number;
+  widthMm?: number;
+  heightMm?: number;
 }
 
 /** Create payload — the route validates and narrows before calling in. */
@@ -186,12 +233,14 @@ export interface AdminOptionInput {
   label: string;
   note: string | null;
   sortOrder: number;
-  /** decimal(6,4) string, e.g. "0.9000" — paper/quantity only. */
+  /** decimal(6,4) string, e.g. "0.9000" — paper/quantity/size only. */
   multiplier?: string;
   copies?: number;
   pageCount?: number;
   baseRatePence?: number;
   pricePence?: number;
+  widthMm?: number;
+  heightMm?: number;
 }
 
 export type AdminOptionPatch = Partial<{
@@ -204,6 +253,8 @@ export type AdminOptionPatch = Partial<{
   pageCount: number;
   baseRatePence: number;
   pricePence: number;
+  widthMm: number;
+  heightMm: number;
 }>;
 
 export async function adminListOptions(
@@ -244,6 +295,24 @@ export async function adminListOptions(
       .from(quantityOptions)
       .where(eq(quantityOptions.productId, productId))
       .orderBy(asc(quantityOptions.sortOrder), asc(quantityOptions.id));
+    return rows.map((row) => ({ ...row, multiplier: Number(row.multiplier) }));
+  }
+
+  if (kind === "size") {
+    const rows = await db
+      .select({
+        slug: sizeOptions.slug,
+        label: sizeOptions.label,
+        note: sizeOptions.note,
+        sortOrder: sizeOptions.sortOrder,
+        isActive: sizeOptions.isActive,
+        multiplier: sizeOptions.multiplier,
+        widthMm: sizeOptions.widthMm,
+        heightMm: sizeOptions.heightMm,
+      })
+      .from(sizeOptions)
+      .where(eq(sizeOptions.productId, productId))
+      .orderBy(asc(sizeOptions.sortOrder), asc(sizeOptions.id));
     return rows.map((row) => ({ ...row, multiplier: Number(row.multiplier) }));
   }
 
@@ -309,6 +378,13 @@ export async function adminCreateOption(
     await db
       .insert(quantityOptions)
       .values({ ...base, multiplier: input.multiplier!, copies: input.copies! });
+  } else if (kind === "size") {
+    await db.insert(sizeOptions).values({
+      ...base,
+      multiplier: input.multiplier!,
+      widthMm: input.widthMm!,
+      heightMm: input.heightMm!,
+    });
   } else if (kind === "page-count") {
     await db.insert(pageCountOptions).values({
       ...base,
@@ -365,6 +441,17 @@ export async function adminUpdateOption(
         ...(patch.copies !== undefined ? { copies: patch.copies } : {}),
       })
       .where(and(eq(quantityOptions.productId, productId), eq(quantityOptions.slug, optionSlug)));
+  } else if (kind === "size") {
+    await db
+      .update(sizeOptions)
+      .set({
+        ...base,
+        ...nullableNote,
+        ...(patch.multiplier !== undefined ? { multiplier: patch.multiplier } : {}),
+        ...(patch.widthMm !== undefined ? { widthMm: patch.widthMm } : {}),
+        ...(patch.heightMm !== undefined ? { heightMm: patch.heightMm } : {}),
+      })
+      .where(and(eq(sizeOptions.productId, productId), eq(sizeOptions.slug, optionSlug)));
   } else if (kind === "page-count") {
     await db
       .update(pageCountOptions)
@@ -387,6 +474,47 @@ export async function adminUpdateOption(
   }
 
   return getOption(productSlug, kind, optionSlug);
+}
+
+const OPTION_TABLES = {
+  paper: paperOptions,
+  quantity: quantityOptions,
+  "page-count": pageCountOptions,
+  delivery: deliveryOptions,
+  size: sizeOptions,
+} as const;
+
+/**
+ * Renumber one product's options of a kind in the order given (0, 1, 2, …)
+ * — the first active one is the customer's default. The list must name
+ * every option of that kind exactly once, or false is returned (the admin
+ * was looking at a list that has since changed). Null for an unknown product.
+ */
+export async function adminReorderOptions(
+  productSlug: string,
+  kind: OptionKind,
+  slugs: string[],
+): Promise<boolean | null> {
+  const productId = await resolveProductId(productSlug);
+  if (!productId) return null;
+  // Every option table has the same product_id / slug / sort_order columns.
+  const table = OPTION_TABLES[kind] as typeof paperOptions;
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ slug: table.slug })
+      .from(table)
+      .where(eq(table.productId, productId))
+      .for("update");
+    const known = new Set(rows.map((row) => row.slug));
+    if (rows.length !== slugs.length || !slugs.every((slug) => known.has(slug))) return false;
+    for (const [index, slug] of slugs.entries()) {
+      await tx
+        .update(table)
+        .set({ sortOrder: index })
+        .where(and(eq(table.productId, productId), eq(table.slug, slug)));
+    }
+    return true;
+  });
 }
 
 /* ------------------------------------------------------------------ */

@@ -5,8 +5,11 @@ import {
   formatPence,
   getQuote,
   parseCarriedSelection,
+  quoteSize,
   selectionSearchParams,
+  sizesText,
   type PricingData,
+  type Quote,
 } from "@/lib/orderOfServicePricing";
 
 /** Mirrors the seeded order-of-service rates (src/db/seedCatalogue.ts). */
@@ -28,6 +31,17 @@ const PRICING: PricingData = {
     { id: "standard", label: "Standard delivery", pricePence: 0, note: "Free" },
     { id: "next-day", label: "Next day delivery", pricePence: 1000, note: "By {cutoff}" },
   ],
+  size: [],
+};
+
+/** The booklet sold at A5 (the default), A6 and A4. */
+const SIZED: PricingData = {
+  ...PRICING,
+  size: [
+    { id: "a5", label: "A5", multiplier: 1, widthMm: 148, heightMm: 210 },
+    { id: "a6", label: "A6", multiplier: 0.8, widthMm: 105, heightMm: 148 },
+    { id: "a4", label: "A4", multiplier: 1.6, widthMm: 210, heightMm: 297 },
+  ],
 };
 
 describe("defaultSelection", () => {
@@ -37,7 +51,58 @@ describe("defaultSelection", () => {
       pages: "4",
       paper: "silk",
       delivery: "standard",
+      size: "",
     });
+  });
+
+  it("starts on the first size when the product has sizes", () => {
+    expect(defaultSelection(SIZED).size).toBe("a5");
+  });
+});
+
+describe("print sizes", () => {
+  const base = { quantity: "15", pages: "8", paper: "silk", delivery: "standard" };
+
+  it("multiplies the per-copy price by the size's multiplier", () => {
+    expect(getQuote(SIZED, { ...base, size: "a5" }).unitPricePence).toBe(300);
+    expect(getQuote(SIZED, { ...base, size: "a4" }).unitPricePence).toBe(480);
+    expect(getQuote(SIZED, { ...base, size: "a6" }).unitPricePence).toBe(240);
+    expect(getQuote(SIZED, { ...base, size: "a4" }).size?.label).toBe("A4");
+  });
+
+  it("rounds once, after every multiplier", () => {
+    const quote = getQuote(SIZED, { ...base, quantity: "100", paper: "premium-silk", size: "a4" });
+    expect(quote.unitPricePence).toBe(Math.round(300 * 1.2 * 1.6 * 0.84));
+  });
+
+  it("prices a product without sizes at its trim, with no size on the quote", () => {
+    const quote = getQuote(PRICING, { ...base, size: "" });
+    expect(quote.unitPricePence).toBe(300);
+    expect(quote.size).toBeNull();
+    expect(quoteSize(quote)).toBeNull();
+  });
+
+  it("reads a quote frozen before sizes existed as having none", () => {
+    const frozen: Quote = getQuote(SIZED, { ...base, size: "a5" });
+    delete frozen.size;
+    expect(quoteSize(frozen)).toBeNull();
+  });
+
+  it("quotes 'from' at the default size, where the price table and buy box start", () => {
+    expect(cheapestQuote(SIZED)?.size?.id).toBe("a5"); // not the cheaper A6
+  });
+
+  it("carries a size through the URL and drops one the product doesn't sell", () => {
+    expect(parseCarriedSelection(SIZED, { size: "a4" })).toEqual({ size: "a4" });
+    expect(parseCarriedSelection(SIZED, { size: "a3" })).toEqual({});
+    expect(parseCarriedSelection(PRICING, { size: "a4" })).toEqual({});
+  });
+
+  it("lists sizes smallest first", () => {
+    expect(sizesText(SIZED.size)).toBe("A6, A5 or A4");
+    expect(sizesText(SIZED.size.slice(0, 2))).toBe("A6 or A5");
+    expect(sizesText(SIZED.size.slice(0, 1))).toBe("A5");
+    expect(sizesText([])).toBe("");
   });
 });
 

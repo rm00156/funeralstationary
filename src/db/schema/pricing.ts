@@ -80,6 +80,28 @@ export const pageCountOptions = mysqlTable(
   ],
 );
 
+/**
+ * The sizes a product prints at (A6 / A5 / A4 for the booklet). The design is
+ * drawn once, at the product's own trim, and the press scales it — which is
+ * only sound because every size here is the trim's own shape (the route
+ * checks it, `sizeShapeError`). Optional: a product with no rows prints at its
+ * trim and shows no size choice. A multiplier on the per-copy price, like paper.
+ * A per-line choice, like copies and delivery — it doesn't touch the artwork,
+ * so designs carry no size column.
+ */
+export const sizeOptions = mysqlTable(
+  "size_options",
+  {
+    ...specOptionColumns,
+    widthMm: smallint("width_mm").notNull(),
+    heightMm: smallint("height_mm").notNull(),
+  },
+  (t) => [
+    uniqueIndex("size_options_product_id_uq").on(t.productId, t.id),
+    uniqueIndex("size_options_product_slug_uq").on(t.productId, t.slug),
+  ],
+);
+
 export const deliveryOptions = mysqlTable(
   "delivery_options",
   {

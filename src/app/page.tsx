@@ -54,7 +54,11 @@ export default async function Home() {
           />
         )}
         <ProductRange products={rest} />
-        <QualityDelivery delivery={leadPricing?.delivery ?? []} format={lead?.format ?? null} />
+        <QualityDelivery
+          delivery={leadPricing?.delivery ?? []}
+          format={lead?.format ?? null}
+          sizes={leadPricing?.size}
+        />
         <Testimonials />
         <HelpBand />
       </main>

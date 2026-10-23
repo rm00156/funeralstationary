@@ -235,31 +235,41 @@ export interface ResolvedTarget {
 }
 
 /** The customer's step-1 choice, resolved against the live catalogue. */
-export async function resolveArtworkTarget(productSlug: unknown, pagesSlug: unknown): Promise<ResolvedTarget> {
+export async function resolveArtworkTarget(
+  productSlug: unknown,
+  pagesSlug: unknown,
+  sizeSlug?: unknown,
+): Promise<ResolvedTarget> {
   const product = typeof productSlug === "string" ? await getSellableProduct(productSlug) : null;
   if (!product) throw new UploadError(400, `Unknown product "${String(productSlug)}"`);
   const pricing = await getPricingData(product.id);
   const pages = pricing.pages.find((option) => option.id === pagesSlug);
   if (!pages) throw new UploadError(400, `Unknown pages option "${String(pagesSlug)}"`);
+  // No size sent (a page opened before sizes existed) is the default size.
+  const size =
+    sizeSlug === undefined || sizeSlug === ""
+      ? pricing.size[0] ?? null
+      : pricing.size.find((option) => option.id === sizeSlug);
+  if (size === undefined) throw new UploadError(400, `Unknown size option "${String(sizeSlug)}"`);
   return {
     product,
     pricing,
-    target: { format: product.format, pages, pageOptions: pricing.pages },
+    target: { format: product.format, pages, pageOptions: pricing.pages, size },
   };
 }
 
 /**
- * Check an upload against a product and page count. A Canva link has no file
+ * Check an upload against a product, page count and print size. A Canva link has no file
  * to read yet, so it reports nothing — staff check it when they download it.
  */
 export async function checkUpload(
   owner: Owner,
   id: string,
-  choice: { product: unknown; pages: unknown },
+  choice: { product: unknown; pages: unknown; size?: unknown },
 ): Promise<ArtworkReport> {
   const upload = await getUpload(owner, id);
   if (!upload) throw new UploadError(404, "Upload not found");
-  const { target } = await resolveArtworkTarget(choice.product, choice.pages);
+  const { target } = await resolveArtworkTarget(choice.product, choice.pages, choice.size);
   if (upload.source === "canva") return { checks: [], blocking: false, warnings: false };
   return evaluateArtwork((await analyseUpload(upload)).analysis, target);
 }

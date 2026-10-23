@@ -14,12 +14,22 @@ import { vatIncludedText } from "@/lib/vat";
 /** Tell the header badge (and anything else listening) the basket changed. */
 export const notifyCartChanged = () => window.dispatchEvent(new Event("tfs:cart-changed"));
 
-type LineAxis = "quantity" | "delivery";
+type LineAxis = "size" | "quantity" | "delivery";
 
 const AXIS_LABELS: Record<LineAxis, string> = {
+  size: "Size",
   quantity: "Copies",
   delivery: "Delivery",
 };
+
+/**
+ * The choices a line offers. Size only on a design line of a product sold in
+ * several sizes — an uploaded file was checked at the size it was added at.
+ */
+function lineAxes(item: CartItem, pricing: PricingData | null): LineAxis[] {
+  const sized = !item.artwork && ((pricing?.size.length ?? 0) > 1 || item.stale.includes("size"));
+  return sized ? ["size", "quantity", "delivery"] : ["quantity", "delivery"];
+}
 
 export default function CartView({
   initialCart,
@@ -178,9 +188,11 @@ function CartLine({
 }) {
   const problem = item.designMissing
     ? "This design has been removed — please take it out of your basket."
-    : item.stale.length > 0
-      ? `The ${item.stale.map(axisLabel).join(", ")} you chose ${item.stale.length > 1 ? "are" : "is"} no longer available — please choose again.`
-      : null;
+    : item.artwork && item.stale.includes("size")
+      ? "The size your file was checked at is no longer available — please take it out and add your file again at another size."
+      : item.stale.length > 0
+        ? `The ${item.stale.map(axisLabel).join(", ")} you chose ${item.stale.length > 1 ? "are" : "is"} no longer available — please choose again.`
+        : null;
 
   return (
     <li
@@ -245,14 +257,14 @@ function CartLine({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        {(["quantity", "delivery"] as const).map((axis) => {
+      <div className={`mt-5 grid gap-4 ${lineAxes(item, pricing).length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+        {lineAxes(item, pricing).map((axis) => {
           const stale = item.stale.includes(axis);
           // Copies are listed as "15 copies" so the number can't be read as a page count.
           const options =
             axis === "quantity"
               ? (pricing?.quantity ?? []).map((option) => ({ id: option.id, label: copiesText(option.value) }))
-              : pricing?.delivery ?? [];
+              : (pricing?.[axis] ?? []);
           return (
             <ConfigField
               key={axis}

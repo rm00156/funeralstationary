@@ -113,10 +113,20 @@ export interface PageOptionLike {
   pages: number;
 }
 
+/** A print size option, as the check needs it (orderOfServicePricing's SizeOption). */
+export interface SizeOptionLike {
+  id: string;
+  label: string;
+  widthMm: number;
+  heightMm: number;
+}
+
 /** What the file is being checked against: the customer's step-1 choice. */
 export interface ArtworkTarget {
   format: ProductFormat;
   pages: PageOptionLike;
+  /** The print size chosen, for a product sold in several; null/absent prints at the trim. */
+  size?: SizeOptionLike | null;
   /** The product's every page-count option, so a mismatch can offer a switch. */
   pageOptions: readonly PageOptionLike[];
 }
@@ -169,11 +179,17 @@ const A_SIZES: Record<string, PageTrim> = {
 };
 
 /**
- * The size an option prints at: its A size for a board, else the trim. The
- * label is admin-editable copy ("A1", "A1 easel", "Large (A1)"), so an A size
- * is looked for anywhere in it, then in the option's slug.
+ * The size an option prints at: the print size chosen, when the product is
+ * sold in several; its A size for a board; else the trim. A board's label is
+ * admin-editable copy ("A1", "A1 easel", "Large (A1)"), so an A size is looked
+ * for anywhere in it, then in the option's slug.
  */
-export function printTrim(format: ProductFormat, option: { id?: string; label: string }): PageTrim {
+export function printTrim(
+  format: ProductFormat,
+  option: { id?: string; label: string },
+  size?: Pick<SizeOptionLike, "widthMm" | "heightMm"> | null,
+): PageTrim {
+  if (size) return { widthMm: size.widthMm, heightMm: size.heightMm };
   if (!format.sizedByOption) return format.trim;
   for (const text of [option.label, option.id ?? ""]) {
     const match = /(?:^|[^a-z0-9])(a[0-6])(?![0-9])/i.exec(text);
@@ -474,8 +490,28 @@ function fontsCheck(analysis: Extract<ArtworkAnalysis, { ok: true }>): ArtworkCh
   };
 }
 
+/** The size a target's file is printed at — what artwork_snapshot.trim records. */
+export function artworkTargetTrim(target: ArtworkTarget): PageTrim {
+  return printTrim(target.format, target.pages, target.size);
+}
+
+/**
+ * A target with a print size chosen is checked as if the product were made
+ * at that size: the file should be the size it prints at (an A4 booklet's
+ * file is A4), and a file of the same shape at another size is scaled, with
+ * the usual warning.
+ */
+function atPrintSize(target: ArtworkTarget): ArtworkTarget {
+  if (!target.size) return target;
+  return {
+    ...target,
+    format: { ...target.format, trim: artworkTargetTrim(target), sizeLabel: target.size.label },
+  };
+}
+
 /** Check a file's facts against what the customer has chosen to print. */
-export function evaluateArtwork(analysis: ArtworkAnalysis, target: ArtworkTarget): ArtworkReport {
+export function evaluateArtwork(analysis: ArtworkAnalysis, chosen: ArtworkTarget): ArtworkReport {
+  const target = atPrintSize(chosen);
   if (!analysis.ok) {
     const checks: ArtworkCheck[] = [
       {

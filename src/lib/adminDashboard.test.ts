@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   actionItems,
+  linePagesLabel,
   changeText,
   cutoffState,
   likeContains,
@@ -106,6 +107,31 @@ describe("serviceUrgency", () => {
     expect(serviceUrgency("2026-10-12", "2026-10-08")).toEqual({ label: "Service Mon", urgency: "soon" });
     expect(serviceUrgency("2026-10-20", "2026-10-08")).toEqual({ label: "Service Tue 20 Oct", urgency: "later" });
     expect(serviceUrgency(null, "2026-10-08").urgency).toBe("none");
+  });
+});
+
+describe("linePagesLabel", () => {
+  const A5 = { widthMm: 148, heightMm: 210 };
+  const quote = {
+    quantity: { id: "50", label: "50 copies", multiplier: 1, value: 50 },
+    pages: { id: "8", label: "8 page", pages: 8, baseRatePence: 120 },
+    paper: { id: "silk", label: "Silk", multiplier: 1 },
+    delivery: { id: "standard", label: "Standard", pricePence: 0, note: "" },
+    unitPricePence: 120,
+    printCostPence: 6000,
+    totalPence: 6000,
+  };
+
+  it("names a print size other than the product's trim", () => {
+    const a4 = { id: "a4", label: "A4", multiplier: 1.4, widthMm: 210, heightMm: 297 };
+    expect(linePagesLabel({ ...quote, size: a4 }, A5)).toBe("A4 · 8 page");
+  });
+
+  it("leaves the trim's own size, no size and a pre-size quote unnamed", () => {
+    const a5 = { id: "a5", label: "A5", multiplier: 1, ...A5 };
+    expect(linePagesLabel({ ...quote, size: a5 }, A5)).toBe("8 page");
+    expect(linePagesLabel({ ...quote, size: null }, A5)).toBe("8 page");
+    expect(linePagesLabel(quote, A5)).toBe("8 page");
   });
 });
 

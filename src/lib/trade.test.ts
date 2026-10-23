@@ -194,8 +194,9 @@ describe("withTradeDiscount", () => {
     pages: [{ id: "8", label: "8 pages", pages: 8, baseRatePence: 333 }],
     paper: [{ id: "silk", label: "Silk", multiplier: 1.1 }],
     delivery: [{ id: "std", label: "Standard", pricePence: 495, note: "" }],
+    size: [],
   };
-  const selection = { quantity: "50", pages: "8", paper: "silk", delivery: "std" };
+  const selection = { quantity: "50", pages: "8", paper: "silk", delivery: "std", size: "" };
 
   it("takes the discount off the print price, rounding once, and leaves delivery alone", () => {
     const list = getQuote(data, selection);
@@ -208,6 +209,13 @@ describe("withTradeDiscount", () => {
 
   it("returns the same table when there's no discount", () => {
     expect(withTradeDiscount(data, 0)).toBe(data);
+  });
+
+  it("discounts a print size through the page rate, once", () => {
+    const sized = { ...data, size: [{ id: "a4", label: "A4", multiplier: 1.5, widthMm: 210, heightMm: 297 }] };
+    const trade = withTradeDiscount(sized, 10);
+    expect(trade.size).toEqual(sized.size);
+    expect(getQuote(trade, { ...selection, size: "a4" }).unitPricePence).toBe(Math.round(333 * 0.9 * 1.1 * 1.5 * 0.9));
   });
 });
 

@@ -8,7 +8,7 @@
  * worth catching.
  */
 import "dotenv/config";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   deliveryOptions,
@@ -16,6 +16,7 @@ import {
   paperOptions,
   products,
   quantityOptions,
+  sizeOptions,
   templateCategories,
   templateCategoryLinks,
   templates,
@@ -26,6 +27,7 @@ import {
   buildPaperOptionsSeed,
   buildProductsSeed,
   buildQuantityOptionsSeed,
+  buildSizeOptionsSeed,
   buildTemplateCategoriesSeed,
   buildTemplateCategoryLinksSeed,
   buildTemplatesSeed,
@@ -73,6 +75,7 @@ async function main() {
     (await db.select().from(deliveryOptions)).length,
     buildDeliveryOptionsSeed().length,
   );
+  expect("size_options", (await db.select().from(sizeOptions)).length, buildSizeOptionsSeed().length);
 
   // Referential integrity: every template must join to a real product. An
   // inner join dropping rows means a template_id/product_id went bad.
@@ -83,13 +86,23 @@ async function main() {
   expect("templates joined to a product", joined.length, buildTemplatesSeed().length);
 
   // Spot-check the pounds->pence conversion actually landed in the column,
-  // not just in the builder (unit tests already cover the builder).
+  // not just in the builder (unit tests already cover the builder). The
+  // wanted value comes from the builder too, so a price change in the seed
+  // catalogue doesn't need an edit here.
+  const fourPageSeed = buildPageCountOptionsSeed().find(
+    (option) => option.productSlug === "order-of-service" && option.slug === "4",
+  );
   const [fourPage] = await db
     .select({ baseRatePence: pageCountOptions.baseRatePence })
     .from(pageCountOptions)
-    .where(eq(pageCountOptions.slug, "4"))
+    .innerJoin(products, eq(pageCountOptions.productId, products.id))
+    .where(and(eq(products.slug, "order-of-service"), eq(pageCountOptions.slug, "4")))
     .limit(1);
-  expect('page_count_options."4".base_rate_pence', fourPage?.baseRatePence ?? -1, 220);
+  expect(
+    'order-of-service page_count_options."4".base_rate_pence',
+    fourPage?.baseRatePence ?? -1,
+    fourPageSeed?.baseRatePence ?? -1,
+  );
 
   if (failures.length > 0) {
     console.error(`\n${failures.length} check(s) failed:`);

@@ -129,3 +129,19 @@ export function buildDeliveryOptionsSeed() {
     })),
   );
 }
+
+export function buildSizeOptionsSeed() {
+  return Object.entries(PRICING).flatMap(([productSlug, { sizes = [] }]) =>
+    sizes.map((option, index) => ({
+      productSlug,
+      slug: option.id,
+      label: option.label,
+      multiplier: toMultiplier(option.multiplier),
+      note: option.note ?? null,
+      widthMm: option.widthMm,
+      heightMm: option.heightMm,
+      sortOrder: index,
+      isActive: option.active ?? true,
+    })),
+  );
+}

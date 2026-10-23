@@ -19,6 +19,7 @@ import {
 import {
   OPEN_STATUSES,
   addDays,
+  linePagesLabel,
   monthStart,
   shopDate,
   shopDayStart,
@@ -27,7 +28,8 @@ import {
   type DashboardOrder,
   type TakingsSummary,
 } from "@/lib/adminDashboard";
-import { getProductLabels } from "@/lib/catalogue.server";
+import { getProductFormats, getProductLabels } from "@/lib/catalogue.server";
+import { BOOKLET_FORMAT } from "@/lib/designEditor";
 import { ORDER_STATUSES, earliestServiceDate, type OrderStatus } from "@/lib/orders";
 
 /** Weeks of takings in the chart. */
@@ -93,7 +95,7 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
 
-  const [itemRows, refundRows, shippedRows, labels] = await Promise.all([
+  const [itemRows, refundRows, shippedRows, labels, formats] = await Promise.all([
     db
       .select({
         id: orderItems.id,
@@ -103,6 +105,7 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
         designId: orderItems.designId,
         copies: orderItems.quantityCopies,
         quote: orderItems.quoteSnapshot,
+        format: orderItems.formatSnapshot,
         artwork: orderItems.artworkSnapshot,
         serviceDate: orderItems.serviceDate,
       })
@@ -126,6 +129,7 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
       )
       .groupBy(orderEvents.orderId),
     getProductLabels(),
+    getProductFormats(),
   ]);
 
   const designLineIds = itemRows.filter((item) => !item.artwork).map((item) => item.id);
@@ -157,7 +161,8 @@ export async function loadWorkingOrders(now: Date): Promise<DashboardOrder[]> {
       lines: items.map((item) => ({
         productLabel: labels.get(item.productId) ?? item.productId,
         copies: item.copies,
-        pagesLabel: item.quote.pages.label,
+        // The format frozen at the pay click; the live one for lines paid before it was.
+        pagesLabel: linePagesLabel(item.quote, (item.format ?? formats.get(item.productId) ?? BOOKLET_FORMAT).trim),
         source: item.artwork ? item.artwork.source : "template",
         templateName: item.templateId ? (templateNames.get(item.templateId) ?? item.templateId) : null,
         canvaUrl: item.artwork?.source === "canva" ? item.artwork.canvaUrl : null,

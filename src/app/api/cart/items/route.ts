@@ -11,7 +11,7 @@ const optionalSlug = (value: unknown): string | undefined =>
 
 /**
  * POST /api/cart/items — add one of the caller's designs to the basket.
- * Idempotent per design. quantity and delivery are optional slugs (the
+ * Idempotent per design. quantity, delivery and size are optional slugs (the
  * product page's choices, carried through the editor); pages and paper
  * always come from the design itself.
  *
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { designId, quantity, delivery, acknowledgeDefaults } = (body ?? {}) as Record<
+  const { designId, quantity, delivery, size, acknowledgeDefaults } = (body ?? {}) as Record<
     string,
     unknown
   >;
@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     const cart = await addCartItem(owner, designId, {
       quantity: optionalSlug(quantity),
       delivery: optionalSlug(delivery),
+      size: optionalSlug(size),
       acknowledgeDefaults: acknowledgeDefaults === true,
     });
     return Response.json({ cart }, { status: 201 });

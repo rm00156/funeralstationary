@@ -281,6 +281,12 @@ export interface ProductPricingSeed {
   paper: SeedOption[];
   /** `price` in pounds. */
   delivery: { id: string; label: string; price: number; note: string }[];
+  /**
+   * Print sizes, each the trim's own shape (the press scales the design).
+   * Optional — a product without them prints at its trim. `active: false`
+   * waits in /admin for a price.
+   */
+  sizes?: (SeedOption & { widthMm: number; heightMm: number; active?: boolean })[];
 }
 
 const DELIVERY: ProductPricingSeed["delivery"] = [
@@ -342,26 +348,30 @@ const BOTH_SIDES = (rate: number) => [
 
 /** Every product's pricing tables, keyed by product slug. */
 export const PRICING: Record<string, ProductPricingSeed> = {
+  // The owner's own price list (his previous site's, A5 and A4 at 15 to 500
+  // copies) plus 15%, fitted to this rate x size x quantity-break model —
+  // see migration 0034, which set the same figures on existing databases.
   "order-of-service": {
     quantity: [
       { id: "15", label: "15", value: 15, multiplier: 1 },
-      { id: "25", label: "25", value: 25, multiplier: 0.95 },
-      { id: "50", label: "50", value: 50, multiplier: 0.9 },
-      { id: "75", label: "75", value: 75, multiplier: 0.87 },
-      { id: "100", label: "100", value: 100, multiplier: 0.84 },
-      { id: "150", label: "150", value: 150, multiplier: 0.81 },
-      { id: "200", label: "200", value: 200, multiplier: 0.78 },
-      { id: "250", label: "250", value: 250, multiplier: 0.76 },
-      { id: "300", label: "300", value: 300, multiplier: 0.74 },
+      { id: "30", label: "30", value: 30, multiplier: 0.6466 },
+      { id: "50", label: "50", value: 50, multiplier: 0.4181 },
+      { id: "100", label: "100", value: 100, multiplier: 0.2993 },
+      { id: "150", label: "150", value: 150, multiplier: 0.2455 },
+      { id: "200", label: "200", value: 200, multiplier: 0.2216 },
+      { id: "250", label: "250", value: 250, multiplier: 0.1991 },
+      { id: "300", label: "300", value: 300, multiplier: 0.1946 },
+      { id: "400", label: "400", value: 400, multiplier: 0.1792 },
+      { id: "500", label: "500", value: 500, multiplier: 0.1703 },
     ],
-    // Base per-copy rate (A5, silk).
+    // Base per-copy rate (A5, silk, 15 copies).
     pages: [
-      { id: "4", label: "4 page", pages: 4, rate: 2.2, note: "A single folded sheet" },
-      { id: "8", label: "8 page", pages: 8, rate: 3.0 },
-      { id: "12", label: "12 page", pages: 12, rate: 3.8 },
-      { id: "16", label: "16 page", pages: 16, rate: 4.6 },
-      { id: "20", label: "20 page", pages: 20, rate: 5.4 },
-      { id: "24", label: "24 page", pages: 24, rate: 6.2, note: "Stapled on the spine" },
+      { id: "4", label: "4 page", pages: 4, rate: 2.76, note: "A single folded sheet" },
+      { id: "8", label: "8 page", pages: 8, rate: 4.02 },
+      { id: "12", label: "12 page", pages: 12, rate: 4.76 },
+      { id: "16", label: "16 page", pages: 16, rate: 5.89 },
+      { id: "20", label: "20 page", pages: 20, rate: 7.14 },
+      { id: "24", label: "24 page", pages: 24, rate: 8.2, note: "Stapled on the spine" },
     ],
     paper: [
       {
@@ -390,6 +400,13 @@ export const PRICING: Record<string, ProductPricingSeed> = {
       },
     ],
     delivery: DELIVERY,
+    // A5 is what the designs are drawn at, so it is the default. A4 is fitted
+    // to his A4 list; A6 isn't on it, so it is A5 less 20%.
+    sizes: [
+      { id: "a5", label: "A5", multiplier: 1, widthMm: 148, heightMm: 210 },
+      { id: "a6", label: "A6", multiplier: 0.8, widthMm: 105, heightMm: 148 },
+      { id: "a4", label: "A4", multiplier: 1.4422, widthMm: 210, heightMm: 297 },
+    ],
   },
   "memorial-cards": {
     quantity: CARD_QUANTITIES,
