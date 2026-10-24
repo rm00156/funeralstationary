@@ -511,19 +511,20 @@ function goldenShineCandles(): ClassicDesign {
   };
 }
 
-function doveInTheClouds(art: ArtworkUrls): ClassicDesign {
+function doveInTheClouds(urls: ArtworkUrls): ClassicDesign {
   const blue = "#2c5aa0";
   const navy = "#1b2f55";
   return {
     paper: "#cfe2f5",
-    chrome: () => [ground(art.background("sky-rays", "ink"))],
+    chrome: () => [ground(urls.background("sky-rays", "ink"))],
     cover: () => [
       fixed({ text: "In Loving Memory", fontFamily: "marcellus", fontSize: 15, uppercase: true, letterSpacing: 0.5, color: "#ffffff", x: 15, y: 6.2, w: 70, h: 0 }),
       shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 28.6, y: 12.4, w: 42.8, h: 35.8 }),
       photo({ x: 29.4, y: 13, w: 41.2, h: 34.6 }),
       field({ text: PLACEHOLDER_NAME, fontFamily: "marcellus", fontSize: 19, uppercase: true, color: "#ffffff", x: 8, y: 50.8, w: 84, h: 0 }),
       field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: navy, x: 8, y: 55.6, w: 84, h: 0 }),
-      ornament({ icon: "dove", color: "#ffffff", ...aspectBox(40, 60.6, 20, 64 / 48) }),
+      // The owner's dove (dove.psd, 572 × 682), in place of the drawn ornament.
+      artwork(art("dove.png"), { x: 39.3, y: 59.4, w: 21.4, h: squareH(21.4) / (572 / 682) }),
       fixed({ text: "Service:", fontFamily: "marcellus", fontSize: 12, bold: true, uppercase: true, color: navy, x: 30, y: 78.6, w: 40, h: 0 }),
       field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: navy, x: 20, y: 81, w: 60, h: 0 }),
       fixed({ text: "Venue:", fontFamily: "marcellus", fontSize: 12, bold: true, uppercase: true, color: navy, x: 30, y: 87.6, w: 40, h: 0 }),
@@ -534,12 +535,18 @@ function doveInTheClouds(art: ArtworkUrls): ClassicDesign {
   };
 }
 
-function religiousCrossSunlight(art: ArtworkUrls): ClassicDesign {
+function religiousCrossSunlight(urls: ArtworkUrls): ClassicDesign {
   const white = "#ffffff";
   const navy = "#1b2f55";
   return {
     paper: "#b9d3ee",
-    chrome: () => [ground(art.background("cross-sky", "ink"))],
+    // The owner's cut-out cross (Religious Cross Sunlight PSD, 440 × 844) on
+    // a plain sky: the post a quarter of the way in, the crossbar behind the
+    // portrait, the foot off the bottom edge. cross-sky stays for saved designs.
+    chrome: () => [
+      ground(urls.background("cross-sunlight-sky", "ink")),
+      artwork(art("cross-sunlight.png"), { x: -8.7, y: 16, w: 63.6, h: squareH(63.6) / (440 / 844) }),
+    ],
     cover: () => [
       fixed({ text: "Celebrating The Life Of", fontFamily: "pinyonScript", fontSize: 22, color: white, x: 15, y: 6.2, w: 70, h: 0 }),
       field({ text: PLACEHOLDER_NAME, fontFamily: "marcellus", fontSize: 26, uppercase: true, color: white, x: 6, y: 11.2, w: 88, h: 0 }),
@@ -669,8 +676,11 @@ function bookworm(art: ArtworkUrls): ClassicDesign {
   };
 }
 
-/** A martial-arts silhouette behind the portrait, inside a fine double rule. */
-function martialArts(paper: string, silhouette: string, box: { x: number; y: number; w: number }): ClassicDesign {
+/**
+ * A martial-arts silhouette behind the portrait, inside a fine double rule.
+ * `aspect` is the silhouette's width over height.
+ */
+function martialArts(paper: string, silhouette: string, aspect: number, box: { x: number; y: number; w: number }): ClassicDesign {
   const ink = GREY_INK;
   const rule = "#a9b0bb";
   return {
@@ -680,7 +690,7 @@ function martialArts(paper: string, silhouette: string, box: { x: number; y: num
       frame({ variant: "single", color: rule, x: 5, y: 3.6, w: 90, h: 92.8 }),
     ],
     cover: () => [
-      artwork(art(silhouette), { ...box, h: squareH(box.w) / (226.78 / 253.33) }),
+      artwork(art(silhouette), { ...box, h: squareH(box.w) / aspect }),
       fixed({ text: "Celebrating the life of", fontFamily: "marcellus", fontSize: 12, uppercase: true, color: "#555555", x: 15, y: 7.8, w: 70, h: 0 }),
       field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 21, bold: true, uppercase: true, color: ink, x: 8, y: 11.4, w: 84, h: 0 }),
       field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: ink, x: 8, y: 16.8, w: 84, h: 0 }),
@@ -991,7 +1001,10 @@ const THEMED_DESIGNS = {
   guitar,
   melody,
   bookworm,
-  "karate-grey": () => martialArts("#eef1f6", "karate-silhouette-left.svg", { x: 0, y: 14, w: 78 }),
+  // The owner's silhouettes (karate grey.tif, kickboxer.tif) in the drawn
+  // ones' grey, a little taller; karate-silhouette(-left).svg stay for
+  // saved designs.
+  "karate-grey": () => martialArts("#eef1f6", "karate-grey.png", 934 / 1400, { x: 2, y: 11, w: 66 }),
   fields,
   "mountain-waterfall": mountainWaterfall,
   "red-sunset": redSunset,
@@ -1005,7 +1018,7 @@ const THEMED_DESIGNS = {
   "white-rabbits": whiteRabbits,
   "paw-prints-green": () => petCard("#dcefd8", "#9cc58e"),
   "paw-prints-lilac": () => petCard("#e6def4", "#b3a3d6"),
-  "kickboxer-yellow": () => martialArts("#f3f2e3", "karate-silhouette.svg", { x: 20, y: 14, w: 76 }),
+  "kickboxer-yellow": () => martialArts("#f3f2e3", "kickboxer.png", 1028 / 1400, { x: 22, y: 11, w: 73 }),
 } satisfies Record<string, (art: ArtworkUrls) => ClassicDesign>;
 
 export type ThemedDesignId = keyof typeof THEMED_DESIGNS;
@@ -1143,7 +1156,7 @@ const CURATED_THEMED: Array<
   ["Candlelight", "candlelight", ["religious", "classic"], "portrait-30", []],
   ["Golden Shine Candles", "golden-shine-candles", ["religious", "classic"], "portrait-27", []],
   ["Dove in the Clouds", "dove-in-the-clouds", ["religious", "birds", "calm"], "portrait-29", [["sky-rays", "ink"]]],
-  ["Religious Cross Sunlight", "religious-cross-sunlight", ["religious", "calm"], "portrait-36", [["cross-sky", "ink"]]],
+  ["Religious Cross Sunlight", "religious-cross-sunlight", ["religious", "calm"], "portrait-36", [["cross-sunlight-sky", "ink"]]],
   ["Golden Sunset", "golden-sunset", ["nature", "calm"], "portrait-28", [["lake-sunset-ember", "ember"]]],
   ["Grand Piano", "grand-piano", ["music", "classic"], "portrait-38", [["piano-hands", "noir"]]],
   ["Guitar", "guitar", ["music", "simple"], "portrait-12", []],
