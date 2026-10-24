@@ -438,9 +438,23 @@ function bobMarley(): ClassicDesign {
 /* Photographs and candles                                             */
 /* ------------------------------------------------------------------ */
 
-/** The drawn candles (candles.svg / blue-candles.svg) in a cover's bottom-right corner. */
-const candles = (file: string, x: number, y: number, w: number) =>
-  artwork(art(file), { x, y, w, h: squareH(w) / (90 / 136) });
+/**
+ * Three lit pillar candles in a cover's bottom-right corner: photographs
+ * (AI-generated on black, keyed to transparent so the flames keep a soft
+ * glow), placed as tall as the drawn candles.svg / blue-candles.svg they
+ * replace, which stay for saved designs. `w` is the drawn candles' width.
+ */
+const CANDLE_PHOTOS = {
+  ivory: { file: "candles-photo.png", aspect: 537 / 870 },
+  blue: { file: "blue-candles-photo.png", aspect: 550 / 872 },
+};
+const candles = (colour: keyof typeof CANDLE_PHOTOS, x: number, y: number, w: number) => {
+  const { file, aspect } = CANDLE_PHOTOS[colour];
+  const h = squareH(w) / (90 / 136);
+  const width = (w * aspect) / (90 / 136);
+  // Keep the group's right edge where the drawn one ended.
+  return artwork(art(file), { x: x + w - width, y, w: width, h });
+};
 
 /** A band of colour across the page, bleeding off both edges — Candlelight's years. */
 const yearsBand = (color: string, y: number, text: string) => [
@@ -463,7 +477,7 @@ function blueCandles(): ClassicDesign {
       field({ text: "88 years old", fontFamily: "ebGaramond", fontSize: 11, italic: true, color: "#ffffff", x: 25, y: 65.6, w: 50, h: 0 }),
       ornament({ icon: "latin-cross", color: "#c9a35b", ...aspectBox(46.8, 69.6, 6.4, 20 / 32) }),
       fixed({ text: "Please remember me in your prayers", fontFamily: "ebGaramond", fontSize: 10.5, italic: true, color: "#1d2f55", x: 4, y: 80.2, w: 56, h: 0 }),
-      candles("blue-candles.svg", 57, 62, 38),
+      candles("blue", 57, 62, 38),
     ],
     type: { heading: "marcellus", body: "ebGaramond", script: "pinyonScript", ink: "#1d2f55", muted: "#1d2f55", accent: "#ffffff" },
   };
@@ -486,7 +500,7 @@ function candlelight(): ClassicDesign {
       field({ text: `${VENUE}\n${SERVICE_TIME}`, fontFamily: "ebGaramond", fontSize: 10.5, italic: true, align: "left", color: ink, x: 7, y: 75, w: 50, h: 0 }),
       fixed({ text: "Burial at:", fontFamily: "ebGaramond", fontSize: 10.5, bold: true, align: "left", color: ink, x: 7, y: 84.6, w: 50, h: 0 }),
       field({ text: "Reading Cemetery, Cemetery Junction\n1.00pm", fontFamily: "ebGaramond", fontSize: 10.5, italic: true, align: "left", color: ink, x: 7, y: 87, w: 54, h: 0 }),
-      candles("candles.svg", 63, 63, 35),
+      candles("ivory", 63, 63, 35),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: maroon },
   };
@@ -505,7 +519,7 @@ function goldenShineCandles(): ClassicDesign {
       shape({ shape: "rect", color: brown, fill: brown, strokeWidth: 1, x: 25.8, y: 24.6, w: 48.4, h: 42 }),
       photo({ x: 27, y: 25.5, w: 46, h: 40.2 }),
       field({ text: `${SERVICE_WHEN_LINE}\n${VENUE_SHORT}`, fontFamily: "ebGaramond", fontSize: 12, bold: true, color: ink, x: 5, y: 69.6, w: 70, h: 0 }),
-      candles("candles.svg", 62, 65, 36),
+      candles("ivory", 62, 65, 36),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: brown },
   };
