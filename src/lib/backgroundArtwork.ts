@@ -783,6 +783,21 @@ const MANIFEST: readonly BackgroundSpec[] = [
     palettes: ["ink"],
   },
   {
+    id: "melody-score",
+    name: "Melody Score",
+    source: { kind: "file", path: "assets/backgrounds/sheet-music.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Sheet music, supplied by The Funeral Stationery.",
+    // Crisp black notation, enlarged by the page's cover crop, so knocked
+    // back further than sheet-music: the whole cover's type sits on it.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0.85,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
     id: "piano-keys",
     name: "Piano Keys",
     source: { kind: "commons", file: "File:Lauberger & Gloss keyboard in black and white (Unsplash).jpg" },

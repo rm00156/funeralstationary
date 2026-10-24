@@ -336,6 +336,13 @@
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hand-music-musician-compose_(24218546222).jpg"
   },
   {
+    "id": "melody-score",
+    "name": "Melody Score",
+    "licence": "Supplied by the owner",
+    "credit": "Sheet music, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
     "id": "piano-keys",
     "name": "Piano Keys",
     "licence": "CC0",

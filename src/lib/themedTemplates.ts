@@ -638,7 +638,8 @@ function melody(art: ArtworkUrls): ClassicDesign {
   const ink = GREY_INK;
   return {
     paper: "#ffffff",
-    chrome: () => [ground(art.background("sheet-music", "ink"))],
+    // The owner's photograph; sheet-music stays for saved designs.
+    chrome: () => [ground(art.background("melody-score", "ink"))],
     cover: () => [
       ...musicCover(ink, "double"),
       field({ text: "“Forever in our hearts, and in every song”", fontFamily: "ebGaramond", fontSize: 11, italic: true, color: "#7a1f2e", x: 8, y: 58.6, w: 84, h: 0 }),
@@ -1146,7 +1147,7 @@ const CURATED_THEMED: Array<
   ["Golden Sunset", "golden-sunset", ["nature", "calm"], "portrait-28", [["lake-sunset-ember", "ember"]]],
   ["Grand Piano", "grand-piano", ["music", "classic"], "portrait-38", [["piano-hands", "noir"]]],
   ["Guitar", "guitar", ["music", "simple"], "portrait-12", []],
-  ["Melody", "melody", ["music", "calm"], "portrait-17", [["sheet-music", "ink"]]],
+  ["Melody", "melody", ["music", "calm"], "portrait-17", [["melody-score", "ink"]]],
   ["Bookworm", "bookworm", ["sport", "simple"], "portrait-28", []],
   ["Karate Grey", "karate-grey", ["sport", "modern"], "portrait-12", []],
   ["Kickboxer Yellow", "kickboxer-yellow", ["sport", "modern"], "portrait-15", []],
