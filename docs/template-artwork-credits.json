@@ -392,6 +392,13 @@
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gitarre-Museum_f%C3%BCr_Kunst_und_Gewerbe_Hamburg-1992.32.tif"
   },
   {
+    "id": "owner-guitar",
+    "name": "Guitar",
+    "licence": "Supplied by the owner",
+    "credit": "Classical guitar, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
     "id": "old-books",
     "name": "Old Books",
     "licence": "CC0",

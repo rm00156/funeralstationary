@@ -895,6 +895,13 @@ const MANIFEST: readonly BackgroundSpec[] = [
     "CC0",
     "Gitarre, Museum für Kunst und Gewerbe Hamburg, 1992.32. Via Wikimedia Commons.",
     { tolerance: 30, inset: 0.02, cropBottom: 0, minIsland: 0.002 }),
+  // The owner's photograph of a classical guitar on white, lying on the
+  // diagonal already, so the cover places it without rotation.
+  cutout("owner-guitar", "Guitar",
+    { kind: "file", path: "assets/backgrounds/guitar.jpg" },
+    "Supplied by the owner",
+    "Classical guitar, supplied by The Funeral Stationery.",
+    { tolerance: 40, inset: 0.01, cropBottom: 0, minIsland: 0.002 }),
   cutout("old-books", "Old Books",
     { kind: "commons", file: "File:Old Books 01.JPG" },
     "CC0",

@@ -626,7 +626,9 @@ function guitar(art: ArtworkUrls): ClassicDesign {
       field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 20, y: 61, w: 60, h: 0 }),
       fixed({ text: "Venue:", fontFamily: "marcellus", fontSize: 11.5, uppercase: true, color: ink, x: 30, y: 67.6, w: 40, h: 0 }),
       field({ text: VENUE_TWO_LINES, fontFamily: "ebGaramond", fontSize: 11, color: ink, x: 12, y: 70, w: 76, h: 0 }),
-      { ...artwork(art.spray("museum-guitar"), { x: 38, y: 50, w: 26, h: 70 }), rotation: 100 },
+      // The owner's guitar (cut out at 1510 × 644), below the venue lines;
+      // museum-guitar stays for saved designs.
+      artwork(art.spray("owner-guitar"), { x: 8, y: 75, w: 84, h: squareH(84) / (1510 / 644) }),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#b98a4e" },
   };
