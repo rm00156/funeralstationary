@@ -12,6 +12,7 @@ import {
   PLACEHOLDER_CROP,
   PLACEHOLDER_PORTRAIT_IDS,
   placeholderPortraitKey,
+  SUBJECT_PORTRAIT_IDS,
   portraitIdForSeed,
   portraitRotationFor,
   portraitSetForPage,
@@ -54,6 +55,13 @@ describe("placeholderPortraitKey", () => {
     for (const id of ["portrait-3", ...STUDIO_PORTRAIT_IDS, ...ELDER_PORTRAIT_IDS] as const) {
       expect(placeholderPortraitKey(id)).toBe(`templates/placeholders/${id}.webp`);
     }
+  });
+
+  it("gives the pets their own -v2 files, the whole animal, and leaves the baby alone", () => {
+    for (const id of SUBJECT_PORTRAIT_IDS.filter((id) => id !== "portrait-22")) {
+      expect(placeholderPortraitKey(id)).toBe(`templates/placeholders/${id}-v2.webp`);
+    }
+    expect(placeholderPortraitKey("portrait-22")).toBe("templates/placeholders/portrait-22.webp");
   });
 });
 
