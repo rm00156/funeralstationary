@@ -511,19 +511,20 @@ function goldenShineCandles(): ClassicDesign {
   };
 }
 
-function doveInTheClouds(art: ArtworkUrls): ClassicDesign {
+function doveInTheClouds(urls: ArtworkUrls): ClassicDesign {
   const blue = "#2c5aa0";
   const navy = "#1b2f55";
   return {
     paper: "#cfe2f5",
-    chrome: () => [ground(art.background("sky-rays", "ink"))],
+    chrome: () => [ground(urls.background("sky-rays", "ink"))],
     cover: () => [
       fixed({ text: "In Loving Memory", fontFamily: "marcellus", fontSize: 15, uppercase: true, letterSpacing: 0.5, color: "#ffffff", x: 15, y: 6.2, w: 70, h: 0 }),
       shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 28.6, y: 12.4, w: 42.8, h: 35.8 }),
       photo({ x: 29.4, y: 13, w: 41.2, h: 34.6 }),
       field({ text: PLACEHOLDER_NAME, fontFamily: "marcellus", fontSize: 19, uppercase: true, color: "#ffffff", x: 8, y: 50.8, w: 84, h: 0 }),
       field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: navy, x: 8, y: 55.6, w: 84, h: 0 }),
-      ornament({ icon: "dove", color: "#ffffff", ...aspectBox(40, 60.6, 20, 64 / 48) }),
+      // The owner's dove (dove.psd, 572 × 682), in place of the drawn ornament.
+      artwork(art("dove.png"), { x: 39.3, y: 59.4, w: 21.4, h: squareH(21.4) / (572 / 682) }),
       fixed({ text: "Service:", fontFamily: "marcellus", fontSize: 12, bold: true, uppercase: true, color: navy, x: 30, y: 78.6, w: 40, h: 0 }),
       field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: navy, x: 20, y: 81, w: 60, h: 0 }),
       fixed({ text: "Venue:", fontFamily: "marcellus", fontSize: 12, bold: true, uppercase: true, color: navy, x: 30, y: 87.6, w: 40, h: 0 }),
