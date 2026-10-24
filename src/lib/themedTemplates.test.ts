@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CLIPARTS } from "@/components/PageCanvas";
 import { parseLayoutPages } from "@/lib/adminValidation";
 import { CLASSIC_TEMPLATE_SPECS } from "@/lib/classicTemplates";
-import { TEMPLATE_PAGE_COUNT, type CanvasElement, type TextElement } from "@/lib/designEditor";
+import { TEMPLATE_PAGE_COUNT, type CanvasElement, type DesignPage, type TextElement } from "@/lib/designEditor";
 import { FLAT_TEMPLATE_SPECS } from "@/lib/flatTemplates";
 import {
   ELDER_PORTRAIT_GENDER,
@@ -105,6 +105,16 @@ describe("buildThemedLayout", () => {
   it("moves the farewell clear of the Guyana flag's arrowhead", () => {
     const back = texts(buildThemedLayout("guyana-thanksgiving", urls)[2].elements);
     expect(back[0].y).toBeGreaterThan(60);
+  });
+
+  it("puts the owner's Marley portrait under the cover's borders, and on the cover alone", () => {
+    const [cover, interior, back] = buildThemedLayout("bob-marley", urls);
+    const marley = (page: DesignPage) => page.elements.findIndex((el) => el.type === "image" && el.src === `${ARTWORK_PATH}/bob-marley.png`);
+    const firstBorder = cover.elements.findIndex((el) => el.type === "shape");
+    expect(marley(cover)).toBeGreaterThan(0);
+    expect(marley(cover)).toBeLessThan(firstBorder);
+    expect(marley(interior)).toBe(-1);
+    expect(marley(back)).toBe(-1);
   });
 });
 

@@ -1703,9 +1703,11 @@ const CURATED_ARTWORK: Array<
   // versions keep the flowers in the bottom third, so the cover has room for
   // the full service details and the back page for the gathering afterwards.
   ["Purple Flowers", "band-framed", "crocus-meadow-low", "violet", "cormorant", "flower", ["floral", "nature", "colourful"]],
-  ["Orchid", "band-framed", "white-blossom-low", "bronze", "classic", "flower", ["floral", "calm"]],
-  ["Pink Aura", "band-framed", "pastel-rose-band-low", "rose", "garamond", "heart", ["floral", "calm"]],
-  ["Pink Roses", "band-framed", "pastel-rose-corner-low", "rose", "classic", "flower", ["floral", "colourful"]],
+  // Orchid, Pink Aura and Pink Roses are the owner's own photographs (their
+  // PSDs); the backgrounds they replaced stay for saved designs.
+  ["Orchid", "band-framed", "orchid-low", "bronze", "classic", "flower", ["floral", "calm"]],
+  ["Pink Aura", "band-framed", "pink-aura-low", "rose", "garamond", "heart", ["floral", "calm"]],
+  ["Pink Roses", "band-framed", "pink-rose-low", "rose", "classic", "flower", ["floral", "colourful"]],
   ["Red & White Roses", "band-framed", "red-petal-band-low", "ink", "prata", "heart", ["floral", "classic"]],
   ["Rose Petals", "band-framed", "rose-bush-band-low", "wine", "baskerville", "flower", ["floral", "colourful"]],
   ["White Roses", "band-oval", "white-rose-corner-low", "violet", "playfair", "flower", ["floral", "classic"]],
