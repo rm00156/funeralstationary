@@ -799,6 +799,23 @@ const MANIFEST: readonly BackgroundSpec[] = [
     palettes: ["noir"],
   },
   {
+    id: "piano-hands",
+    name: "Piano Hands",
+    source: { kind: "file", path: "assets/backgrounds/piano.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Hands on a piano keyboard in black and white, supplied by The Funeral Stationery.",
+    // Lower than piano-keys: these keys are bright white all the way up, so
+    // they start below the cover's venue lines rather than under them.
+    placement: { x: 0, y: 74, w: 100, h: 26 },
+    focus: { x: 0.5, y: 1 },
+    inset: 0,
+    fade: { edge: "top", start: 79, end: 74 },
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["noir"],
+  },
+  {
     id: "lake-sunset-ember",
     name: "Lake at Sunset (ember sky)",
     source: { kind: "commons", file: "File:Gander Bay lake sunset. (Unsplash).jpg" },

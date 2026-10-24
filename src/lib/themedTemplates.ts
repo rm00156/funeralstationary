@@ -582,7 +582,8 @@ function grandPiano(art: ArtworkUrls): ClassicDesign {
   return {
     paper: "#000000",
     chrome: () => [
-      ground(art.background("piano-keys", "noir")),
+      // The owner's photograph; piano-keys stays for saved designs.
+      ground(art.background("piano-hands", "noir")),
       frame({ variant: "single", corners: "notched", color: gold, x: 4.6, y: 3, w: 90.8, h: 94 }),
     ],
     cover: () => [
@@ -1141,7 +1142,7 @@ const CURATED_THEMED: Array<
   ["Dove in the Clouds", "dove-in-the-clouds", ["religious", "birds", "calm"], "portrait-29", [["sky-rays", "ink"]]],
   ["Religious Cross Sunlight", "religious-cross-sunlight", ["religious", "calm"], "portrait-36", [["cross-sky", "ink"]]],
   ["Golden Sunset", "golden-sunset", ["nature", "calm"], "portrait-28", [["lake-sunset-ember", "ember"]]],
-  ["Grand Piano", "grand-piano", ["music", "classic"], "portrait-38", [["piano-keys", "noir"]]],
+  ["Grand Piano", "grand-piano", ["music", "classic"], "portrait-38", [["piano-hands", "noir"]]],
   ["Guitar", "guitar", ["music", "simple"], "portrait-12", []],
   ["Melody", "melody", ["music", "calm"], "portrait-17", [["sheet-music", "ink"]]],
   ["Bookworm", "bookworm", ["sport", "simple"], "portrait-28", []],
