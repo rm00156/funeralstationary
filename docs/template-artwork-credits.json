@@ -364,6 +364,20 @@
     "sourceUrl": ""
   },
   {
+    "id": "football-page",
+    "name": "Football",
+    "licence": "Supplied by the owner",
+    "credit": "Football on grass, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "cricket-page",
+    "name": "Cricket",
+    "licence": "Supplied by the owner",
+    "credit": "Cricket ball on grass, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
     "id": "piano-keys",
     "name": "Piano Keys",
     "licence": "CC0",

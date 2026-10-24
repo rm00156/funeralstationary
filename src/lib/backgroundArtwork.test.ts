@@ -89,7 +89,7 @@ describe("BACKGROUND_SPECS", () => {
 
   it("finds every file source in the repo", () => {
     const files = BACKGROUND_SPECS.flatMap((s) => (s.source.kind === "file" ? [s.source.path] : []));
-    expect(files).toEqual(expect.arrayContaining(["assets/backgrounds/orchid.jpg", "assets/backgrounds/pink-aura.jpg", "assets/backgrounds/pink-rose.jpg", "assets/backgrounds/piano.jpg", "assets/backgrounds/guitar.jpg", "assets/backgrounds/sheet-music.jpg", "assets/backgrounds/basketball.png", "assets/backgrounds/golf.jpg", "assets/backgrounds/rugby.jpg"]));
+    expect(files).toEqual(expect.arrayContaining(["assets/backgrounds/orchid.jpg", "assets/backgrounds/pink-aura.jpg", "assets/backgrounds/pink-rose.jpg", "assets/backgrounds/piano.jpg", "assets/backgrounds/guitar.jpg", "assets/backgrounds/sheet-music.jpg", "assets/backgrounds/basketball.png", "assets/backgrounds/golf.jpg", "assets/backgrounds/rugby.jpg", "assets/backgrounds/football.jpg", "assets/backgrounds/cricket.jpg"]));
     for (const file of files) expect(existsSync(path.join(process.cwd(), file)), file).toBe(true);
   });
 

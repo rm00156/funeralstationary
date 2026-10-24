@@ -810,7 +810,8 @@ function cricket(art: ArtworkUrls): ClassicDesign {
   const ink = GREY_INK;
   return {
     paper: "#ffffff",
-    chrome: () => [ground(art.background("grass-band", "ink"))],
+    // The owner's grass and ball; grass-band and cricket-ball.svg stay for saved designs.
+    chrome: () => [ground(art.background("cricket-page", "ink"))],
     cover: () => [
       fixed({ text: "In Loving Memory Of", fontFamily: "pinyonScript", fontSize: 25, color: ink, x: 15, y: 5.6, w: 70, h: 0 }),
       photo({ x: 25, y: 12, w: 50, h: 45 }),
@@ -818,7 +819,6 @@ function cricket(art: ArtworkUrls): ClassicDesign {
       field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 11, bold: true, color: ink, x: 6, y: 62.8, w: 88, h: 0 }),
       field({ text: VENUE, fontFamily: "ebGaramond", fontSize: 10.5, color: ink, x: 20, y: 66.6, w: 60, h: 0 }),
       field({ text: SERVICE_WHEN, fontFamily: "ebGaramond", fontSize: 10.5, color: ink, x: 20, y: 74.2, w: 60, h: 0 }),
-      kit("cricket-ball.svg", 1, 73.6, 82.4, 22),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: red },
   };
@@ -828,13 +828,13 @@ function football(art: ArtworkUrls): ClassicDesign {
   const ink = "#3a3a3a";
   return {
     paper: "#ffffff",
-    chrome: () => [ground(art.background("grass-band", "ink"))],
+    // The owner's grass and ball; grass-band and football.svg stay for saved designs.
+    chrome: () => [ground(art.background("football-page", "ink"))],
     cover: () => [
       fixed({ text: "In Loving Memory of", fontFamily: "pinyonScript", fontSize: 28, color: ink, x: 12, y: 13.6, w: 76, h: 0 }),
       photo({ shape: "oval", border: "single", borderColor: "#c9c9c9", x: 33.8, y: 22, w: 32.4, h: 30 }),
       field({ text: PLACEHOLDER_NAME, fontFamily: "pinyonScript", fontSize: 38, color: ink, x: 6, y: 55, w: 88, h: 0 }),
       field({ text: DATES_LONG, fontFamily: "pinyonScript", fontSize: 22, color: ink, x: 8, y: 62.6, w: 84, h: 0 }),
-      kit("football.svg", 1, 38, 80, 24),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#3f8f2f" },
     backTop: 30,
@@ -1155,8 +1155,8 @@ const CURATED_THEMED: Array<
   ["Mountain Waterfall", "mountain-waterfall", ["nature", "calm"], "portrait-38", [["waterfall-band", "periwinkle"]]],
   ["Red Sunset", "red-sunset", ["nature", "modern"], "portrait-14", [["red-sunset-band", "wine"]]],
   ["Basketball", "basketball", ["sport"], "portrait-15", [["basketball-page", "ink"]]],
-  ["Cricket", "cricket", ["sport"], "portrait-30", [["grass-band", "ink"]]],
-  ["Football", "football", ["sport"], "portrait-17", [["grass-band", "ink"]]],
+  ["Cricket", "cricket", ["sport"], "portrait-30", [["cricket-page", "ink"]]],
+  ["Football", "football", ["sport"], "portrait-17", [["football-page", "ink"]]],
   ["Golf", "golf", ["sport", "calm"], "portrait-36", [["golf-page", "ink"]]],
   ["Rugby", "rugby", ["sport"], "portrait-20", [["rugby-page", "ink"]]],
   ["Rainbow Sky", "rainbow-sky", ["child", "colourful"], "portrait-22"],
