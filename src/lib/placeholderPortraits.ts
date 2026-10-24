@@ -197,13 +197,20 @@ export function isPlaceholderPortraitId(value: unknown): value is PlaceholderPor
  * thumbnail rendered from the old file keeps it. The automatic sets were
  * close-cropped headshots that touched a squarer window's frame; their `-v2`
  * files are the same people outpainted and re-cropped to a looser head and
- * shoulders (portrait-3 already had the room, so it keeps its file). Add to
- * this, never overwrite a key in place.
+ * shoulders (portrait-3 already had the room, so it keeps its file). The
+ * pets' `-v2` files show the whole animal: the first rabbits and the cat were
+ * close-ups cut off by their windows, so three are new CC0 photographs and
+ * the dog is re-cropped from its own. Add to this, never overwrite a key in
+ * place.
  */
 const REFRAMED_PORTRAIT_IDS: ReadonlySet<PlaceholderPortraitId> = new Set([
   "portrait-1",
   "portrait-2",
   ...COLOUR_PORTRAIT_IDS,
+  "portrait-23",
+  "portrait-24",
+  "portrait-25",
+  "portrait-26",
 ]);
 
 export function placeholderPortraitKey(id: PlaceholderPortraitId): string {
