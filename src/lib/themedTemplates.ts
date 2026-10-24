@@ -534,12 +534,18 @@ function doveInTheClouds(art: ArtworkUrls): ClassicDesign {
   };
 }
 
-function religiousCrossSunlight(art: ArtworkUrls): ClassicDesign {
+function religiousCrossSunlight(urls: ArtworkUrls): ClassicDesign {
   const white = "#ffffff";
   const navy = "#1b2f55";
   return {
     paper: "#b9d3ee",
-    chrome: () => [ground(art.background("cross-sky", "ink"))],
+    // The owner's cut-out cross (Religious Cross Sunlight PSD, 440 × 844) on
+    // a plain sky: the post a quarter of the way in, the crossbar behind the
+    // portrait, the foot off the bottom edge. cross-sky stays for saved designs.
+    chrome: () => [
+      ground(urls.background("cross-sunlight-sky", "ink")),
+      artwork(art("cross-sunlight.png"), { x: -8.7, y: 16, w: 63.6, h: squareH(63.6) / (440 / 844) }),
+    ],
     cover: () => [
       fixed({ text: "Celebrating The Life Of", fontFamily: "pinyonScript", fontSize: 22, color: white, x: 15, y: 6.2, w: 70, h: 0 }),
       field({ text: PLACEHOLDER_NAME, fontFamily: "marcellus", fontSize: 26, uppercase: true, color: white, x: 6, y: 11.2, w: 88, h: 0 }),
@@ -1149,7 +1155,7 @@ const CURATED_THEMED: Array<
   ["Candlelight", "candlelight", ["religious", "classic"], "portrait-30", []],
   ["Golden Shine Candles", "golden-shine-candles", ["religious", "classic"], "portrait-27", []],
   ["Dove in the Clouds", "dove-in-the-clouds", ["religious", "birds", "calm"], "portrait-29", [["sky-rays", "ink"]]],
-  ["Religious Cross Sunlight", "religious-cross-sunlight", ["religious", "calm"], "portrait-36", [["cross-sky", "ink"]]],
+  ["Religious Cross Sunlight", "religious-cross-sunlight", ["religious", "calm"], "portrait-36", [["cross-sunlight-sky", "ink"]]],
   ["Golden Sunset", "golden-sunset", ["nature", "calm"], "portrait-28", [["lake-sunset-ember", "ember"]]],
   ["Grand Piano", "grand-piano", ["music", "classic"], "portrait-38", [["piano-hands", "noir"]]],
   ["Guitar", "guitar", ["music", "simple"], "portrait-12", []],

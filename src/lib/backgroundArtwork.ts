@@ -769,6 +769,15 @@ const MANIFEST: readonly BackgroundSpec[] = [
     "Bright blue sky with scenic white cloud patterns, by Trixia Lao. Via Wikimedia Commons.",
     // Softened so the sports covers' small type holds on it.
     { x: 0.5, y: 0.6 }, 0.02, 0.3),
+  // The same sky at full strength, behind the owner's cut-out cross on
+  // Religious Cross Sunlight (cross-sky's cross is part of its photograph).
+  {
+    ...sky("cross-sunlight-sky", "Blue Sky (vivid)", "File:Bright blue sky with scenic white cloud patterns.jpg",
+      "Bright blue sky with scenic white cloud patterns, by Trixia Lao. Via Wikimedia Commons.",
+      { x: 0.5, y: 0.6 }, 0.02),
+    // Cloud runs right across the top, where the cover's script and name are white.
+    shade: { color: "#1b2f55", top: 0.5, bottom: 0 },
+  },
   {
     id: "sheet-music",
     name: "Sheet Music",
