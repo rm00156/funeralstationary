@@ -704,9 +704,6 @@ function martialArts(paper: string, silhouette: string, box: { x: number; y: num
 const kit = (file: string, aspect: number, x: number, y: number, w: number) =>
   artwork(art(file), { x, y, w, h: squareH(w) / aspect });
 
-/** The drawn turf along the foot of a sky — no free photograph has a low enough horizon. */
-const turf = () => artwork(art("turf.svg"), { x: -4, y: 81.6, w: 108, h: squareH(108) / (154 / 40) });
-
 function fields(art: ArtworkUrls): ClassicDesign {
   const navy = "#24408e";
   const ink = "#1f2a44";
@@ -790,17 +787,18 @@ function serviceBlocks(ink: string, top: number, align: "center" | "left" = "cen
   ];
 }
 
-function basketball(): ClassicDesign {
+function basketball(art: ArtworkUrls): ClassicDesign {
   const ink = GREY_INK;
+  const border = () => frame({ variant: "single", corners: "notched", color: "#bdbdbd", x: 3.4, y: 2.4, w: 93.2, h: 95.2 });
   return {
     paper: "#ffffff",
-    chrome: () => [frame({ variant: "single", corners: "notched", color: "#bdbdbd", x: 3.4, y: 2.4, w: 93.2, h: 95.2 })],
+    chrome: () => [border()],
+    // The owner's hoop and ball (basketball-page) on the cover alone, under
+    // the border; basketball-hoop.svg and basketball.svg stay for saved designs.
+    coverChrome: () => [ground(art.background("basketball-page", "ink")), border()],
     cover: () => [
       ...sportHead(fixed({ text: "Celebrating the life of", fontFamily: "marcellus", fontSize: 12, uppercase: true, color: "#555555", x: 15, y: 7.8, w: 70, h: 0 }), ink, 22),
       photo({ border: "single", borderColor: "#333333", x: 29.4, y: 22, w: 39.6, h: 33.2 }),
-      kit("basketball-hoop.svg", 1, 51, 58.4, 56),
-      // After the hoop, so the ball sits in front of the backboard.
-      kit("basketball.svg", 1, 42.4, 58.8, 18),
       ...serviceBlocks(ink, 76.6, "left"),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#e06f1f" },
@@ -847,14 +845,15 @@ function golf(art: ArtworkUrls): ClassicDesign {
   const ink = "#1f2a44";
   return {
     paper: "#cfe2f5",
-    chrome: () => [ground(art.background("sky-clouds", "ink")), turf()],
+    // The owner's sky, grass and tee; sky-clouds, turf.svg and
+    // golf-ball-tee.svg stay for saved designs.
+    chrome: () => [ground(art.background("golf-page", "ink"))],
     cover: () => [
       ...sportHead(fixed({ text: "In Loving Memory of", fontFamily: "pinyonScript", fontSize: 24, color: ink, x: 15, y: 5.8, w: 70, h: 0 }), ink, 20),
       shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 30.8, y: 23.2, w: 36.8, h: 31.6 }),
       photo({ x: 31.6, y: 23.9, w: 35.2, h: 30.2 }),
       kit("golf-flag.svg", 16 / 44, 21, 50, 8),
       ...serviceBlocks(ink, 57.8),
-      kit("golf-ball-tee.svg", 20 / 36, 67, 68, 12),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: "#3f8f2f" },
     interior: plainInterior({ heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#3f8f2f" }),
@@ -865,7 +864,9 @@ function rugby(art: ArtworkUrls): ClassicDesign {
   const ink = "#1f2a44";
   return {
     paper: "#cfe2f5",
-    chrome: () => [ground(art.background("sky-clouds", "ink")), turf()],
+    // The owner's sky, grass and ball; sky-clouds, turf.svg and
+    // rugby-ball.svg stay for saved designs.
+    chrome: () => [ground(art.background("rugby-page", "ink"))],
     cover: () => [
       ...sportHead(fixed({ text: "Celebrating the life of", fontFamily: "marcellus", fontSize: 12, uppercase: true, color: ink, x: 15, y: 7.4, w: 70, h: 0 }), ink),
       shape({ shape: "rect", color: "#ffffff", fill: "#ffffff", strokeWidth: 1, x: 30, y: 21.4, w: 39.2, h: 34.2 }),
@@ -873,7 +874,6 @@ function rugby(art: ArtworkUrls): ClassicDesign {
       ...serviceBlocks(ink, 58.2),
       fixed({ text: "Officiating Minister:", fontFamily: "marcellus", fontSize: 11, uppercase: true, color: ink, x: 15, y: 77.6, w: 70, h: 0 }),
       field({ text: "Reverend Jane Smith", fontFamily: "ebGaramond", fontSize: 10.5, bold: true, italic: true, color: ink, x: 20, y: 80, w: 60, h: 0 }),
-      kit("rugby-ball.svg", 60 / 38, 66, 79.6, 34),
     ],
     type: { heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: ink, accent: "#3f8f2f" },
     interior: plainInterior({ heading: "ebGaramond", body: "ebGaramond", script: "pinyonScript", ink, muted: GREY_MUTED, accent: "#3f8f2f" }),
@@ -1154,11 +1154,11 @@ const CURATED_THEMED: Array<
   ["Fields", "fields", ["nature", "calm"], "portrait-20", [["meadow-wash", "ink"]]],
   ["Mountain Waterfall", "mountain-waterfall", ["nature", "calm"], "portrait-38", [["waterfall-band", "periwinkle"]]],
   ["Red Sunset", "red-sunset", ["nature", "modern"], "portrait-14", [["red-sunset-band", "wine"]]],
-  ["Basketball", "basketball", ["sport"], "portrait-15", []],
+  ["Basketball", "basketball", ["sport"], "portrait-15", [["basketball-page", "ink"]]],
   ["Cricket", "cricket", ["sport"], "portrait-30", [["grass-band", "ink"]]],
   ["Football", "football", ["sport"], "portrait-17", [["grass-band", "ink"]]],
-  ["Golf", "golf", ["sport", "calm"], "portrait-36", [["sky-clouds", "ink"]]],
-  ["Rugby", "rugby", ["sport"], "portrait-20", [["sky-clouds", "ink"]]],
+  ["Golf", "golf", ["sport", "calm"], "portrait-36", [["golf-page", "ink"]]],
+  ["Rugby", "rugby", ["sport"], "portrait-20", [["rugby-page", "ink"]]],
   ["Rainbow Sky", "rainbow-sky", ["child", "colourful"], "portrait-22"],
   ["Rabbit Blue", "rabbit-blue", ["pets"], "portrait-23"],
   ["White Rabbits", "white-rabbits", ["pets"], "portrait-24"],

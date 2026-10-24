@@ -343,6 +343,27 @@
     "sourceUrl": ""
   },
   {
+    "id": "basketball-page",
+    "name": "Basketball",
+    "licence": "Supplied by the owner",
+    "credit": "Basketball and hoop, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "golf-page",
+    "name": "Golf",
+    "licence": "Supplied by the owner",
+    "credit": "Golf ball on a tee under a summer sky, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "rugby-page",
+    "name": "Rugby",
+    "licence": "Supplied by the owner",
+    "credit": "Ball on grass under a summer sky, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
     "id": "piano-keys",
     "name": "Piano Keys",
     "licence": "CC0",

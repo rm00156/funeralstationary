@@ -32,7 +32,8 @@ export type BackgroundSourceRef =
   | { kind: "url"; url: string }
   /**
    * The owner's own photograph, committed under assets/backgrounds/ (a path
-   * from the repo root) as an sRGB JPEG — there is nowhere to fetch it from.
+   * from the repo root) as an sRGB JPEG, or a PNG where it has transparency —
+   * there is nowhere to fetch it from.
    */
   | { kind: "file"; path: string }
   /**
@@ -793,6 +794,49 @@ const MANIFEST: readonly BackgroundSpec[] = [
     focus: { x: 0.5, y: 0.5 },
     inset: 0,
     wash: 0.85,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "basketball-page",
+    name: "Basketball",
+    source: { kind: "file", path: "assets/backgrounds/basketball.png" },
+    licence: "Supplied by the owner",
+    credit: "Basketball and hoop, supplied by The Funeral Stationery.",
+    // The owner's whole cover artwork (page-shaped, ~200dpi); transparent
+    // above the hoop, which the paper fills.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "golf-page",
+    name: "Golf",
+    source: { kind: "file", path: "assets/backgrounds/golf.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Golf ball on a tee under a summer sky, supplied by The Funeral Stationery.",
+    // The owner's whole cover artwork (page-shaped, ~200dpi): sky, grass and tee.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "rugby-page",
+    name: "Rugby",
+    source: { kind: "file", path: "assets/backgrounds/rugby.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Ball on grass under a summer sky, supplied by The Funeral Stationery.",
+    // The owner's whole cover artwork (page-shaped, ~200dpi): sky, grass and ball.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0,
     tint: 0,
     textZone: "top",
     palettes: ["ink"],
