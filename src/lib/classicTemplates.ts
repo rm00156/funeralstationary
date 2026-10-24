@@ -134,6 +134,11 @@ export interface ClassicDesign {
    */
   interior?: { type: PageType; chrome: () => CanvasElement[] };
   /**
+   * The cover's own chrome, in place of `chrome` there — for artwork that
+   * belongs between the ground and the border on the cover alone.
+   */
+  coverChrome?: () => CanvasElement[];
+  /**
    * Where the back page's farewell starts (percent of page height), for a
    * ground whose middle isn't clear — a flag's arrowhead. Default 37.
    */
@@ -438,7 +443,7 @@ export function buildDesignPages(design: ClassicDesign): DesignPage[] {
   const type: PageType = { paper: design.paper, ...design.type };
   const interior = design.interior ?? { type, chrome: design.chrome };
   const pages: DesignPage[] = [
-    { id: uid("page"), background: design.paper, elements: [...design.chrome(), ...design.cover()] },
+    { id: uid("page"), background: design.paper, elements: [...(design.coverChrome ?? design.chrome)(), ...design.cover()] },
     { id: uid("page"), background: interior.type.paper, elements: interiorPage(interior.type, interior.chrome()) },
     { id: uid("page"), background: design.paper, elements: backPage(type, design.chrome(), design.backTop) },
   ];

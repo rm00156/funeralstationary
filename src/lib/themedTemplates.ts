@@ -401,12 +401,23 @@ function bobMarley(): ClassicDesign {
   const red = "#d0202a";
   const green = "#2f9a3a";
   const ink = "#2b2b2b";
+  const borders = () => [
+    shape({ shape: "rect", color: red, strokeWidth: 3, x: 3.2, y: 2.4, w: 93.6, h: 95.2 }),
+    shape({ shape: "rect", color: green, strokeWidth: 3, x: 5.4, y: 3.9, w: 89.2, h: 92.2 }),
+  ];
   return {
     paper: "#f6ec5a",
-    chrome: () => [
+    chrome: () => [ground(art("yellow-shine.svg")), ...borders()],
+    // The owner's ghosted portrait (bob marley.psd, 884 × 1224), placed as
+    // their own cover has it: faint behind the service details, bottom right,
+    // the rest hanging off the page — which also takes the PSD's hard right
+    // and bottom edges off the sheet. Between the ground and the borders, and
+    // on the cover only, so the running order and back page stay plain. The
+    // PNG is the PSD knocked back toward the yellow (30%) at 75% of its alpha.
+    coverChrome: () => [
       ground(art("yellow-shine.svg")),
-      shape({ shape: "rect", color: red, strokeWidth: 3, x: 3.2, y: 2.4, w: 93.6, h: 95.2 }),
-      shape({ shape: "rect", color: green, strokeWidth: 3, x: 5.4, y: 3.9, w: 89.2, h: 92.2 }),
+      artwork(art("bob-marley.png"), { x: 32, y: 51, w: 95, h: squareH(95) / (884 / 1224) }),
+      ...borders(),
     ],
     cover: () => [
       fixed({ text: "A Celebration of the life of", fontFamily: "pinyonScript", fontSize: 24, color: ink, x: 12, y: 8.6, w: 76, h: 0 }),
