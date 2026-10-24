@@ -669,8 +669,11 @@ function bookworm(art: ArtworkUrls): ClassicDesign {
   };
 }
 
-/** A martial-arts silhouette behind the portrait, inside a fine double rule. */
-function martialArts(paper: string, silhouette: string, box: { x: number; y: number; w: number }): ClassicDesign {
+/**
+ * A martial-arts silhouette behind the portrait, inside a fine double rule.
+ * `aspect` is the silhouette's width over height.
+ */
+function martialArts(paper: string, silhouette: string, aspect: number, box: { x: number; y: number; w: number }): ClassicDesign {
   const ink = GREY_INK;
   const rule = "#a9b0bb";
   return {
@@ -680,7 +683,7 @@ function martialArts(paper: string, silhouette: string, box: { x: number; y: num
       frame({ variant: "single", color: rule, x: 5, y: 3.6, w: 90, h: 92.8 }),
     ],
     cover: () => [
-      artwork(art(silhouette), { ...box, h: squareH(box.w) / (226.78 / 253.33) }),
+      artwork(art(silhouette), { ...box, h: squareH(box.w) / aspect }),
       fixed({ text: "Celebrating the life of", fontFamily: "marcellus", fontSize: 12, uppercase: true, color: "#555555", x: 15, y: 7.8, w: 70, h: 0 }),
       field({ text: PLACEHOLDER_NAME, fontFamily: "ebGaramond", fontSize: 21, bold: true, uppercase: true, color: ink, x: 8, y: 11.4, w: 84, h: 0 }),
       field({ text: SUNRISE_SUNSET, fontFamily: "ebGaramond", fontSize: 10.5, bold: true, color: ink, x: 8, y: 16.8, w: 84, h: 0 }),
@@ -991,7 +994,10 @@ const THEMED_DESIGNS = {
   guitar,
   melody,
   bookworm,
-  "karate-grey": () => martialArts("#eef1f6", "karate-silhouette-left.svg", { x: 0, y: 14, w: 78 }),
+  // The owner's silhouettes (karate grey.tif, kickboxer.tif) in the drawn
+  // ones' grey, a little taller; karate-silhouette(-left).svg stay for
+  // saved designs.
+  "karate-grey": () => martialArts("#eef1f6", "karate-grey.png", 934 / 1400, { x: 2, y: 11, w: 66 }),
   fields,
   "mountain-waterfall": mountainWaterfall,
   "red-sunset": redSunset,
@@ -1005,7 +1011,7 @@ const THEMED_DESIGNS = {
   "white-rabbits": whiteRabbits,
   "paw-prints-green": () => petCard("#dcefd8", "#9cc58e"),
   "paw-prints-lilac": () => petCard("#e6def4", "#b3a3d6"),
-  "kickboxer-yellow": () => martialArts("#f3f2e3", "karate-silhouette.svg", { x: 20, y: 14, w: 76 }),
+  "kickboxer-yellow": () => martialArts("#f3f2e3", "kickboxer.png", 1028 / 1400, { x: 22, y: 11, w: 73 }),
 } satisfies Record<string, (art: ArtworkUrls) => ClassicDesign>;
 
 export type ThemedDesignId = keyof typeof THEMED_DESIGNS;
