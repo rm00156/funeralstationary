@@ -336,11 +336,60 @@
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hand-music-musician-compose_(24218546222).jpg"
   },
   {
+    "id": "melody-score",
+    "name": "Melody Score",
+    "licence": "Supplied by the owner",
+    "credit": "Sheet music, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "basketball-page",
+    "name": "Basketball",
+    "licence": "Supplied by the owner",
+    "credit": "Basketball and hoop, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "golf-page",
+    "name": "Golf",
+    "licence": "Supplied by the owner",
+    "credit": "Golf ball on a tee under a summer sky, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "rugby-page",
+    "name": "Rugby",
+    "licence": "Supplied by the owner",
+    "credit": "Ball on grass under a summer sky, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "football-page",
+    "name": "Football",
+    "licence": "Supplied by the owner",
+    "credit": "Football on grass, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
+    "id": "cricket-page",
+    "name": "Cricket",
+    "licence": "Supplied by the owner",
+    "credit": "Cricket ball on grass, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
+  },
+  {
     "id": "piano-keys",
     "name": "Piano Keys",
     "licence": "CC0",
     "credit": "Lauberger & Gloss keyboard in black and white, via Unsplash. Via Wikimedia Commons.",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lauberger_%26_Gloss_keyboard_in_black_and_white_(Unsplash).jpg"
+  },
+  {
+    "id": "piano-hands",
+    "name": "Piano Hands",
+    "licence": "Supplied by the owner",
+    "credit": "Hands on a piano keyboard in black and white, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
   },
   {
     "id": "lake-sunset-ember",
@@ -383,6 +432,13 @@
     "licence": "CC0",
     "credit": "Gitarre, Museum für Kunst und Gewerbe Hamburg, 1992.32. Via Wikimedia Commons.",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Gitarre-Museum_f%C3%BCr_Kunst_und_Gewerbe_Hamburg-1992.32.tif"
+  },
+  {
+    "id": "owner-guitar",
+    "name": "Guitar",
+    "licence": "Supplied by the owner",
+    "credit": "Classical guitar, supplied by The Funeral Stationery.",
+    "sourceUrl": ""
   },
   {
     "id": "old-books",

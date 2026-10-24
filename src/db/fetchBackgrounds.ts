@@ -221,7 +221,10 @@ async function process_(spec: BackgroundSpec, renderer: BackgroundRenderer) {
     spec.source.kind === "satin"
       ? await renderer.renderSatin(spec.source)
       : spec.source.kind === "file"
-        ? { bytes: await readFile(path.join(process.cwd(), spec.source.path)), contentType: "image/jpeg" }
+        ? {
+            bytes: await readFile(path.join(process.cwd(), spec.source.path)),
+            contentType: spec.source.path.endsWith(".png") ? "image/png" : "image/jpeg",
+          }
         : await download(spec, source);
 
   // Cutout spray, if this plate supports one. Not per palette — see

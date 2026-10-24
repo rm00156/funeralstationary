@@ -32,7 +32,8 @@ export type BackgroundSourceRef =
   | { kind: "url"; url: string }
   /**
    * The owner's own photograph, committed under assets/backgrounds/ (a path
-   * from the repo root) as an sRGB JPEG — there is nowhere to fetch it from.
+   * from the repo root) as an sRGB JPEG, or a PNG where it has transparency —
+   * there is nowhere to fetch it from.
    */
   | { kind: "file"; path: string }
   /**
@@ -783,6 +784,92 @@ const MANIFEST: readonly BackgroundSpec[] = [
     palettes: ["ink"],
   },
   {
+    id: "melody-score",
+    name: "Melody Score",
+    source: { kind: "file", path: "assets/backgrounds/sheet-music.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Sheet music, supplied by The Funeral Stationery.",
+    // Crisp black notation, enlarged by the page's cover crop, so knocked
+    // back further than sheet-music: the whole cover's type sits on it.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0.85,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "basketball-page",
+    name: "Basketball",
+    source: { kind: "file", path: "assets/backgrounds/basketball.png" },
+    licence: "Supplied by the owner",
+    credit: "Basketball and hoop, supplied by The Funeral Stationery.",
+    // The owner's whole cover artwork (page-shaped, ~200dpi); transparent
+    // above the hoop, which the paper fills.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "golf-page",
+    name: "Golf",
+    source: { kind: "file", path: "assets/backgrounds/golf.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Golf ball on a tee under a summer sky, supplied by The Funeral Stationery.",
+    // The owner's whole cover artwork (page-shaped, ~200dpi): sky, grass and tee.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "rugby-page",
+    name: "Rugby",
+    source: { kind: "file", path: "assets/backgrounds/rugby.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Ball on grass under a summer sky, supplied by The Funeral Stationery.",
+    // The owner's whole cover artwork (page-shaped, ~200dpi): sky, grass and ball.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "football-page",
+    name: "Football",
+    source: { kind: "file", path: "assets/backgrounds/football.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Football on grass, supplied by The Funeral Stationery.",
+    // The owner's whole cover artwork (page-shaped, ~200dpi): white, grass and ball.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
+    id: "cricket-page",
+    name: "Cricket",
+    source: { kind: "file", path: "assets/backgrounds/cricket.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Cricket ball on grass, supplied by The Funeral Stationery.",
+    // The owner's whole cover artwork (page-shaped, ~200dpi): white, grass and ball.
+    focus: { x: 0.5, y: 0.5 },
+    inset: 0,
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["ink"],
+  },
+  {
     id: "piano-keys",
     name: "Piano Keys",
     source: { kind: "commons", file: "File:Lauberger & Gloss keyboard in black and white (Unsplash).jpg" },
@@ -793,6 +880,23 @@ const MANIFEST: readonly BackgroundSpec[] = [
     focus: { x: 0.5, y: 0.8 },
     inset: 0,
     fade: { edge: "top", start: 73, end: 66 },
+    wash: 0,
+    tint: 0,
+    textZone: "top",
+    palettes: ["noir"],
+  },
+  {
+    id: "piano-hands",
+    name: "Piano Hands",
+    source: { kind: "file", path: "assets/backgrounds/piano.jpg" },
+    licence: "Supplied by the owner",
+    credit: "Hands on a piano keyboard in black and white, supplied by The Funeral Stationery.",
+    // Lower than piano-keys: these keys are bright white all the way up, so
+    // they start below the cover's venue lines rather than under them.
+    placement: { x: 0, y: 74, w: 100, h: 26 },
+    focus: { x: 0.5, y: 1 },
+    inset: 0,
+    fade: { edge: "top", start: 79, end: 74 },
     wash: 0,
     tint: 0,
     textZone: "top",
@@ -878,6 +982,13 @@ const MANIFEST: readonly BackgroundSpec[] = [
     "CC0",
     "Gitarre, Museum für Kunst und Gewerbe Hamburg, 1992.32. Via Wikimedia Commons.",
     { tolerance: 30, inset: 0.02, cropBottom: 0, minIsland: 0.002 }),
+  // The owner's photograph of a classical guitar on white, lying on the
+  // diagonal already, so the cover places it without rotation.
+  cutout("owner-guitar", "Guitar",
+    { kind: "file", path: "assets/backgrounds/guitar.jpg" },
+    "Supplied by the owner",
+    "Classical guitar, supplied by The Funeral Stationery.",
+    { tolerance: 40, inset: 0.01, cropBottom: 0, minIsland: 0.002 }),
   cutout("old-books", "Old Books",
     { kind: "commons", file: "File:Old Books 01.JPG" },
     "CC0",
